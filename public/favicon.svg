@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="7" fill="#181425"/>
+  <!-- 落日 -->
+  <circle cx="23" cy="9" r="4" fill="#E4A672"/>
+  <!-- 沙丘 -->
+  <path d="M0 25 Q8 20 16 24 Q24 28 32 23 V32 H0 Z" fill="#B86F50"/>
+  <path d="M0 28 Q9 25 17 28 Q25 31 32 28 V32 H0 Z" fill="#EAD4AA"/>
+  <!-- 候鸟 -->
+  <path d="M4 17 Q10 9 16 16 Q22 9 28 17" stroke="#EAD4AA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
