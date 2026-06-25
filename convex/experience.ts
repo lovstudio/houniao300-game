@@ -38,6 +38,30 @@ function parseJson(content: string): DirectorStep {
   }
 }
 
+// 候鸟300 是真实发生在海边的艺术节现场——故事必须锚定到评委与观众脚下这片沙地。
+const FESTIVAL_SITE =
+  '候鸟300 是真实发生在海边沙滩上的艺术节现场：连绵的帐篷营区、一级与二级城墙、戏剧大本营、时间广场、被海风与潮声包围的沙地、夜里的篝火与灯串。';
+
+// 命名结局原型：导演据用户累积选择倾向收束到其一，结局名写进勋章，给"我是 X 型"的身份感。
+// 这样"再玩一次（全新结局）"才名副其实。
+const ENDING_ARCHETYPES = [
+  '沙城常住候鸟｜选择留下，把这片海当成家',
+  '带着遗憾离开｜错过了什么，却在转身时释怀',
+  '这场戏的主角｜从旁观者变成被众人看见的人',
+  '偷沙的旅人｜只带走一粒沙，藏起一个私密的纪念',
+  '把名字写进风里｜燃烧过、参与过，然后轻轻消失',
+];
+
+function validateStep(step: DirectorStep, willFinal: boolean): string | null {
+  if (!step.imagePrompt?.trim() || !step.narration?.trim()) return '缺少 imagePrompt 或 narration';
+  if (willFinal) {
+    if (!step.badgeTitle?.trim() || !step.badgeSummary?.trim()) return '收尾格缺少 badgeTitle/badgeSummary';
+  } else if (!step.question?.trim() || !step.options || step.options.length < 2) {
+    return '非收尾格缺少 question 或 options';
+  }
+  return null;
+}
+
 async function director(
   event: Doc<'events'>,
   history: { narration: string; question?: string; answer?: string }[],
@@ -50,8 +74,9 @@ async function director(
   },
 ): Promise<DirectorStep> {
   const isFirst = opts.stepIndex === 0;
+  const venue = event.hostName || '候鸟沙城';
   const system = [
-    '你是一个沉浸式 AIGC 互动连环画的"导演"。你为用户即时编织一条独一无二的视觉叙事线。',
+    '你是一个沉浸式 AIGC 互动连环画的"导演"。你为真实身处海边艺术节现场的用户即时编织一条独一无二的视觉叙事线。',
     '每一步你产出：一张图片的提示词、一段中文旁白、以及（除非收尾）一个面向用户的问题和若干选项。',
     '严格只输出一个 JSON 对象，不要 markdown、不要多余文字。字段：',
     '  imagePrompt: string  // 英文，详尽的文生图提示词，必须融入活动风格并与前几格保持视觉连贯',
@@ -60,14 +85,29 @@ async function director(
     '  options: string[]    // 3-4 个中文选项（收尾格省略）',
     '  allowCustom: boolean // 是否允许用户自定义输入（收尾格省略）',
     '  final: boolean       // 是否为收尾格',
-    '  badgeTitle: string   // 仅收尾格：为这段独特经历命名一枚勋章（4-8 字）',
-    '  badgeSummary: string // 仅收尾格：一句话总结用户这趟体验',
+    '  badgeTitle: string   // 仅收尾格：命中的命名结局（取原型名，4-10 字，给"我是X型"身份感）',
+    '  badgeSummary: string // 仅收尾格：一句可当签名档的题词（≤20 字，诗性/反差/留白，禁止套话）',
     ...(isFirst
       ? [
           '  protagonist: string  // 英文，一句话锁定主角外形（性别气质/服饰/配色/材质特征），后续每格都将复用同一主角，请具体且稳定',
         ]
       : []),
     `视觉风格固定为：${event.style}`,
+    // —— 锚定真实现场 ——
+    FESTIVAL_SITE,
+    `本次活动真实场地：「${venue}」。故事必须发生在这片真实沙地与该场地上，让线上叙事与用户脚下的现场同构。`,
+    isFirst
+      ? `开篇旁白必须点名真实场景（如「${venue}」、海边沙地、帐篷营区、城墙、篝火等），让用户一眼认出自己就在那里。`
+      : '继续把场景锚定在该活动场地与海边艺术节现场，不要漂到架空世界。',
+    // —— 题词金句化 ——
+    '每一段 narration 里都要埋一句 ≤14 字、能独立成立的金句（诗性、反差或留白），让用户想截图引用。',
+    '金句要自然融进旁白行文，不要用 markdown 加粗、星号、引号或任何符号包裹（前端按纯文本展示）。',
+    '严禁任何套话与兜底废话（如"独一无二的旅程""完成了一段体验"）；宁可写得锋利具体，也不要平庸。',
+    // —— 命名结局 ——
+    '本故事将收束到以下命名结局原型之一（格式：结局名｜一句注解）：',
+    ...ENDING_ARCHETYPES.map((e) => `  - ${e}`),
+    '每个用户选项都隐含一种倾向；请根据"历史"里用户的累积选择，自然地把剧情导向最契合的那个结局。',
+    '收尾时：badgeTitle 取命中结局的"结局名"（｜前那部分），badgeSummary 是为这位用户量身的金句题词。',
     // 跨格视觉一致性：每格都带上首格锁定的主角描述，且 imagePrompt 必须复刻同一主角与色板。
     ...(opts.protagonistDesc
       ? [
@@ -80,7 +120,7 @@ async function director(
   ].join('\n');
 
   const user = JSON.stringify({
-    活动: { 标题: event.title, 主题: event.theme, 背景: event.background },
+    活动: { 标题: event.title, 主题: event.theme, 场地: venue, 背景: event.background },
     历史: history,
     当前第几格: opts.stepIndex,
     最多格数: opts.maxPanels,
@@ -88,8 +128,10 @@ async function director(
   });
 
   // 叙事质量是体验的核心，默认用高质量模型（可用 DIRECTOR_MODEL 覆盖）。
-  // 模型偶发输出非法 JSON 会让整格生成失败、前端白屏，故最多重试 3 次；
-  // 重试时降温以换取更确定的 JSON 结构。
+  // 模型偶发输出非法 JSON、或缺字段/平庸收尾，都会重试（不输出兜底默认值）；
+  // 重试时降温以换取更确定的结构。
+  // 注意：minPanels 只是"最早可收尾"，不是"必须收尾"——是否收尾以 forceFinal 或模型
+  // 自己给出的 final=true 为准，否则就是普通推进格（要 question/options，不要 badge）。
   let lastErr: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     const { content } = await chatCompletion({
@@ -102,12 +144,19 @@ async function director(
       max_tokens: 1000,
     });
     try {
-      return parseJson(content as string);
+      const step = parseJson(content as string);
+      // willFinal 必须与下游 answerPanel 的 isFinal 判定完全一致：
+      // 模型的 final=true 只有在已达 minPanels 时才算数，否则按普通推进格校验（要 question/options）。
+      // 否则会出现"被当作收尾校验（只验 badge）、却被插成非收尾格（缺 question/options）"的死格。
+      const willFinal = opts.forceFinal || (step.final === true && opts.stepIndex >= opts.minPanels - 1);
+      const err = validateStep(step, willFinal);
+      if (err) throw new Error(err);
+      return step;
     } catch (err) {
       lastErr = err;
     }
   }
-  throw new Error(`导演输出无法解析为 JSON（已重试）：${lastErr}`);
+  throw new Error(`导演输出不合格（已重试）：${lastErr}`);
 }
 
 // ============================================================
@@ -332,6 +381,26 @@ export const saveReflection = mutation({
 // ============================================================
 // 公开 action：核心交互闭环
 // ============================================================
+// 生图容错：优先用首格图做 image edit；若失败（如偶发内容审核 400）退回纯 t2i；
+// 再失败则该格暂无图——绝不让单格生图失败阻断整条剧情/收尾。返回 storageId 或 null。
+async function genImageSafe(ctx: ActionCtx, prompt: string, reference?: Blob): Promise<string | null> {
+  let blob: Blob | null = null;
+  try {
+    blob = await generateImage(prompt, reference);
+  } catch (e1) {
+    if (reference) {
+      try {
+        blob = await generateImage(prompt); // 退回纯 t2i（prompt 已含主角描述，仍尽量一致）
+      } catch (e2) {
+        console.error('文生图(edit+t2i)均失败', e2);
+      }
+    } else {
+      console.error('文生图失败', e1);
+    }
+  }
+  return blob ? await ctx.storage.store(blob) : null;
+}
+
 // 生成首格（导演 + 文生图），供两个入口复用。
 async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'>, event: Doc<'events'>) {
   const step = await director(event, [], {
@@ -350,14 +419,15 @@ async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'
     allowCustom: step.allowCustom ?? true,
     isFinal: false,
   });
-  const blob = await generateImage(step.imagePrompt);
-  const storageId = await ctx.storage.store(blob);
-  await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+  const storageId = await genImageSafe(ctx, step.imagePrompt);
+  if (storageId) {
+    await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+  }
   // 锁定主角 + 首格图，供后续每格做 image edit 参考，保持跨格视觉一致。
   await ctx.runMutation(internal.experience.setExperienceLock, {
     experienceId,
     protagonistDesc: step.protagonist,
-    firstPanelStorageId: storageId,
+    firstPanelStorageId: storageId ?? undefined,
   });
 }
 
@@ -439,19 +509,22 @@ export const answerPanel = action({
       allowCustom: isFinal ? false : step.allowCustom ?? true,
       isFinal,
     });
-    // 用首格图作参考做 image edit，锁定主角 + 色板 + 沙雕材质（仅改场景/动作）。
+    // 用首格图作参考做 image edit，锁定主角 + 色板 + 沙雕材质（仅改场景/动作）；
+    // 生图失败优雅降级，不阻断剧情/收尾。
     const reference = state.experience.firstPanelStorageId
       ? (await ctx.storage.get(state.experience.firstPanelStorageId)) ?? undefined
       : undefined;
-    const blob = await generateImage(step.imagePrompt, reference);
-    const storageId = await ctx.storage.store(blob);
-    await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+    const storageId = await genImageSafe(ctx, step.imagePrompt, reference);
+    if (storageId) {
+      await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+    }
 
     if (isFinal) {
+      // 不做平庸兜底：命名结局 + 金句题词由 director 保证（validateStep），缺则上游已重试。
       await ctx.runMutation(internal.experience.awardBadge, {
         experienceId,
-        title: step.badgeTitle ?? `${event.title}·体验者`,
-        summary: step.badgeSummary ?? '完成了一段独一无二的旅程。',
+        title: step.badgeTitle!,
+        summary: step.badgeSummary!,
       });
     }
   },
