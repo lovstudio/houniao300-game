@@ -366,6 +366,53 @@ export const activityBadges = query({
   },
 });
 
+// 公测实时结局墙：最近完成的体验（跨所有活动），用于投屏大屏直播。
+// 每条 = 结局名(title) + 题词(summary/reflection) + 收尾画面图 + 活动名 + 玩家 + 时间。
+// 另带总场次与命名结局分布，制造现场社交张力。useQuery 订阅，新结局自动上墙。
+export const wallFeed = query({
+  handler: async (ctx) => {
+    const badges = await ctx.db.query('badges').order('desc').take(60);
+    const items = await Promise.all(
+      badges.map(async (b) => {
+        const event = await ctx.db.get(b.eventId);
+        const profile = await ctx.db
+          .query('profiles')
+          .withIndex('userId', (q) => q.eq('userId', b.userId))
+          .first();
+        // 该体验的收尾格（结局画面）；没有则退回首格。
+        const panels = await ctx.db
+          .query('panels')
+          .withIndex('experienceId', (q) => q.eq('experienceId', b.experienceId))
+          .collect();
+        panels.sort((a, c) => c.index - a.index);
+        const ending = panels.find((p) => p.isFinal && p.imageStorageId) ?? panels.find((p) => p.imageStorageId);
+        return {
+          _id: b._id,
+          title: b.title,
+          summary: b.summary,
+          reflection: b.reflection ?? null,
+          userName: b.userName,
+          awardedAt: b.awardedAt,
+          eventTitle: event?.title ?? '',
+          avatarPreset: profile?.avatarPreset ?? null,
+          avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
+          imageUrl: ending?.imageStorageId ? await ctx.storage.getUrl(ending.imageStorageId) : null,
+        };
+      }),
+    );
+
+    // 全量完成场次 + 命名结局分布（按 badgeTitle 聚合）。
+    const allBadges = await ctx.db.query('badges').collect();
+    const distMap = new Map<string, number>();
+    for (const b of allBadges) distMap.set(b.title, (distMap.get(b.title) ?? 0) + 1);
+    const distribution = [...distMap.entries()]
+      .map(([title, count]) => ({ title, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return { items, total: allBadges.length, distribution };
+  },
+});
+
 // 末幕留下感言/题词，写到该体验的勋章上。
 export const saveReflection = mutation({
   args: { experienceId: v.id('experiences'), text: v.string() },

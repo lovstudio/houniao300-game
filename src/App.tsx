@@ -1,6 +1,7 @@
 import Game, { type ControlMode } from './components/Game.tsx';
 import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
+import EndingsWall from './components/EndingsWall.tsx';
 import Onboarding from './components/Onboarding.tsx';
 import { setActivityEnterHandler, activityFromSchedule, type ActivityDescriptor } from './lib/activityEnter.ts';
 import { SCHEDULE } from '../data/schedule.ts';
@@ -24,6 +25,12 @@ export default function Home() {
   const [cameraFollow, setCameraFollow] = useState(true);
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
+
+  // 公测实时结局墙：?wall=1 进入，跳过身份门，纯公共投屏大屏视图。
+  const isWall = useMemo(
+    () => new URLSearchParams(window.location.search).get('wall') === '1',
+    [],
+  );
 
   // 全局玩家身份：未完成 onboarding 前，强制停在录入页。
   const userId = useMemo(getAnonUserId, []);
@@ -78,6 +85,11 @@ export default function Home() {
       }
       return nextFollow;
     });
+
+  // 公测实时结局墙：公共大屏，不经身份门，直接渲染。
+  if (isWall) {
+    return <EndingsWall />;
+  }
 
   // 身份门：加载中显示占位，未录入则强制 onboarding。
   if (profile === undefined) {
