@@ -63,14 +63,25 @@ function blockSourceRect(x: number, y: number, w: number, h: number) {
 }
 
 const seaPolygon: SourcePoint[] = [
-  [0, 185],
-  [85, 220],
-  [185, 335],
-  [290, 540],
-  [405, 780],
-  [535, 1075],
-  [650, 1279],
+  [0, 176],
+  [268, 450],
+  [508, 690],
+  [690, 875],
+  [951, 1050],
+  [1245, 1230],
+  [1340, 1279],
   [0, 1279],
+];
+
+const pondPolygon: SourcePoint[] = [
+  [860, 888],
+  [960, 884],
+  [1038, 918],
+  [1050, 978],
+  [1008, 1032],
+  [912, 1050],
+  [838, 1020],
+  [820, 948],
 ];
 
 const forestPolygon: SourcePoint[] = [
@@ -169,6 +180,7 @@ const sandWallPolygons: SourcePoint[][] = [
 ];
 
 blockSourcePolygon(seaPolygon);
+blockSourcePolygon(pondPolygon);
 blockSourcePolygon(forestPolygon);
 blockSourcePolygon(hotelGreenPolygon);
 
@@ -180,16 +192,16 @@ blockSourceRect(485, 112, 105, 66); // 伏园
 blockSourceRect(182, 270, 140, 74); // 婚姻登记处
 blockSourceRect(214, 392, 140, 76); // 候鸟电影院
 blockSourceRect(398, 366, 160, 92); // 候鸟工作坊
-blockSourceRect(780, 300, 175, 118); // 候鸟黑客松
+blockSourceRect(702, 298, 192, 156); // 候鸟黑客松
 blockSourceRect(812, 430, 136, 76); // 时间广场
 blockSourceRect(1125, 480, 145, 92); // 候鸟交易所
 blockSourcePolygon([
-  [952, 560],
-  [1115, 555],
-  [1160, 620],
-  [1118, 705],
-  [970, 700],
-  [910, 635],
+  [955, 548],
+  [1075, 556],
+  [1118, 624],
+  [1070, 698],
+  [958, 700],
+  [908, 628],
 ]); // 鸟其林
 blockSourceRect(910, 710, 150, 70); // 候鸟俱乐部
 blockSourceRect(640, 620, 210, 112); // 候鸟沙城剧场
@@ -199,6 +211,13 @@ blockSourceRect(1448, 780, 230, 120); // 二级城墙
 
 for (const wall of sandWallPolygons) {
   blockSourcePolygon(wall);
+}
+
+// East-side glamping pods (kept in sync with podField() in PixiStaticMap).
+for (let r = 0; r < 6; r++) {
+  for (let c = 0; c < 6; c++) {
+    blockSourceRect(1448 + c * 44 + r * 4 - 12, 726 + r * 80 + c * 6 - 9, 24, 18);
+  }
 }
 
 export const bgtiles = [emptyLayer()];

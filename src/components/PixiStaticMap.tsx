@@ -90,6 +90,41 @@ function drawTent(
   container.addChild(tent);
 }
 
+function drawPod(
+  container: PIXI.Container,
+  project: ReturnType<typeof createProjector>,
+  x: number,
+  y: number,
+  r = 13,
+) {
+  const shadow = new PIXI.Graphics();
+  shadow.beginFill(0x5a432c, 0.22);
+  shadow.drawEllipse(
+    project.x(x + 3),
+    project.y(y + 4),
+    r * 1.05 * project.scale,
+    r * 0.7 * project.scale,
+  );
+  shadow.endFill();
+  container.addChild(shadow);
+
+  const pod = new PIXI.Graphics();
+  pod.lineStyle(1.2 * project.scale, 0xcfc4b2, 0.9);
+  pod.beginFill(0xf6f3ec);
+  pod.drawEllipse(project.x(x), project.y(y), r * project.scale, r * 0.78 * project.scale);
+  pod.endFill();
+  // ridge highlight to suggest a rounded canvas dome
+  pod.lineStyle(1 * project.scale, 0xffffff, 0.5);
+  pod.moveTo(project.x(x - r * 0.6), project.y(y - r * 0.1));
+  pod.quadraticCurveTo(
+    project.x(x),
+    project.y(y - r * 0.55),
+    project.x(x + r * 0.6),
+    project.y(y - r * 0.1),
+  );
+  container.addChild(pod);
+}
+
 function drawSandWall(
   container: PIXI.Container,
   project: ReturnType<typeof createProjector>,
@@ -158,30 +193,58 @@ function addLabel(
   container.addChild(wrapper);
 }
 
-const seaPolygon: SourcePoint[] = [
-  [0, 185],
-  [85, 220],
-  [185, 335],
-  [290, 540],
-  [405, 780],
-  [535, 1075],
-  [650, 1279],
-  [0, 1279],
+// Shoreline taken from the user's hand-drawn marks on the aerial photo: a steep upper
+// segment, a bend at the tidal pond, then a flatter lower segment exiting the bottom
+// edge at ~4/5 width. The lower segment runs through the pond so sea and pond connect.
+const coastline: SourcePoint[] = [
+  [0, 176],
+  [268, 450],
+  [508, 690],
+  [690, 875],
+  [951, 1050],
+  [1245, 1230],
+  [1340, 1279],
 ];
 
-const wetSandPolygon: SourcePoint[] = [
-  [75, 214],
-  [170, 335],
-  [285, 560],
-  [398, 820],
-  [520, 1100],
-  [600, 1279],
-  [695, 1279],
-  [570, 1040],
-  [452, 770],
-  [338, 535],
-  [220, 330],
-  [112, 220],
+const seaPolygon: SourcePoint[] = [...coastline, [0, 1279]];
+
+// Offset the shoreline perpendicularly into the sea (down-left) by `d` source-pixels.
+function offsetCoast(d: number): SourcePoint[] {
+  return coastline.map(([x, y], i) => {
+    const prev = coastline[Math.max(0, i - 1)];
+    const next = coastline[Math.min(coastline.length - 1, i + 1)];
+    const tx = next[0] - prev[0];
+    const ty = next[1] - prev[1];
+    const len = Math.hypot(tx, ty) || 1;
+    // right-hand normal (-ty, tx) points toward the sea (negative x / positive y)
+    return [x + (-ty / len) * d, y + (tx / len) * d] as SourcePoint;
+  });
+}
+
+function drawFoamLine(
+  graphics: PIXI.Graphics,
+  project: ReturnType<typeof createProjector>,
+  pts: SourcePoint[],
+  width: number,
+  color: number,
+  alpha: number,
+) {
+  graphics.lineStyle(width * project.scale, color, alpha);
+  graphics.moveTo(...project.point(pts[0]));
+  for (const p of pts.slice(1)) {
+    graphics.lineTo(...project.point(p));
+  }
+}
+
+const pondPolygon: SourcePoint[] = [
+  [860, 888],
+  [960, 884],
+  [1038, 918],
+  [1050, 978],
+  [1008, 1032],
+  [912, 1050],
+  [838, 1020],
+  [820, 948],
 ];
 
 const forestPolygon: SourcePoint[] = [
@@ -279,6 +342,17 @@ const sandWallPolygons: SourcePoint[][] = [
   ],
 ];
 
+// Deterministic layout of the east-side glamping pods (shared with sandCity collision).
+function podField(): SourcePoint[] {
+  const pods: SourcePoint[] = [];
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      pods.push([1448 + c * 44 + r * 4, 726 + r * 80 + c * 6]);
+    }
+  }
+  return pods;
+}
+
 function drawRoad(
   graphics: PIXI.Graphics,
   project: ReturnType<typeof createProjector>,
@@ -295,7 +369,11 @@ function drawRoad(
   }
 }
 
-function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldHeight: number) {
+export function drawSandCityModel(
+  container: PIXI.Container,
+  worldWidth: number,
+  worldHeight: number,
+) {
   const project = createProjector(worldWidth, worldHeight);
   const terrain = new PIXI.Graphics();
 
@@ -307,8 +385,23 @@ function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldH
   drawPolygon(terrain, project, seaPolygon);
   terrain.endFill();
 
-  terrain.beginFill(0xc6ad86, 0.55);
-  drawPolygon(terrain, project, wetSandPolygon);
+  // Shallow-water tint hugging the shoreline.
+  terrain.beginFill(0x6f968c, 0.6);
+  drawPolygon(terrain, project, [...coastline, ...offsetCoast(120).reverse()]);
+  terrain.endFill();
+
+  // Muddy tidal pond in the centre of the site.
+  terrain.lineStyle(3 * project.scale, 0x8a7448, 0.6);
+  terrain.beginFill(0x6f5c3b);
+  drawPolygon(terrain, project, pondPolygon);
+  terrain.endFill();
+  terrain.lineStyle(0);
+  terrain.beginFill(0x83703f, 0.4);
+  drawPolygon(
+    terrain,
+    project,
+    pondPolygon.map(([x, y]) => [934 + (x - 934) * 0.6, 966 + (y - 966) * 0.6]),
+  );
   terrain.endFill();
 
   terrain.beginFill(0x4f7a47);
@@ -346,34 +439,10 @@ function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldH
     [1350, 1279],
   ]);
 
-  terrain.lineStyle(8 * project.scale, 0xf7f3e8, 0.85);
-  terrain.moveTo(...project.point([85, 215]));
-  terrain.bezierCurveTo(
-    project.x(190),
-    project.y(330),
-    project.x(285),
-    project.y(555),
-    project.x(405),
-    project.y(790),
-  );
-  terrain.bezierCurveTo(
-    project.x(470),
-    project.y(930),
-    project.x(545),
-    project.y(1120),
-    project.x(628),
-    project.y(1279),
-  );
-  terrain.lineStyle(3 * project.scale, 0xffffff, 0.45);
-  terrain.moveTo(...project.point([118, 238]));
-  terrain.bezierCurveTo(
-    project.x(232),
-    project.y(362),
-    project.x(320),
-    project.y(570),
-    project.x(430),
-    project.y(810),
-  );
+  // White foam breaking along the shoreline (a few offset wavy lines inside the sea).
+  drawFoamLine(terrain, project, offsetCoast(8), 7, 0xfbf8f0, 0.9);
+  drawFoamLine(terrain, project, offsetCoast(34), 4, 0xffffff, 0.6);
+  drawFoamLine(terrain, project, offsetCoast(64), 3, 0xffffff, 0.4);
 
   container.addChild(terrain);
 
@@ -418,7 +487,7 @@ function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldH
   drawBuilding(container, project, 176, 276, 135, 68, 0xf4eee2);
   drawBuilding(container, project, 214, 400, 140, 72, 0xf1e7da);
   drawBuilding(container, project, 406, 374, 154, 88, 0xf0dbb6);
-  drawBuilding(container, project, 782, 308, 176, 112, 0xf2eadc);
+  drawBuilding(container, project, 702, 298, 192, 156, 0xf2eadc);
   drawBuilding(container, project, 1118, 482, 154, 94, 0xf3eadb);
   drawBuilding(container, project, 1288, 612, 255, 114, 0xe8ddc8);
   drawBuilding(container, project, 1182, 858, 180, 128, 0xf1eee7);
@@ -427,12 +496,12 @@ function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldH
   special.lineStyle(3 * project.scale, 0xb99d74, 0.95);
   special.beginFill(0xf5efe4);
   drawPolygon(special, project, [
-    [952, 560],
-    [1115, 555],
-    [1160, 620],
-    [1118, 705],
-    [970, 700],
-    [910, 635],
+    [955, 548],
+    [1075, 556],
+    [1118, 624],
+    [1070, 698],
+    [958, 700],
+    [908, 628],
   ]);
   special.endFill();
   container.addChild(special);
@@ -444,18 +513,16 @@ function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldH
     drawSandWall(container, project, wall);
   }
 
-  for (let i = 0; i < 8; i++) {
-    drawTent(container, project, 1500 + (i % 4) * 48, 930 + Math.floor(i / 4) * 72, 42, 58);
-  }
-  for (let i = 0; i < 6; i++) {
-    drawTent(container, project, 1430 + i * 44, 720 + (i % 2) * 28, 38, 44);
+  // Glamping pod field on the east side; rows follow the diagonal coastline.
+  for (const [px, py] of podField()) {
+    drawPod(container, project, px, py);
   }
 
   const plazas = new PIXI.Graphics();
   plazas.lineStyle(3 * project.scale, 0xf4e7c8, 0.75);
   plazas.beginFill(0xd9c39b, 0.42);
-  plazas.drawEllipse(project.x(835), project.y(432), 85 * project.scale, 36 * project.scale);
-  plazas.drawEllipse(project.x(760), project.y(652), 112 * project.scale, 42 * project.scale);
+  plazas.drawEllipse(project.x(800), project.y(498), 96 * project.scale, 40 * project.scale);
+  plazas.drawEllipse(project.x(745), project.y(665), 112 * project.scale, 42 * project.scale);
   plazas.endFill();
   container.addChild(plazas);
 
@@ -466,8 +533,8 @@ function drawSandCityModel(container: PIXI.Container, worldWidth: number, worldH
   addLabel(container, project, '婚姻登记处', 180, 282);
   addLabel(container, project, '候鸟电影院', 212, 405);
   addLabel(container, project, '候鸟工作坊', 398, 380);
-  addLabel(container, project, '候鸟黑客松', 816, 332);
-  addLabel(container, project, '时间广场', 792, 412);
+  addLabel(container, project, '候鸟黑客松', 706, 312);
+  addLabel(container, project, '时间广场', 762, 470);
   addLabel(container, project, '候鸟交易所', 1120, 494);
   addLabel(container, project, '鸟其林', 990, 590);
   addLabel(container, project, '候鸟俱乐部', 925, 718);
