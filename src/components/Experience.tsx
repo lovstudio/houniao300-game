@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useAction, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
-import { ActivityDescriptor } from '../lib/activityEnter';
+import { ActivityDescriptor, activityFromSchedule, enterActivity } from '../lib/activityEnter';
 import { getAnonUserId } from '../lib/identity';
 import { Avatar } from '../lib/avatars';
+import { SCHEDULE } from '../../data/schedule';
+import ComicPoster from './ComicPoster';
 import clsx from 'clsx';
 
 // 进入某个活动的专属游戏。游戏隶属于该活动且独立。
@@ -35,6 +37,7 @@ export default function Experience({
   return (
     <ComicPlayer
       experienceId={experienceId}
+      activity={activity}
       onExit={onExit}
       onReplay={() => setExperienceId(null)}
     />
@@ -127,10 +130,12 @@ function ActivityIntro({
 // ---------- 连环画播放器 ----------
 function ComicPlayer({
   experienceId,
+  activity,
   onExit,
   onReplay,
 }: {
   experienceId: Id<'experiences'>;
+  activity: ActivityDescriptor;
   onExit: () => void;
   onReplay: () => void;
 }) {
@@ -192,30 +197,14 @@ function ComicPlayer({
 
         {/* 完成 -> 勋章 + 收尾交互 */}
         {experience.status === 'completed' && badge && (
-          <div className="mx-auto mt-6 flex max-w-2xl flex-col items-center gap-3 border-2 border-clay-500 bg-brown-800 p-6 text-center">
-            <Medallion title={badge.title} large />
-            <p className="font-display text-2xl text-brown-100">{badge.title}</p>
-            <p className="text-brown-200">{badge.summary}</p>
-            <p className="mt-2 text-sm text-brown-400">
-              这是只属于你的一条连环画——点击{' '}
-              <span className="lg:hidden">下方</span>
-              <span className="hidden lg:inline">右侧</span>任意一幕都能回看。
-            </p>
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={onReplay}
-                className="rounded bg-clay-700 px-5 py-2.5 font-display text-white hover:bg-clay-500"
-              >
-                再玩一次（全新结局）
-              </button>
-              <button
-                onClick={onExit}
-                className="rounded border-2 border-brown-700 px-5 py-2.5 font-display text-brown-100 hover:border-clay-500"
-              >
-                返回小镇
-              </button>
-            </div>
-          </div>
+          <EndScreen
+            experienceId={experienceId}
+            activity={activity}
+            badge={badge}
+            panels={panels}
+            onReplay={onReplay}
+            onExit={onExit}
+          />
         )}
 
         {/* 交互区 */}
@@ -293,6 +282,177 @@ function ComicPlayer({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------- 末幕收尾：勋章 + 题词 + 长图 + 别人的结局 + 推荐 ----------
+function EndScreen({
+  experienceId,
+  activity,
+  badge,
+  panels,
+  onReplay,
+  onExit,
+}: {
+  experienceId: Id<'experiences'>;
+  activity: ActivityDescriptor;
+  badge: { title: string; summary: string; reflection?: string; userName: string };
+  panels: { _id: string; imageUrl: string | null; narration: string }[];
+  onReplay: () => void;
+  onExit: () => void;
+}) {
+  const saveReflection = useMutation(api.experience.saveReflection);
+  const others = useQuery(api.experience.activityBadges, { activityKey: activity.activityKey });
+  const [reflection, setReflection] = useState(badge.reflection ?? '');
+  const [saved, setSaved] = useState(false);
+  const [showPoster, setShowPoster] = useState(false);
+  const [showOthers, setShowOthers] = useState(false);
+
+  // 推荐下一个活动：先同场地，再同分类，去重去自身，最多 3 个。
+  const recs = useMemo(() => {
+    const seen = new Set<string>([activity.title]);
+    const out: (typeof SCHEDULE)[number][] = [];
+    const pick = (pred: (s: (typeof SCHEDULE)[number]) => boolean) => {
+      for (const s of SCHEDULE) {
+        if (out.length >= 3) break;
+        if (seen.has(s.title) || !pred(s)) continue;
+        seen.add(s.title);
+        out.push(s);
+      }
+    };
+    pick((s) => s.venue === activity.hostName);
+    pick((s) => s.cat === activity.category);
+    return out;
+  }, [activity]);
+
+  const onSaveReflection = async () => {
+    await saveReflection({ experienceId, text: reflection.trim() });
+    setSaved(true);
+  };
+
+  return (
+    <div className="mx-auto mt-6 w-full max-w-2xl space-y-4">
+      {/* 勋章 */}
+      <div className="flex flex-col items-center gap-3 border-2 border-clay-500 bg-brown-800 p-6 text-center">
+        <Medallion title={badge.title} large />
+        <p className="font-display text-2xl text-brown-100">{badge.title}</p>
+        <p className="text-brown-200">{badge.summary}</p>
+        <p className="text-sm text-brown-400">
+          点击<span className="lg:hidden">下方</span>
+          <span className="hidden lg:inline">右侧</span>任意一幕可回看你的连环画。
+        </p>
+      </div>
+
+      {/* 题词 */}
+      <div className="border-2 border-brown-700 bg-brown-800 p-4">
+        <p className="mb-2 font-display text-brown-100">留下一句题词</p>
+        <textarea
+          className="w-full resize-none rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-500"
+          rows={2}
+          maxLength={60}
+          placeholder="为这段旅程写一句话，会留在勋章墙上…"
+          value={reflection}
+          onChange={(e) => {
+            setReflection(e.target.value);
+            setSaved(false);
+          }}
+        />
+        <button
+          onClick={() => void onSaveReflection()}
+          disabled={!reflection.trim()}
+          className="mt-2 rounded bg-clay-700 px-4 py-1.5 text-sm font-bold text-white hover:bg-clay-500 disabled:opacity-50"
+        >
+          {saved ? '已保存' : '保存题词'}
+        </button>
+      </div>
+
+      {/* 主行动 */}
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => setShowPoster(true)}
+          className="rounded bg-clay-700 px-4 py-2.5 font-display text-white hover:bg-clay-500"
+        >
+          生成连环画长图
+        </button>
+        <button
+          onClick={() => setShowOthers((v) => !v)}
+          className="rounded border-2 border-brown-700 px-4 py-2.5 font-display text-brown-100 hover:border-clay-500"
+        >
+          看别人的结局{others ? `（${others.length}）` : ''}
+        </button>
+        <button
+          onClick={onReplay}
+          className="rounded border-2 border-brown-700 px-4 py-2.5 font-display text-brown-100 hover:border-clay-500"
+        >
+          再玩一次（全新结局）
+        </button>
+        <button
+          onClick={onExit}
+          className="rounded border-2 border-brown-700 px-4 py-2.5 font-display text-brown-100 hover:border-clay-500"
+        >
+          返回小镇
+        </button>
+      </div>
+
+      {/* 别人的结局 */}
+      {showOthers && others && (
+        <div className="space-y-2">
+          {others.length === 0 && (
+            <p className="text-sm text-brown-400">还没有别人完成这个活动，你是第一个。</p>
+          )}
+          {others.map((b) => (
+            <div key={b._id} className="flex gap-3 border-2 border-brown-700 bg-brown-800 p-3">
+              {b.endingImageUrl && (
+                <img src={b.endingImageUrl} alt="" className="h-16 w-16 shrink-0 rounded object-cover" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <Avatar url={b.avatarUrl} preset={b.avatarPreset} size="sm" />
+                  <span className="truncate text-sm text-brown-200">{b.userName}</span>
+                  <span className="shrink-0 font-display text-sm text-clay-100">· {b.title}</span>
+                </div>
+                {b.reflection && (
+                  <p className="mt-1 truncate text-xs italic text-brown-300">「{b.reflection}」</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 推荐下一个活动 */}
+      {recs.length > 0 && (
+        <div className="border-2 border-brown-700 bg-brown-800 p-4">
+          <p className="mb-2 font-display text-brown-100">接着探索</p>
+          <div className="space-y-2">
+            {recs.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => enterActivity(activityFromSchedule(s))}
+                className="block w-full rounded border border-brown-700 px-3 py-2 text-left text-sm text-brown-100 hover:border-clay-500"
+              >
+                <span className="text-brown-300">
+                  {s.cat} · {s.venue}
+                </span>
+                <br />
+                {s.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showPoster && (
+        <ComicPoster
+          title={activity.title}
+          userName={badge.userName}
+          badgeTitle={badge.title}
+          badgeSummary={badge.summary}
+          panels={panels.map((p) => ({ imageUrl: p.imageUrl, narration: p.narration }))}
+          onClose={() => setShowPoster(false)}
+        />
+      )}
     </div>
   );
 }

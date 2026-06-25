@@ -9,6 +9,7 @@ export type ActivityDescriptor = {
   style: string;
   background: string;
   hostName?: string;
+  category?: string; // 节目单分类，用于"推荐下一个活动"
   minPanels: number;
   maxPanels: number;
 };
@@ -45,6 +46,7 @@ export function activityFromSchedule(item: {
     style: SAND_STYLE,
     background: item.desc,
     hostName: item.venue,
+    category: item.cat,
     minPanels: 5,
     maxPanels: 8,
   };

@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { query, action, internalMutation, internalQuery, ActionCtx } from './_generated/server';
+import { query, mutation, action, internalMutation, internalQuery, ActionCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { chatCompletion } from './util/llm';
@@ -248,13 +248,33 @@ export const activityBadges = query({
           .query('profiles')
           .withIndex('userId', (q) => q.eq('userId', b.userId))
           .first();
+        // 该体验的收尾格（别人的结局画面）
+        const panels = await ctx.db
+          .query('panels')
+          .withIndex('experienceId', (q) => q.eq('experienceId', b.experienceId))
+          .collect();
+        const ending = panels.sort((a, c) => c.index - a.index).find((p) => p.isFinal) ?? panels[0];
         return {
           ...b,
           avatarPreset: profile?.avatarPreset,
           avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
+          endingImageUrl: ending?.imageStorageId ? await ctx.storage.getUrl(ending.imageStorageId) : null,
+          endingNarration: ending?.narration ?? '',
         };
       }),
     );
+  },
+});
+
+// 末幕留下感言/题词，写到该体验的勋章上。
+export const saveReflection = mutation({
+  args: { experienceId: v.id('experiences'), text: v.string() },
+  handler: async (ctx, { experienceId, text }) => {
+    const badge = await ctx.db
+      .query('badges')
+      .withIndex('experienceId', (q) => q.eq('experienceId', experienceId))
+      .first();
+    if (badge) await ctx.db.patch(badge._id, { reflection: text });
   },
 });
 
@@ -294,6 +314,7 @@ export const startActivityExperience = action({
       style: v.string(),
       background: v.string(),
       hostName: v.optional(v.string()),
+      category: v.optional(v.string()), // 前端用于推荐，后端不持久化
       minPanels: v.number(),
       maxPanels: v.number(),
     }),
@@ -301,7 +322,16 @@ export const startActivityExperience = action({
     userName: v.string(),
   },
   handler: async (ctx, { activity, userId, userName }): Promise<Id<'experiences'>> => {
-    const eventId = await ctx.runMutation(internal.experience.getOrCreateEvent, activity);
+    const eventId = await ctx.runMutation(internal.experience.getOrCreateEvent, {
+      activityKey: activity.activityKey,
+      title: activity.title,
+      theme: activity.theme,
+      style: activity.style,
+      background: activity.background,
+      hostName: activity.hostName,
+      minPanels: activity.minPanels,
+      maxPanels: activity.maxPanels,
+    });
     const event = await ctx.runQuery(internal.experience.getEvent, { eventId });
     if (!event) throw new Error('event 创建失败');
     const experienceId = await ctx.runMutation(internal.experience.createExperience, {

@@ -147,7 +147,11 @@ export default function Home() {
       {/* 活动专属体验：作为覆盖层叠在小镇之上，关闭即回到小镇（小镇状态不丢） */}
       {activeActivity && (
         <div className="fixed inset-0 z-[60] bg-brown-900">
-          <Experience activity={activeActivity} onExit={() => setActiveActivity(null)} />
+          <Experience
+            key={activeActivity.activityKey}
+            activity={activeActivity}
+            onExit={() => setActiveActivity(null)}
+          />
         </div>
       )}
     </main>

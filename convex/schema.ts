@@ -70,10 +70,12 @@ export default defineSchema({
     userName: v.string(),
     title: v.string(),
     summary: v.string(),
+    reflection: v.optional(v.string()), // 用户末幕留下的感言/题词
     awardedAt: v.number(),
   })
     .index('eventId', ['eventId'])
-    .index('userId', ['userId']),
+    .index('userId', ['userId'])
+    .index('experienceId', ['experienceId']),
 
   messages: defineTable({
     conversationId,
