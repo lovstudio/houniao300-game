@@ -11,6 +11,58 @@ export default defineSchema({
     type: v.union(v.literal('background'), v.literal('player')),
   }),
 
+  // ---- AIGC 连环画体验模块（独立于 AI Town 引擎）----
+  // 一个活动（由主理人创建），自带主题/风格/背景知识。
+  events: defineTable({
+    title: v.string(),
+    theme: v.string(),
+    style: v.string(), // 视觉风格描述，注入文生图提示词
+    background: v.string(), // 活动背景 / 知识库摘要
+    hostName: v.optional(v.string()),
+    minPanels: v.number(),
+    maxPanels: v.number(),
+    active: v.boolean(),
+  }),
+
+  // 一次体验 = 一个用户走完一个活动的一条 AIGC 叙事线。
+  experiences: defineTable({
+    eventId: v.id('events'),
+    userId: v.string(), // 匿名 id（前端 localStorage），鉴权接入后可替换
+    userName: v.string(),
+    status: v.union(v.literal('active'), v.literal('completed')),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index('eventId', ['eventId'])
+    .index('userId', ['userId']),
+
+  // 连环画里的一格：图片 + 旁白 +（可选）问题/选项 + 用户回答。
+  panels: defineTable({
+    experienceId: v.id('experiences'),
+    index: v.number(),
+    imagePrompt: v.string(),
+    imageStorageId: v.optional(v.string()), // 图片异步生成后回填
+    narration: v.string(),
+    question: v.optional(v.string()),
+    options: v.array(v.string()),
+    allowCustom: v.boolean(),
+    answer: v.optional(v.string()),
+    isFinal: v.boolean(),
+  }).index('experienceId', ['experienceId', 'index']),
+
+  // 完成活动后获得的勋章，所有人可见（勋章墙）。
+  badges: defineTable({
+    eventId: v.id('events'),
+    experienceId: v.id('experiences'),
+    userId: v.string(),
+    userName: v.string(),
+    title: v.string(),
+    summary: v.string(),
+    awardedAt: v.number(),
+  })
+    .index('eventId', ['eventId'])
+    .index('userId', ['userId']),
+
   messages: defineTable({
     conversationId,
     messageUuid: v.string(),

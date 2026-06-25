@@ -1,5 +1,6 @@
 import Game, { type ControlMode } from './components/Game.tsx';
 import Timeline from './components/Timeline.tsx';
+import Experience from './components/Experience.tsx';
 
 import { ToastContainer } from 'react-toastify';
 // import { UserButton } from '@clerk/clerk-react';
@@ -15,6 +16,7 @@ export default function Home() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('player');
   const [cameraFollow, setCameraFollow] = useState(true);
+  const [screen, setScreen] = useState<'town' | 'experience'>('town');
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -102,17 +104,30 @@ export default function Home() {
         onHelp={() => setHelpModalOpen(true)}
       />
 
+      <div className="absolute top-2 right-2 z-20">
+        <button
+          className="bg-clay-700 px-3 py-1.5 font-display text-sm text-white shadow-solid"
+          onClick={() => setScreen((s) => (s === 'town' ? 'experience' : 'town'))}
+        >
+          {screen === 'town' ? '进入活动体验' : '返回小镇'}
+        </button>
+      </div>
+
       <div className="relative isolate min-h-0 flex-1 overflow-hidden shadow-2xl">
-        <Game
-          controlMode={controlMode}
-          cameraFollow={cameraFollow}
-          onToggleControlMode={toggleControlMode}
-          onToggleCameraFollow={toggleCameraFollow}
-          onSetCameraFollow={setCameraFollow}
-        />
+        {screen === 'town' ? (
+          <Game
+            controlMode={controlMode}
+            cameraFollow={cameraFollow}
+            onToggleControlMode={toggleControlMode}
+            onToggleCameraFollow={toggleCameraFollow}
+            onSetCameraFollow={setCameraFollow}
+          />
+        ) : (
+          <Experience />
+        )}
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </div>
-      <Timeline />
+      {screen === 'town' && <Timeline />}
     </main>
   );
 }
