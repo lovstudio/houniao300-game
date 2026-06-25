@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
 import { Descriptions } from '../data/characters';
-import * as map from '../data/gentle';
+import * as map from '../data/sandCity';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
@@ -38,6 +38,33 @@ const init = mutation({
   },
 });
 export default init;
+
+export const syncMap = mutation({
+  handler: async (ctx) => {
+    const { worldStatus } = await getOrCreateDefaultWorld(ctx);
+    const worldMap = {
+      worldId: worldStatus.worldId,
+      width: map.mapwidth,
+      height: map.mapheight,
+      tileSetUrl: map.tilesetpath,
+      tileSetDimX: map.tilesetpxw,
+      tileSetDimY: map.tilesetpxh,
+      tileDim: map.tiledim,
+      bgTiles: map.bgtiles,
+      objectTiles: map.objmap,
+      animatedSprites: map.animatedsprites,
+    };
+    const existing = await ctx.db
+      .query('maps')
+      .withIndex('worldId', (q) => q.eq('worldId', worldStatus.worldId))
+      .unique();
+    if (existing) {
+      await ctx.db.replace(existing._id, worldMap);
+    } else {
+      await ctx.db.insert('maps', worldMap);
+    }
+  },
+});
 
 async function getOrCreateDefaultWorld(ctx: MutationCtx) {
   const now = Date.now();

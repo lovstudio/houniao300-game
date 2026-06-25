@@ -17,10 +17,22 @@ export type ViewportProps = {
   children?: ReactNode;
 };
 
+export function viewportMinScale(
+  props: Pick<ViewportProps, 'screenWidth' | 'screenHeight' | 'worldWidth' | 'worldHeight'>,
+) {
+  const fitWorldScale = Math.min(
+    props.screenWidth / props.worldWidth,
+    props.screenHeight / props.worldHeight,
+  );
+  return Math.min(3, Math.max(0.05, fitWorldScale * 0.96));
+}
+
 // https://davidfig.github.io/pixi-viewport/jsdoc/Viewport.html
 export default PixiComponent('Viewport', {
   create(props: ViewportProps) {
     const { app, children, viewportRef, ...viewportProps } = props;
+    const minScale = viewportMinScale(props);
+    const initialScale = Math.min(3, Math.max(minScale, 1.15));
     const viewport = new Viewport({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       events: app.renderer.events,
@@ -37,16 +49,44 @@ export default PixiComponent('Viewport', {
       .wheel()
       .decelerate()
       .clamp({ direction: 'all', underflow: 'center' })
-      .setZoom(-10)
       .clampZoom({
-        minScale: (1.04 * props.screenWidth) / (props.worldWidth / 2),
+        minScale,
         maxScale: 3.0,
-      });
+      })
+      .setZoom(initialScale)
+      .moveCenter(props.worldWidth / 2, props.worldHeight / 2);
     return viewport;
   },
   applyProps(viewport, oldProps: any, newProps: any) {
+    if (
+      oldProps.screenWidth !== newProps.screenWidth ||
+      oldProps.screenHeight !== newProps.screenHeight ||
+      oldProps.worldWidth !== newProps.worldWidth ||
+      oldProps.worldHeight !== newProps.worldHeight
+    ) {
+      viewport.resize(
+        newProps.screenWidth,
+        newProps.screenHeight,
+        newProps.worldWidth,
+        newProps.worldHeight,
+      );
+      const minScale = viewportMinScale(newProps);
+      viewport.clampZoom({ minScale, maxScale: 3.0 });
+      if (viewport.scaled < minScale) {
+        viewport.setZoom(minScale, true);
+      }
+    }
     Object.keys(newProps).forEach((p) => {
-      if (p !== 'app' && p !== 'viewportRef' && p !== 'children' && oldProps[p] !== newProps[p]) {
+      if (
+        p !== 'app' &&
+        p !== 'viewportRef' &&
+        p !== 'children' &&
+        p !== 'screenWidth' &&
+        p !== 'screenHeight' &&
+        p !== 'worldWidth' &&
+        p !== 'worldHeight' &&
+        oldProps[p] !== newProps[p]
+      ) {
         // @ts-expect-error Ignoring TypeScript here
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         viewport[p] = newProps[p];

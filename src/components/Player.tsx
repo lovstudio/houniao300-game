@@ -21,6 +21,7 @@ export const Player = ({
   player,
   onClick,
   historicalTime,
+  optimisticLocation,
 }: {
   game: ServerGame;
   isViewer: boolean;
@@ -28,6 +29,7 @@ export const Player = ({
 
   onClick: SelectElement;
   historicalTime?: number;
+  optimisticLocation?: Location;
 }) => {
   const playerCharacter = game.playerDescriptions.get(player.id)?.character;
   if (!playerCharacter) {
@@ -50,7 +52,9 @@ export const Player = ({
     return null;
   }
 
-  if (!historicalLocation) {
+  const displayLocation = optimisticLocation ?? historicalLocation;
+
+  if (!displayLocation) {
     return null;
   }
 
@@ -63,14 +67,14 @@ export const Player = ({
       (a) => a.playerId === player.id && !!a.inProgressOperation,
     );
   const tileDim = game.worldMap.tileDim;
-  const historicalFacing = { dx: historicalLocation.dx, dy: historicalLocation.dy };
+  const historicalFacing = { dx: displayLocation.dx, dy: displayLocation.dy };
   return (
     <>
       <Character
-        x={historicalLocation.x * tileDim + tileDim / 2}
-        y={historicalLocation.y * tileDim + tileDim / 2}
+        x={displayLocation.x * tileDim + tileDim / 2}
+        y={displayLocation.y * tileDim + tileDim / 2}
         orientation={orientationDegrees(historicalFacing)}
-        isMoving={historicalLocation.speed > 0}
+        isMoving={displayLocation.speed > 0}
         isThinking={isThinking}
         isSpeaking={isSpeaking}
         emoji={

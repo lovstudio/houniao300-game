@@ -13,8 +13,21 @@ import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
+export type ControlMode = 'player' | 'camera';
 
-export default function Game() {
+export default function Game({
+  controlMode,
+  cameraFollow,
+  onToggleControlMode,
+  onToggleCameraFollow,
+  onSetCameraFollow,
+}: {
+  controlMode: ControlMode;
+  cameraFollow: boolean;
+  onToggleControlMode: () => void;
+  onToggleCameraFollow: () => void;
+  onSetCameraFollow: (enabled: boolean) => void;
+}) {
   const convex = useConvex();
   const [selectedElement, setSelectedElement] = useState<{
     kind: 'player';
@@ -42,9 +55,9 @@ export default function Game() {
   return (
     <>
       {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
-      <div className="mx-auto w-full max-w grid grid-rows-[240px_1fr] lg:grid-rows-[1fr] lg:grid-cols-[1fr_auto] lg:grow max-w-[1400px] min-h-[480px] game-frame">
+      <div className="fullscreen-game-frame game-frame grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(14rem,34vh)] lg:grid-rows-[1fr] lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
         {/* Game area */}
-        <div className="relative overflow-hidden bg-brown-900" ref={gameWrapperRef}>
+        <div className="relative min-h-0 min-w-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <div className="absolute inset-0">
             <div className="container">
               <Stage width={width} height={height} options={{ backgroundColor: 0x7ab5ff }}>
@@ -57,6 +70,11 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     engineId={engineId}
                     width={width}
                     height={height}
+                    controlMode={controlMode}
+                    cameraFollow={cameraFollow}
+                    onToggleControlMode={onToggleControlMode}
+                    onToggleCameraFollow={onToggleCameraFollow}
+                    onSetCameraFollow={onSetCameraFollow}
                     historicalTime={historicalTime}
                     setSelectedElement={setSelectedElement}
                   />
@@ -67,7 +85,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
         </div>
         {/* Right column area */}
         <div
-          className="flex flex-col overflow-y-auto shrink-0 px-4 py-6 sm:px-6 lg:w-96 xl:pr-6 border-t-8 sm:border-t-0 sm:border-l-8 border-brown-900  bg-brown-800 text-brown-100"
+          className="flex min-h-0 flex-col overflow-y-auto shrink-0 px-4 py-6 sm:px-6 lg:w-96 xl:pr-6 border-t-8 sm:border-t-0 sm:border-l-8 border-brown-900 bg-brown-800/95 text-brown-100"
           ref={scrollViewRef}
         >
           <PlayerDetails
