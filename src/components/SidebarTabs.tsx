@@ -8,6 +8,7 @@ import { ServerGame } from '../hooks/serverGame';
 import { SelectElement } from './Player';
 import { SCHEDULE, VENUES, VENUE_COORDS, CATEGORY_COLORS, DATES, type SchedItem } from '../../data/schedule';
 import { focusMapVenue, focusMapTile, setVenueSelectHandler } from '../lib/mapFocus';
+import { enterActivity, activityFromSchedule } from '../lib/activityEnter';
 import { toast } from 'react-toastify';
 
 type Tab = 'state' | 'chat' | 'schedule';
@@ -422,10 +423,16 @@ function ScheduleDetail({
         <p className="mt-4 whitespace-pre-wrap rounded-lg bg-brown-700/40 p-3 text-sm leading-relaxed text-brown-100">
           {item.desc}
         </p>
+        <button
+          onClick={() => enterActivity(activityFromSchedule(item))}
+          className="mt-4 w-full rounded bg-clay-600 px-3 py-2.5 font-display text-base font-bold text-white shadow-solid hover:bg-clay-500"
+        >
+          进入这个活动的专属体验 →
+        </button>
         {onmap && (
           <button
             onClick={() => focusVenueOnMap(item.venue)}
-            className="mt-4 w-full rounded bg-clay-700 px-3 py-2 text-sm font-semibold text-white hover:bg-clay-600"
+            className="mt-2 w-full rounded bg-brown-700/60 px-3 py-2 text-sm font-semibold text-brown-100 hover:bg-brown-700"
           >
             在地图上定位场地
           </button>

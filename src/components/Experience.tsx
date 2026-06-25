@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useAction, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { ActivityDescriptor } from '../lib/activityEnter';
 import clsx from 'clsx';
 
 // 匿名用户身份（鉴权接入后可替换为真实 user）。
@@ -17,111 +18,110 @@ function useAnonUser() {
   }, []);
 }
 
-export default function Experience() {
+// 进入某个活动的专属游戏。游戏隶属于该活动且独立。
+export default function Experience({
+  activity,
+  onExit,
+}: {
+  activity: ActivityDescriptor;
+  onExit: () => void;
+}) {
   const anon = useAnonUser();
   const [userName, setUserName] = useState(anon.name);
   const [experienceId, setExperienceId] = useState<Id<'experiences'> | null>(null);
 
   if (!experienceId) {
     return (
-      <EventPicker
+      <ActivityIntro
+        activity={activity}
+        userId={anon.id}
         userName={userName}
         setUserName={setUserName}
-        onStart={(id) => setExperienceId(id)}
-        userId={anon.id}
+        onStart={setExperienceId}
+        onExit={onExit}
       />
     );
   }
-  return <ComicPlayer experienceId={experienceId} onExit={() => setExperienceId(null)} />;
+  return <ComicPlayer experienceId={experienceId} onExit={onExit} />;
 }
 
-// ---------- 活动选择 + 勋章墙 ----------
-function EventPicker({
+// ---------- 活动介绍 + 开始 + 本活动勋章墙 ----------
+function ActivityIntro({
+  activity,
   userId,
   userName,
   setUserName,
   onStart,
+  onExit,
 }: {
+  activity: ActivityDescriptor;
   userId: string;
   userName: string;
   setUserName: (v: string) => void;
   onStart: (id: Id<'experiences'>) => void;
+  onExit: () => void;
 }) {
-  const events = useQuery(api.experience.listEvents);
-  const badges = useQuery(api.experience.listBadges);
-  const seed = useMutation(api.experience.seedDemoEvent);
-  const start = useAction(api.experience.startExperience);
-  const [starting, setStarting] = useState<Id<'events'> | null>(null);
+  const badges = useQuery(api.experience.activityBadges, { activityKey: activity.activityKey });
+  const start = useAction(api.experience.startActivityExperience);
+  const [starting, setStarting] = useState(false);
 
-  const handleStart = async (eventId: Id<'events'>) => {
+  const handleStart = async () => {
     const name = userName.trim() || '匿名候鸟';
     localStorage.setItem('hn_uname', name);
-    setStarting(eventId);
+    setStarting(true);
     try {
-      const id = await start({ eventId, userId, userName: name });
+      const id = await start({ activity, userId, userName: name });
       onStart(id);
     } finally {
-      setStarting(null);
+      setStarting(false);
     }
   };
 
   return (
     <div className="h-full overflow-y-auto bg-brown-900 px-6 py-8 text-brown-100">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="font-display game-title mb-2 text-5xl">候鸟体验</h1>
-        <p className="mb-6 text-brown-200">
-          每个活动都是一段由 AI 即时生成的连环画旅程——你的每一次选择，都通向一张独一无二的画面。
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-sm text-brown-300">活动专属体验</span>
+          <button className="text-sm text-brown-300 underline" onClick={onExit}>
+            返回小镇
+          </button>
+        </div>
+
+        <h1 className="font-display game-title mb-2 text-4xl">{activity.title}</h1>
+        <p className="mb-1 text-brown-200">{activity.theme}</p>
+        {activity.hostName && <p className="mb-4 text-sm text-brown-300">场地 · {activity.hostName}</p>}
+        <p className="mb-6 whitespace-pre-wrap rounded-lg bg-brown-800 p-3 text-sm leading-relaxed text-brown-200">
+          {activity.background}
         </p>
 
         <input
-          className="mb-6 w-full max-w-sm rounded border-2 border-brown-700 bg-brown-800 px-3 py-2 text-brown-100 placeholder:text-brown-500"
+          className="mb-4 w-full max-w-sm rounded border-2 border-brown-700 bg-brown-800 px-3 py-2 text-brown-100 placeholder:text-brown-500"
           placeholder="给自己起个名字（用于勋章墙）"
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
         />
-
-        {events === undefined && <p className="text-brown-300">加载活动中…</p>}
-        {events && events.length === 0 && (
-          <div className="rounded border-2 border-dashed border-brown-700 p-6 text-center">
-            <p className="mb-4 text-brown-300">还没有活动。</p>
-            <button
-              className="bg-clay-700 px-4 py-2 font-display text-white shadow-solid"
-              onClick={() => void seed()}
-            >
-              创建示例活动
-            </button>
-          </div>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {events?.map((ev) => (
-            <div key={ev._id} className="flex flex-col border-2 border-brown-700 bg-brown-800 p-4">
-              <h2 className="font-display text-2xl text-brown-100">{ev.title}</h2>
-              {ev.hostName && <p className="mb-1 text-sm text-brown-300">主理人：{ev.hostName}</p>}
-              <p className="mb-4 flex-1 text-sm text-brown-200">{ev.theme}</p>
-              <button
-                className="bg-clay-700 px-4 py-2 font-display text-white shadow-solid disabled:opacity-50"
-                disabled={starting !== null}
-                onClick={() => void handleStart(ev._id)}
-              >
-                {starting === ev._id ? '正在生成首幕…' : '进入体验'}
-              </button>
-            </div>
-          ))}
+        <div>
+          <button
+            className="bg-clay-700 px-5 py-2.5 font-display text-white shadow-solid disabled:opacity-50"
+            disabled={starting}
+            onClick={() => void handleStart()}
+          >
+            {starting ? '正在生成首幕…' : '开始体验'}
+          </button>
         </div>
 
         {badges && badges.length > 0 && (
           <div className="mt-10">
-            <h2 className="font-display mb-3 text-3xl text-brown-100">勋章墙</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <h2 className="font-display mb-3 text-2xl text-brown-100">
+              本活动勋章墙 · {badges.length} 人完成
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
               {badges.map((b) => (
                 <div key={b._id} className="flex items-center gap-3 border-2 border-brown-700 bg-brown-800 p-3">
                   <Medallion title={b.title} />
                   <div className="min-w-0">
                     <p className="truncate font-display text-brown-100">{b.title}</p>
-                    <p className="truncate text-xs text-brown-300">
-                      {b.userName} · {b.eventTitle}
-                    </p>
+                    <p className="truncate text-xs text-brown-300">{b.userName}</p>
                   </div>
                 </div>
               ))}
@@ -177,7 +177,7 @@ function ComicPlayer({
         <div className="mb-3 flex items-center justify-between">
           <h1 className="font-display text-2xl text-brown-100">{event?.title}</h1>
           <button className="text-sm text-brown-300 underline" onClick={onExit}>
-            返回活动列表
+            返回小镇
           </button>
         </div>
 

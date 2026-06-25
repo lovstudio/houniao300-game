@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { query, mutation, action, internalMutation, internalQuery } from './_generated/server';
+import { query, action, internalMutation, internalQuery, ActionCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { chatCompletion } from './util/llm';
@@ -80,6 +80,28 @@ async function director(
 export const getEvent = internalQuery({
   args: { eventId: v.id('events') },
   handler: async (ctx, { eventId }) => await ctx.db.get(eventId),
+});
+
+// 按 activityKey 懒创建活动对应的 event（每个活动一个，独立）。
+export const getOrCreateEvent = internalMutation({
+  args: {
+    activityKey: v.string(),
+    title: v.string(),
+    theme: v.string(),
+    style: v.string(),
+    background: v.string(),
+    hostName: v.optional(v.string()),
+    minPanels: v.number(),
+    maxPanels: v.number(),
+  },
+  handler: async (ctx, args): Promise<Id<'events'>> => {
+    const existing = await ctx.db
+      .query('events')
+      .withIndex('activityKey', (q) => q.eq('activityKey', args.activityKey))
+      .first();
+    if (existing) return existing._id;
+    return await ctx.db.insert('events', { ...args, active: true });
+  },
 });
 
 export const createExperience = internalMutation({
@@ -206,62 +228,75 @@ export const listBadges = query({
   },
 });
 
-// ============================================================
-// 公开 mutation：开发期种子数据
-// ============================================================
-export const seedDemoEvent = mutation({
-  handler: async (ctx) => {
-    const existing = await ctx.db.query('events').first();
-    if (existing) return existing._id;
-    return await ctx.db.insert('events', {
-      title: '候鸟沙城·迁徙之约',
-      theme: '一只候鸟跨越山海、寻找栖息地的旅程',
-      style:
-        'cinematic sand-sculpture diorama, warm golden hour light, fine sand grain texture, soft depth of field, dreamy storybook mood',
-      background:
-        '候鸟沙城是一座由风与沙塑成的临时之城，每年迁徙季短暂浮现。旅人将化身一只候鸟，在沙之城邦中做出选择，遇见同行者，最终找到属于自己的栖息之地。',
-      hostName: '候鸟工作室',
-      minPanels: 5,
-      maxPanels: 8,
-      active: true,
-    });
+// 某个活动的勋章墙（按 activityKey）。
+export const activityBadges = query({
+  args: { activityKey: v.string() },
+  handler: async (ctx, { activityKey }) => {
+    const event = await ctx.db
+      .query('events')
+      .withIndex('activityKey', (q) => q.eq('activityKey', activityKey))
+      .first();
+    if (!event) return [];
+    return await ctx.db
+      .query('badges')
+      .withIndex('eventId', (q) => q.eq('eventId', event._id))
+      .order('desc')
+      .take(100);
   },
 });
 
 // ============================================================
 // 公开 action：核心交互闭环
 // ============================================================
-export const startExperience = action({
-  args: { eventId: v.id('events'), userId: v.string(), userName: v.string() },
-  handler: async (ctx, { eventId, userId, userName }): Promise<Id<'experiences'>> => {
-    const event = await ctx.runQuery(internal.experience.getEvent, { eventId });
-    if (!event) throw new Error('event 不存在');
+// 生成首格（导演 + 文生图），供两个入口复用。
+async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'>, event: Doc<'events'>) {
+  const step = await director(event, [], {
+    stepIndex: 0,
+    minPanels: event.minPanels,
+    maxPanels: event.maxPanels,
+    forceFinal: false,
+  });
+  const panelId = await ctx.runMutation(internal.experience.insertPanel, {
+    experienceId,
+    index: 0,
+    imagePrompt: step.imagePrompt,
+    narration: step.narration,
+    question: step.question,
+    options: step.options ?? [],
+    allowCustom: step.allowCustom ?? true,
+    isFinal: false,
+  });
+  const blob = await generateImage(step.imagePrompt);
+  const storageId = await ctx.storage.store(blob);
+  await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+}
 
+// 从节目单的某个活动进入：按 activityKey 取/建 event，再开一段独立体验。
+export const startActivityExperience = action({
+  args: {
+    activity: v.object({
+      activityKey: v.string(),
+      title: v.string(),
+      theme: v.string(),
+      style: v.string(),
+      background: v.string(),
+      hostName: v.optional(v.string()),
+      minPanels: v.number(),
+      maxPanels: v.number(),
+    }),
+    userId: v.string(),
+    userName: v.string(),
+  },
+  handler: async (ctx, { activity, userId, userName }): Promise<Id<'experiences'>> => {
+    const eventId = await ctx.runMutation(internal.experience.getOrCreateEvent, activity);
+    const event = await ctx.runQuery(internal.experience.getEvent, { eventId });
+    if (!event) throw new Error('event 创建失败');
     const experienceId = await ctx.runMutation(internal.experience.createExperience, {
       eventId,
       userId,
       userName,
     });
-
-    const step = await director(event, [], {
-      stepIndex: 0,
-      minPanels: event.minPanels,
-      maxPanels: event.maxPanels,
-      forceFinal: false,
-    });
-    const panelId = await ctx.runMutation(internal.experience.insertPanel, {
-      experienceId,
-      index: 0,
-      imagePrompt: step.imagePrompt,
-      narration: step.narration,
-      question: step.question,
-      options: step.options ?? [],
-      allowCustom: step.allowCustom ?? true,
-      isFinal: false,
-    });
-    const blob = await generateImage(step.imagePrompt);
-    const storageId = await ctx.storage.store(blob);
-    await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+    await generateFirstPanel(ctx, experienceId, event);
     return experienceId;
   },
 });

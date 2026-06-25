@@ -1,6 +1,7 @@
 import Game, { type ControlMode } from './components/Game.tsx';
 import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
+import { setActivityEnterHandler, type ActivityDescriptor } from './lib/activityEnter.ts';
 
 import { ToastContainer } from 'react-toastify';
 // import { UserButton } from '@clerk/clerk-react';
@@ -16,13 +17,20 @@ export default function Home() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('player');
   const [cameraFollow, setCameraFollow] = useState(true);
-  const [screen, setScreen] = useState<'town' | 'experience'>('town');
+  // 当前正在体验的活动（从节目单点进），null = 在小镇里。
+  const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreenChange);
     onFullscreenChange();
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  // 节目单里的活动详情点击「进入专属体验」时被调用。
+  useEffect(() => {
+    setActivityEnterHandler((activity) => setActiveActivity(activity));
+    return () => setActivityEnterHandler(null);
   }, []);
 
   const toggleFullscreen = async () => {
@@ -102,25 +110,26 @@ export default function Home() {
         onToggleCameraFollow={toggleCameraFollow}
         onToggleFullscreen={() => void toggleFullscreen()}
         onHelp={() => setHelpModalOpen(true)}
-        screen={screen}
-        onToggleScreen={() => setScreen((s) => (s === 'town' ? 'experience' : 'town'))}
       />
 
       <div className="relative isolate min-h-0 flex-1 overflow-hidden shadow-2xl">
-        {screen === 'town' ? (
-          <Game
-            controlMode={controlMode}
-            cameraFollow={cameraFollow}
-            onToggleControlMode={toggleControlMode}
-            onToggleCameraFollow={toggleCameraFollow}
-            onSetCameraFollow={setCameraFollow}
-          />
-        ) : (
-          <Experience />
-        )}
+        <Game
+          controlMode={controlMode}
+          cameraFollow={cameraFollow}
+          onToggleControlMode={toggleControlMode}
+          onToggleCameraFollow={toggleCameraFollow}
+          onSetCameraFollow={setCameraFollow}
+        />
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </div>
-      {screen === 'town' && <Timeline />}
+      <Timeline />
+
+      {/* 活动专属体验：作为覆盖层叠在小镇之上，关闭即回到小镇（小镇状态不丢） */}
+      {activeActivity && (
+        <div className="fixed inset-0 z-[60] bg-brown-900">
+          <Experience activity={activeActivity} onExit={() => setActiveActivity(null)} />
+        </div>
+      )}
     </main>
   );
 }

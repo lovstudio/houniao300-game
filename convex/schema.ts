@@ -12,8 +12,10 @@ export default defineSchema({
   }),
 
   // ---- AIGC 连环画体验模块（独立于 AI Town 引擎）----
-  // 一个活动（由主理人创建），自带主题/风格/背景知识。
+  // 一个活动 = 节目单里的一项，每个活动有自己独立的游戏。
+  // activityKey 由节目单条目唯一标识（date+time+venue+title），首次进入时按 key 懒创建。
   events: defineTable({
+    activityKey: v.optional(v.string()),
     title: v.string(),
     theme: v.string(),
     style: v.string(), // 视觉风格描述，注入文生图提示词
@@ -22,7 +24,7 @@ export default defineSchema({
     minPanels: v.number(),
     maxPanels: v.number(),
     active: v.boolean(),
-  }),
+  }).index('activityKey', ['activityKey']),
 
   // 一次体验 = 一个用户走完一个活动的一条 AIGC 叙事线。
   experiences: defineTable({
