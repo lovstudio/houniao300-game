@@ -40,8 +40,14 @@ export const Character = ({
   const [spriteSheet, setSpriteSheet] = useState<Spritesheet>();
   useEffect(() => {
     const parseSheet = async () => {
+      // Character textureUrls are authored with the dev base prefix ('/ai-town'); swap it for
+      // the actual deploy base so sprites load both locally (/ai-town) and on the root domain (/).
+      // BASE_URL has no trailing slash locally ('/ai-town') but is '/' in production, so strip any
+      // trailing slash before substituting to avoid a missing/doubled separator.
+      const basePrefix = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const resolvedUrl = textureUrl.replace('/ai-town', basePrefix);
       const sheet = new Spritesheet(
-        BaseTexture.from(textureUrl, {
+        BaseTexture.from(resolvedUrl, {
           scaleMode: PIXI.SCALE_MODES.NEAREST,
         }),
         spritesheetData,

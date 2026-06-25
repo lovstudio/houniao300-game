@@ -1,9 +1,5 @@
 {
   "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/ai-town/:match*",
-      "destination": "/:match*"
-    }
-  ]
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/((?!assets/|.*\\.).*)", "destination": "/index.html" }]
 }

@@ -42,3 +42,8 @@ dist
 
 convex-local*
 convex_local*
+.env.local*
+.env.local.cloud
+.env.local.selfhosted
+/.vercel
+/dist
