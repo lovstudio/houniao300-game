@@ -19,27 +19,7 @@ function imageConfig() {
   };
 }
 
-// 生成一张图片，返回 PNG Blob（调用方负责存入 Convex storage）。
-export async function generateImage(prompt: string): Promise<Blob> {
-  const config = imageConfig();
-  const { result } = await retryWithBackoff(async () => {
-    const resp = await fetch(config.url + '/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: 'Bearer ' + config.apiKey } : {}),
-      },
-      body: JSON.stringify({ model: config.model, prompt, n: 1, size: config.size }),
-    });
-    if (!resp.ok) {
-      throw {
-        retry: resp.status === 429 || resp.status >= 500,
-        error: new Error(`文生图失败 ${resp.status}: ${await resp.text()}`),
-      };
-    }
-    return (await resp.json()) as { data?: { b64_json?: string; url?: string }[] };
-  });
-
+async function toBlob(result: { data?: { b64_json?: string; url?: string }[] }): Promise<Blob> {
   const item = result.data?.[0];
   if (item?.b64_json) {
     const binary = atob(item.b64_json);
@@ -53,4 +33,46 @@ export async function generateImage(prompt: string): Promise<Blob> {
     return await img.blob();
   }
   throw new Error('文生图返回为空');
+}
+
+// 生成一张图片，返回 PNG Blob（调用方负责存入 Convex storage）。
+// 传入 reference 时走 /v1/images/edits（image edit）——用首格图锁定主角 + 色板 + 沙雕材质，
+// 保证连环画跨格视觉一致；不传则普通文生图。
+export async function generateImage(prompt: string, reference?: Blob): Promise<Blob> {
+  const config = imageConfig();
+  const { result } = await retryWithBackoff(async () => {
+    let resp: Response;
+    if (reference) {
+      const form = new FormData();
+      form.append('model', config.model);
+      form.append('prompt', prompt);
+      form.append('size', config.size);
+      form.append('n', '1');
+      form.append('image', reference, 'reference.png');
+      resp = await fetch(config.url + '/v1/images/edits', {
+        method: 'POST',
+        // 不要手动设 Content-Type，让 fetch 自动带上 multipart boundary。
+        headers: config.apiKey ? { Authorization: 'Bearer ' + config.apiKey } : {},
+        body: form,
+      });
+    } else {
+      resp = await fetch(config.url + '/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.apiKey ? { Authorization: 'Bearer ' + config.apiKey } : {}),
+        },
+        body: JSON.stringify({ model: config.model, prompt, n: 1, size: config.size }),
+      });
+    }
+    if (!resp.ok) {
+      throw {
+        retry: resp.status === 429 || resp.status >= 500,
+        error: new Error(`文生图失败 ${resp.status}: ${await resp.text()}`),
+      };
+    }
+    return (await resp.json()) as { data?: { b64_json?: string; url?: string }[] };
+  });
+
+  return toBlob(result);
 }

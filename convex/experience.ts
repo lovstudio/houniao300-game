@@ -18,6 +18,7 @@ type DirectorStep = {
   final?: boolean;
   badgeTitle?: string;
   badgeSummary?: string;
+  protagonist?: string; // 仅首格：一句英文主角外形锚定（贯穿全程，锁定同一人）
 };
 
 function parseJson(content: string): DirectorStep {
@@ -40,8 +41,15 @@ function parseJson(content: string): DirectorStep {
 async function director(
   event: Doc<'events'>,
   history: { narration: string; question?: string; answer?: string }[],
-  opts: { stepIndex: number; minPanels: number; maxPanels: number; forceFinal: boolean },
+  opts: {
+    stepIndex: number;
+    minPanels: number;
+    maxPanels: number;
+    forceFinal: boolean;
+    protagonistDesc?: string;
+  },
 ): Promise<DirectorStep> {
+  const isFirst = opts.stepIndex === 0;
   const system = [
     '你是一个沉浸式 AIGC 互动连环画的"导演"。你为用户即时编织一条独一无二的视觉叙事线。',
     '每一步你产出：一张图片的提示词、一段中文旁白、以及（除非收尾）一个面向用户的问题和若干选项。',
@@ -54,7 +62,19 @@ async function director(
     '  final: boolean       // 是否为收尾格',
     '  badgeTitle: string   // 仅收尾格：为这段独特经历命名一枚勋章（4-8 字）',
     '  badgeSummary: string // 仅收尾格：一句话总结用户这趟体验',
+    ...(isFirst
+      ? [
+          '  protagonist: string  // 英文，一句话锁定主角外形（性别气质/服饰/配色/材质特征），后续每格都将复用同一主角，请具体且稳定',
+        ]
+      : []),
     `视觉风格固定为：${event.style}`,
+    // 跨格视觉一致性：每格都带上首格锁定的主角描述，且 imagePrompt 必须复刻同一主角与色板。
+    ...(opts.protagonistDesc
+      ? [
+          `主角锁定（全程同一人，禁止换脸/换装/换配色）：${opts.protagonistDesc}`,
+          '每一格的 imagePrompt 都必须显式包含上述主角特征，并保持 same protagonist、same color palette、same sand-sculpture material，只改变场景与动作。',
+        ]
+      : []),
     '关键：每一格都必须实质推进剧情——出现新的场景、转折或人物，绝不能重复上一格的旁白或画面。imagePrompt 也要随之变化。',
     `当一段完整、有起承转合的体验已经达成（且至少进行了 ${opts.minPanels} 格）时，可主动收尾（final=true）。`,
   ].join('\n');
@@ -150,6 +170,21 @@ export const setPanelImage = internalMutation({
   args: { panelId: v.id('panels'), imageStorageId: v.string() },
   handler: async (ctx, { panelId, imageStorageId }) =>
     await ctx.db.patch(panelId, { imageStorageId }),
+});
+
+// 首格生成后锁定主角描述 + 首格图（作为后续每格 image edit 的参考图）。
+export const setExperienceLock = internalMutation({
+  args: {
+    experienceId: v.id('experiences'),
+    protagonistDesc: v.optional(v.string()),
+    firstPanelStorageId: v.optional(v.string()),
+  },
+  handler: async (ctx, { experienceId, protagonistDesc, firstPanelStorageId }) => {
+    const patch: Partial<Doc<'experiences'>> = {};
+    if (protagonistDesc) patch.protagonistDesc = protagonistDesc;
+    if (firstPanelStorageId) patch.firstPanelStorageId = firstPanelStorageId;
+    await ctx.db.patch(experienceId, patch);
+  },
 });
 
 export const setAnswer = internalMutation({
@@ -318,6 +353,12 @@ async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'
   const blob = await generateImage(step.imagePrompt);
   const storageId = await ctx.storage.store(blob);
   await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+  // 锁定主角 + 首格图，供后续每格做 image edit 参考，保持跨格视觉一致。
+  await ctx.runMutation(internal.experience.setExperienceLock, {
+    experienceId,
+    protagonistDesc: step.protagonist,
+    firstPanelStorageId: storageId,
+  });
 }
 
 // 从节目单的某个活动进入：按 activityKey 取/建 event，再开一段独立体验。
@@ -384,6 +425,7 @@ export const answerPanel = action({
       minPanels: event.minPanels,
       maxPanels: event.maxPanels,
       forceFinal,
+      protagonistDesc: state.experience.protagonistDesc,
     });
     const isFinal = forceFinal || (!!step.final && nextIndex >= event.minPanels - 1);
 
@@ -397,7 +439,11 @@ export const answerPanel = action({
       allowCustom: isFinal ? false : step.allowCustom ?? true,
       isFinal,
     });
-    const blob = await generateImage(step.imagePrompt);
+    // 用首格图作参考做 image edit，锁定主角 + 色板 + 沙雕材质（仅改场景/动作）。
+    const reference = state.experience.firstPanelStorageId
+      ? (await ctx.storage.get(state.experience.firstPanelStorageId)) ?? undefined
+      : undefined;
+    const blob = await generateImage(step.imagePrompt, reference);
     const storageId = await ctx.storage.store(blob);
     await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
 

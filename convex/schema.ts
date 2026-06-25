@@ -44,6 +44,9 @@ export default defineSchema({
     status: v.union(v.literal('active'), v.literal('completed')),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
+    // 跨格视觉一致性：首格锁定的主角外形描述 + 首格图（作为后续每格的参考图）。
+    protagonistDesc: v.optional(v.string()),
+    firstPanelStorageId: v.optional(v.string()),
   })
     .index('eventId', ['eventId'])
     .index('userId', ['userId']),
