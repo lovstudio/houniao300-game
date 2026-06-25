@@ -102,16 +102,9 @@ export default function Home() {
         onToggleCameraFollow={toggleCameraFollow}
         onToggleFullscreen={() => void toggleFullscreen()}
         onHelp={() => setHelpModalOpen(true)}
+        screen={screen}
+        onToggleScreen={() => setScreen((s) => (s === 'town' ? 'experience' : 'town'))}
       />
-
-      <div className="absolute top-2 right-2 z-20">
-        <button
-          className="bg-clay-700 px-3 py-1.5 font-display text-sm text-white shadow-solid"
-          onClick={() => setScreen((s) => (s === 'town' ? 'experience' : 'town'))}
-        >
-          {screen === 'town' ? '进入活动体验' : '返回小镇'}
-        </button>
-      </div>
 
       <div className="relative isolate min-h-0 flex-1 overflow-hidden shadow-2xl">
         {screen === 'town' ? (

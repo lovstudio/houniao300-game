@@ -29,6 +29,8 @@ export default function TopBar({
   onToggleCameraFollow,
   onToggleFullscreen,
   onHelp,
+  screen,
+  onToggleScreen,
 }: {
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
@@ -37,6 +39,8 @@ export default function TopBar({
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
   onHelp: () => void;
+  screen: 'town' | 'experience';
+  onToggleScreen: () => void;
 }) {
   return (
     <header className="masthead z-30 shrink-0">
@@ -49,6 +53,12 @@ export default function TopBar({
 
         {/* control deck — primary action + settings menu */}
         <div className="masthead-in deck-group relative z-50 ml-auto flex items-center gap-1" style={{ animationDelay: '0.08s' }}>
+          <button
+            onClick={onToggleScreen}
+            className="bg-clay-700 px-3 py-1.5 font-display text-sm text-white shadow-solid"
+          >
+            {screen === 'town' ? '进入活动体验' : '返回小镇'}
+          </button>
           <InteractButton />
           <SettingsMenu
             controlMode={controlMode}
