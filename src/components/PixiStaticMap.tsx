@@ -1,6 +1,7 @@
 import { PixiComponent, applyDefaultProps } from '@pixi/react';
 import * as PIXI from 'pixi.js';
 import { WorldMap } from '../../convex/aiTown/worldMap';
+import { selectVenueOnMap } from '../lib/mapFocus';
 
 const TILE = 32;
 const SOURCE_WIDTH = 1703;
@@ -158,6 +159,7 @@ function addLabel(
   text: string,
   x: number,
   y: number,
+  venue?: string,
 ) {
   const wrapper = new PIXI.Container();
   wrapper.x = project.x(x);
@@ -190,6 +192,21 @@ function addLabel(
 
   wrapper.addChild(background);
   wrapper.addChild(label);
+
+  // Labels bound to a festival venue are clickable: open that venue's schedule in the
+  // sidebar. Stop propagation so the tap doesn't also drive the map's move-to navigation.
+  if (venue) {
+    wrapper.eventMode = 'static';
+    wrapper.cursor = 'pointer';
+    const stop = (e: PIXI.FederatedPointerEvent) => e.stopPropagation();
+    wrapper.on('pointerdown', stop);
+    wrapper.on('pointerup', stop);
+    wrapper.on('pointertap', (e: PIXI.FederatedPointerEvent) => {
+      e.stopPropagation();
+      selectVenueOnMap(venue);
+    });
+  }
+
   container.addChild(wrapper);
 }
 
@@ -528,19 +545,19 @@ export function drawSandCityModel(
 
   addLabel(container, project, '候鸟巡游花车停放处', 214, 45);
   addLabel(container, project, '候鸟中心', 102, 150);
-  addLabel(container, project, '一级城墙', 252, 178);
-  addLabel(container, project, '伏园', 494, 137);
+  addLabel(container, project, '一级城墙', 252, 178, '一级城墙');
+  addLabel(container, project, '伏园', 494, 137, '伏园');
   addLabel(container, project, '婚姻登记处', 180, 282);
-  addLabel(container, project, '候鸟电影院', 212, 405);
-  addLabel(container, project, '候鸟工作坊', 398, 380);
-  addLabel(container, project, '候鸟黑客松', 706, 312);
-  addLabel(container, project, '时间广场', 762, 470);
+  addLabel(container, project, '候鸟电影院', 212, 405, '候鸟电影院');
+  addLabel(container, project, '候鸟工作坊', 398, 380, '候鸟工作坊');
+  addLabel(container, project, '候鸟黑客松', 706, 312, '候鸟黑客松');
+  addLabel(container, project, '时间广场', 762, 470, '时间广场');
   addLabel(container, project, '候鸟交易所', 1120, 494);
   addLabel(container, project, '鸟其林', 990, 590);
-  addLabel(container, project, '候鸟俱乐部', 925, 718);
+  addLabel(container, project, '候鸟俱乐部', 925, 718, '候鸟俱乐部');
   addLabel(container, project, '候鸟沙城剧场', 670, 642);
-  addLabel(container, project, '公路复古艺术展区', 1305, 645);
-  addLabel(container, project, '300.梯威', 1180, 880);
+  addLabel(container, project, '公路复古艺术展区', 1305, 645, '艺术作品展区');
+  addLabel(container, project, '300.梯威', 1180, 880, '300.梯威');
   addLabel(container, project, '二级城墙', 1480, 805);
 
   // Clip the whole model to the map rectangle: the sea / shallow water / foam are

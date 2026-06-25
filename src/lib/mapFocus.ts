@@ -15,3 +15,29 @@ export function setMapFocusHandler(fn: MapFocusListener | null) {
 export function focusMapVenue(sourceX: number, sourceY: number, label = '') {
   listener?.(sourceX, sourceY, label);
 }
+
+// Focus the camera on a resident, addressed in tile coordinates (player.position).
+export type MapFocusTileListener = (tileX: number, tileY: number) => void;
+
+let tileListener: MapFocusTileListener | null = null;
+
+export function setMapFocusTileHandler(fn: MapFocusTileListener | null) {
+  tileListener = fn;
+}
+
+export function focusMapTile(tileX: number, tileY: number) {
+  tileListener?.(tileX, tileY);
+}
+
+// Reverse direction: a venue marker on the map was clicked; open its schedule in the sidebar.
+export type VenueSelectListener = (venue: string) => void;
+
+let venueSelectListener: VenueSelectListener | null = null;
+
+export function setVenueSelectHandler(fn: VenueSelectListener | null) {
+  venueSelectListener = fn;
+}
+
+export function selectVenueOnMap(venue: string) {
+  venueSelectListener?.(venue);
+}

@@ -13,7 +13,7 @@ import { toastOnError } from '../toasts.ts';
 import { DebugPath } from './DebugPath.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
-import { setMapFocusHandler } from '../lib/mapFocus.ts';
+import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
 
 const MAP_SOURCE_WIDTH = 1703;
 const MAP_SOURCE_HEIGHT = 1279;
@@ -612,8 +612,32 @@ export const PixiGame = (props: {
       });
       setPing({ x, y, t: Date.now() });
     });
-    return () => setMapFocusHandler(null);
-  }, [worldWidthPx, worldHeightPx, props.onSetCameraFollow]);
+    // Focus the camera on a resident picked from the sidebar (tile coordinates).
+    setMapFocusTileHandler((tileX, tileY) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const x = tileX * tileDim + tileDim / 2;
+      const y = tileY * tileDim + tileDim / 2;
+      props.onSetCameraFollow(false);
+      const minScale = viewportMinScale({
+        screenHeight: props.height,
+        screenWidth: props.width,
+        worldHeight: worldHeightPx,
+        worldWidth: worldWidthPx,
+      });
+      viewport.animate({
+        position: new PIXI.Point(x, y),
+        scale: Math.max(minScale, 1.6),
+        time: 700,
+        ease: 'easeInOutCubic',
+      });
+      setPing({ x, y, t: Date.now() });
+    });
+    return () => {
+      setMapFocusHandler(null);
+      setMapFocusTileHandler(null);
+    };
+  }, [worldWidthPx, worldHeightPx, tileDim, props.onSetCameraFollow, props.width, props.height]);
 
   useEffect(() => {
     if (!ping) return;

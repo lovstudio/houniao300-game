@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -6,17 +6,16 @@ import PlayerDetails from './PlayerDetails';
 import { GameId } from '../../convex/aiTown/ids';
 import { ServerGame } from '../hooks/serverGame';
 import { SelectElement } from './Player';
-import { SCHEDULE, VENUE_COORDS, CATEGORY_COLORS, DATES, type SchedItem } from '../../data/schedule';
-import { focusMapVenue } from '../lib/mapFocus';
+import { SCHEDULE, VENUES, VENUE_COORDS, CATEGORY_COLORS, DATES, type SchedItem } from '../../data/schedule';
+import { focusMapVenue, focusMapTile, setVenueSelectHandler } from '../lib/mapFocus';
 import { toast } from 'react-toastify';
 
-type Tab = 'agent' | 'chat' | 'schedule' | 'state';
+type Tab = 'state' | 'chat' | 'schedule';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'agent', label: '角色' },
-  { id: 'chat', label: '全局对话' },
-  { id: 'schedule', label: '节目单' },
   { id: 'state', label: '状态' },
+  { id: 'chat', label: '广播' },
+  { id: 'schedule', label: '节目单' },
 ];
 
 const TODAY_DAY = (() => {
@@ -50,13 +49,23 @@ export default function SidebarTabs({
   playerId?: GameId<'players'>;
   setSelectedElement: SelectElement;
 }) {
-  const [tab, setTab] = useState<Tab>('agent');
-  const agentScrollRef = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<Tab>('state');
+  // bumped each time a venue marker is clicked on the map, to drive the schedule tab
+  const [venueFocus, setVenueFocus] = useState<{ venue: string; n: number } | null>(null);
 
-  // jump to the agent tab whenever a character is selected on the map
+  // jump to the state tab (which now hosts character details) on map selection
   useEffect(() => {
-    if (playerId) setTab('agent');
+    if (playerId) setTab('state');
   }, [playerId]);
+
+  // a venue marker on the map was clicked: open the schedule tab on that venue
+  useEffect(() => {
+    setVenueSelectHandler((venue) => {
+      setVenueFocus((prev) => ({ venue, n: (prev?.n ?? 0) + 1 }));
+      setTab('schedule');
+    });
+    return () => setVenueSelectHandler(null);
+  }, []);
 
   return (
     <div className="flex min-h-0 w-full flex-col">
@@ -84,17 +93,14 @@ export default function SidebarTabs({
 
       {/* tab content */}
       <div className="min-h-0 flex-1">
-        {tab === 'agent' && (
-          <div ref={agentScrollRef} className="h-full overflow-y-auto px-4 py-5 sm:px-6">
-            <PlayerDetails
-              worldId={worldId}
-              engineId={engineId}
-              game={game}
-              playerId={playerId}
-              setSelectedElement={setSelectedElement}
-              scrollViewRef={agentScrollRef}
-            />
-          </div>
+        {tab === 'state' && (
+          <StateTab
+            worldId={worldId}
+            engineId={engineId}
+            game={game}
+            playerId={playerId}
+            setSelectedElement={setSelectedElement}
+          />
         )}
         {tab === 'chat' && (
           <GlobalChat
@@ -102,8 +108,7 @@ export default function SidebarTabs({
             onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
           />
         )}
-        {tab === 'schedule' && <ScheduleTab />}
-        {tab === 'state' && <StateTab game={game} />}
+        {tab === 'schedule' && <ScheduleTab venueFocus={venueFocus} />}
       </div>
     </div>
   );
@@ -135,11 +140,12 @@ function GlobalChat({
     return <Centered>沙城刚刚醒来，居民们还没开口。稍候片刻，或上前搭话。</Centered>;
 
   return (
-    <div ref={ref} className="h-full space-y-2.5 overflow-y-auto px-4 py-4">
-      <p className="sticky top-0 -mx-4 -mt-4 mb-1 bg-brown-800/95 px-4 pb-1 pt-3 text-xs text-brown-300 backdrop-blur">
+    <div className="flex h-full flex-col">
+      <p className="shrink-0 px-4 pb-2 pt-4 text-xs text-brown-300">
         全城广播 · 记录每位 AI 居民的公开发言（最近 {msgs.length} 条）
       </p>
-      {msgs.map((m) => {
+      <div ref={ref} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
+        {msgs.map((m) => {
         const hue = authorHue(m.author);
         return (
           <div key={m.id} className="flex gap-2.5">
@@ -169,24 +175,117 @@ function GlobalChat({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
 
-function ScheduleTab() {
+function focusVenueOnMap(venue: string) {
+  const c = VENUE_COORDS[venue];
+  if (c) focusMapVenue(c[0], c[1], venue);
+  else toast.info(`「${venue}」是候鸟300外场剧场，沙城地图联动即将支持`, { toastId: `off-${venue}` });
+}
+
+function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } | null }) {
+  const [view, setView] = useState<'byDate' | 'byVenue'>('byDate');
   const [date, setDate] = useState(DATES.includes(TODAY_DAY) ? TODAY_DAY : DATES[0]);
-  const items = useMemo(
-    () => SCHEDULE.filter((s) => s.date === date).sort((a, b) => a.min - b.min),
-    [date],
-  );
-  const onItem = (s: SchedItem) => {
-    const c = VENUE_COORDS[s.venue];
-    if (c) focusMapVenue(c[0], c[1], s.venue);
-    else toast.info(`「${s.venue}」是候鸟300外场剧场，沙城地图联动即将支持`, { toastId: `off-${s.venue}` });
-  };
+  const [venue, setVenue] = useState<string | null>(null);
+  const [detail, setDetail] = useState<SchedItem | null>(null);
+
+  // map venue marker click -> jump straight to that venue's schedule
+  useEffect(() => {
+    if (!venueFocus) return;
+    setView('byVenue');
+    setVenue(venueFocus.venue);
+    setDetail(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venueFocus?.n]);
+
+  // a single activity's detail card
+  if (detail) {
+    return (
+      <ScheduleDetail
+        item={detail}
+        onBack={() => setDetail(null)}
+        onVenue={(v) => {
+          setView('byVenue');
+          setVenue(v);
+          setDetail(null);
+        }}
+      />
+    );
+  }
+
+  // a single venue's full schedule
+  if (view === 'byVenue' && venue) {
+    const items = SCHEDULE.filter((s) => s.venue === venue).sort((a, b) =>
+      a.date === b.date ? a.min - b.min : Number(a.date) - Number(b.date),
+    );
+    const onmap = !!VENUE_COORDS[venue];
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+          <button
+            onClick={() => setVenue(null)}
+            className="shrink-0 rounded bg-brown-700/50 px-2 py-1 text-xs text-brown-200 hover:bg-brown-700"
+          >
+            ← 场地
+          </button>
+          <span className="min-w-0 flex-1 truncate font-display text-lg text-brown-100">{venue}</span>
+          {onmap && (
+            <button
+              onClick={() => focusVenueOnMap(venue)}
+              className="shrink-0 rounded bg-clay-700 px-2 py-1 text-xs text-white hover:bg-clay-600"
+            >
+              地图定位
+            </button>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          {items.map((s, i) => (
+            <ScheduleRow key={i} s={s} showDate onClick={() => setDetail(s)} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // venue directory
+  if (view === 'byVenue') {
+    const counts: Record<string, number> = {};
+    SCHEDULE.forEach((s) => (counts[s.venue] = (counts[s.venue] ?? 0) + 1));
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <ViewToggle view={view} setView={setView} />
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          {VENUES.map((v) => {
+            const onmap = !!VENUE_COORDS[v];
+            return (
+              <button
+                key={v}
+                onClick={() => setVenue(v)}
+                className="flex w-full items-center gap-2 border-b border-brown-700/40 py-2 text-left"
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
+                />
+                <span className="min-w-0 flex-1 truncate text-sm text-brown-100">{v}</span>
+                <span className="shrink-0 text-[11px] text-brown-400">{counts[v] ?? 0} 场</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // by date (default)
+  const items = SCHEDULE.filter((s) => s.date === date).sort((a, b) => a.min - b.min);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 gap-1 overflow-x-auto px-3 py-2">
+      <ViewToggle view={view} setView={setView} />
+      <div className="flex shrink-0 gap-1 overflow-x-auto px-3 pb-2">
         {DATES.map((d) => (
           <button
             key={d}
@@ -201,43 +300,172 @@ function ScheduleTab() {
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        {items.map((s, i) => {
-          const onmap = !!VENUE_COORDS[s.venue];
-          return (
-            <button
-              key={i}
-              onClick={() => onItem(s)}
-              className="group flex w-full items-stretch gap-2.5 border-b border-brown-700/40 py-2 text-left"
-            >
-              <div className="w-12 shrink-0 pt-0.5 text-right">
-                <div className="text-sm font-bold tabular-nums text-brown-100">{s.time}</div>
-                {s.dur ? <div className="text-[10px] text-brown-400">{s.dur}min</div> : null}
-              </div>
-              <div className="w-1 shrink-0 rounded-full" style={{ background: CATEGORY_COLORS[s.cat] }} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-brown-100 group-hover:underline">
-                  {s.title}
-                </div>
-                <div className="mt-0.5 flex items-center gap-1 text-[11px] text-brown-300">
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
-                  />
-                  <span className="truncate">{s.venue}</span>
-                  <span className="ml-auto shrink-0 rounded px-1" style={{ background: CATEGORY_COLORS[s.cat] + '33' }}>
-                    {s.cat}
-                  </span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
+        {items.map((s, i) => (
+          <ScheduleRow key={i} s={s} onClick={() => setDetail(s)} />
+        ))}
       </div>
     </div>
   );
 }
 
-function StateTab({ game }: { game: ServerGame }) {
+function ViewToggle({
+  view,
+  setView,
+}: {
+  view: 'byDate' | 'byVenue';
+  setView: (v: 'byDate' | 'byVenue') => void;
+}) {
+  const opts: { id: 'byDate' | 'byVenue'; label: string }[] = [
+    { id: 'byDate', label: '按日期' },
+    { id: 'byVenue', label: '按场地' },
+  ];
+  return (
+    <div className="flex shrink-0 gap-1 px-3 pt-2">
+      {opts.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => setView(o.id)}
+          className={
+            'rounded px-2.5 py-1 text-xs font-semibold transition ' +
+            (view === o.id ? 'bg-brown-700 text-white' : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+          }
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ScheduleRow({
+  s,
+  showDate,
+  onClick,
+}: {
+  s: SchedItem;
+  showDate?: boolean;
+  onClick: () => void;
+}) {
+  const onmap = !!VENUE_COORDS[s.venue];
+  return (
+    <button
+      onClick={onClick}
+      className="group flex w-full items-stretch gap-2.5 border-b border-brown-700/40 py-2 text-left"
+    >
+      <div className="w-12 shrink-0 pt-0.5 text-right">
+        {showDate && <div className="text-[10px] text-brown-400">6/{s.date}</div>}
+        <div className="text-sm font-bold tabular-nums text-brown-100">{s.time}</div>
+        {s.dur ? <div className="text-[10px] text-brown-400">{s.dur}min</div> : null}
+      </div>
+      <div className="w-1 shrink-0 rounded-full" style={{ background: CATEGORY_COLORS[s.cat] }} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-brown-100 group-hover:underline">{s.title}</div>
+        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-brown-300">
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
+          />
+          <span className="truncate">{s.venue}</span>
+          <span className="ml-auto shrink-0 rounded px-1" style={{ background: CATEGORY_COLORS[s.cat] + '33' }}>
+            {s.cat}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ScheduleDetail({
+  item,
+  onBack,
+  onVenue,
+}: {
+  item: SchedItem;
+  onBack: () => void;
+  onVenue: (venue: string) => void;
+}) {
+  const onmap = !!VENUE_COORDS[item.venue];
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+        <button
+          onClick={onBack}
+          className="shrink-0 rounded bg-brown-700/50 px-2 py-1 text-xs text-brown-200 hover:bg-brown-700"
+        >
+          ← 返回
+        </button>
+        <span
+          className="ml-auto shrink-0 rounded px-2 py-0.5 text-xs font-bold"
+          style={{ background: CATEGORY_COLORS[item.cat] + '33', color: CATEGORY_COLORS[item.cat] }}
+        >
+          {item.cat}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        <h3 className="font-display text-2xl leading-tight text-brown-100">{item.title}</h3>
+        <div className="mt-3 space-y-1.5 text-sm text-brown-200">
+          <div className="flex gap-2">
+            <span className="w-10 shrink-0 text-brown-400">时间</span>
+            <span className="tabular-nums">
+              6/{item.date} {item.time}
+              {item.dur ? ` · ${item.dur} 分钟` : ''}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-10 shrink-0 text-brown-400">场地</span>
+            <button onClick={() => onVenue(item.venue)} className="text-left text-[#e4b58c] hover:underline">
+              {item.venue}
+              {onmap ? '' : '（场外剧场）'}
+            </button>
+          </div>
+        </div>
+        <p className="mt-4 whitespace-pre-wrap rounded-lg bg-brown-700/40 p-3 text-sm leading-relaxed text-brown-100">
+          {item.desc}
+        </p>
+        {onmap && (
+          <button
+            onClick={() => focusVenueOnMap(item.venue)}
+            className="mt-4 w-full rounded bg-clay-700 px-3 py-2 text-sm font-semibold text-white hover:bg-clay-600"
+          >
+            在地图上定位场地
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StateTab({
+  worldId,
+  engineId,
+  game,
+  playerId,
+  setSelectedElement,
+}: {
+  worldId: Id<'worlds'>;
+  engineId: Id<'engines'>;
+  game: ServerGame;
+  playerId?: GameId<'players'>;
+  setSelectedElement: SelectElement;
+}) {
+  const detailScrollRef = useRef<HTMLDivElement>(null);
+
+  // A resident is selected (from this list or the map): show their details.
+  if (playerId) {
+    return (
+      <div ref={detailScrollRef} className="h-full overflow-y-auto px-4 py-5 sm:px-6">
+        <PlayerDetails
+          worldId={worldId}
+          engineId={engineId}
+          game={game}
+          playerId={playerId}
+          setSelectedElement={setSelectedElement}
+          scrollViewRef={detailScrollRef}
+        />
+      </div>
+    );
+  }
+
   const players = [...game.world.players.values()];
   const agents = [...game.world.agents.values()];
   const conversations = [...game.world.conversations.values()];
@@ -276,7 +504,10 @@ function StateTab({ game }: { game: ServerGame }) {
             return (
               <button
                 key={p.id}
-                onClick={() => undefined}
+                onClick={() => {
+                  setSelectedElement({ kind: 'player', id: p.id });
+                  focusMapTile(p.position.x, p.position.y);
+                }}
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-brown-700/40"
               >
                 <span

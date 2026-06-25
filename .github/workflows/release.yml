@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve ref
+        id: ref
+        run: |
+          REF="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=${REF}" >> "$GITHUB_OUTPUT"
+          echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package dist
+        run: |
+          cd dist && zip -r "../houniao300-game-${{ steps.ref.outputs.version }}.zip" . && cd ..
+
+      - name: Extract release notes
+        id: notes
+        run: |
+          NOTES=$(awk -v ver="${{ steps.ref.outputs.version }}" '/^## / { if (found) exit; if ($2 == ver) { found=1; next } } found { print }' CHANGELOG.md)
+          {
+            echo "body<<RELEASE_EOF"
+            echo "${NOTES:-Release ${{ steps.ref.outputs.tag }}}"
+            echo "RELEASE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ref.outputs.tag }}
+          name: ${{ steps.ref.outputs.tag }}
+          body: ${{ steps.notes.outputs.body }}
+          files: houniao300-game-*.zip
+          make_latest: true
