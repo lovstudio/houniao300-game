@@ -68,6 +68,8 @@ body {
 /* ── Top masthead: 候鸟驿站招牌 ───────────────────────────── */
 .masthead {
   position: relative;
+  /* 刘海/灵动岛安全区：招牌背景延伸到状态栏下方，内容不被遮挡 */
+  padding-top: env(safe-area-inset-top);
   background:
     radial-gradient(120% 140% at 12% -30%, rgba(204, 120, 76, 0.32), transparent 55%),
     radial-gradient(rgba(255, 236, 200, 0.05) 1px, transparent 1px) 0 0 / 6px 6px,
@@ -473,4 +475,35 @@ p[contenteditable='true']:empty::before {
 
 .shape-top-left-corner {
   clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* ===== 移动端适配 (mobile-adapt) ===== */
+/* 全局横向溢出兜底 */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* 真实视口高度：iOS/安卓浏览器工具栏会吃掉 100vh，用 100dvh，并保留 100vh 兜底 */
+.screen-h {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* 底部安全区（home indicator） */
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 状态栏分段过长时截断而非撑破布局 */
+.status-seg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 移动端把主要可点元素抬到 ≥44px，触屏友好；桌面端不受影响 */
+@media (max-width: 1023px) {
+  .button {
+    min-height: 44px;
+  }
 }

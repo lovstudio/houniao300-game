@@ -43,12 +43,14 @@ export default function SidebarTabs({
   game,
   playerId,
   setSelectedElement,
+  onActivate,
 }: {
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
   playerId?: GameId<'players'>;
   setSelectedElement: SelectElement;
+  onActivate?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>('state');
   // bumped each time a venue marker is clicked on the map, to drive the schedule tab
@@ -56,7 +58,10 @@ export default function SidebarTabs({
 
   // jump to the state tab (which now hosts character details) on map selection
   useEffect(() => {
-    if (playerId) setTab('state');
+    if (playerId) {
+      setTab('state');
+      onActivate?.();
+    }
   }, [playerId]);
 
   // a venue marker on the map was clicked: open the schedule tab on that venue
@@ -64,6 +69,7 @@ export default function SidebarTabs({
     setVenueSelectHandler((venue) => {
       setVenueFocus((prev) => ({ venue, n: (prev?.n ?? 0) + 1 }));
       setTab('schedule');
+      onActivate?.();
     });
     return () => setVenueSelectHandler(null);
   }, []);

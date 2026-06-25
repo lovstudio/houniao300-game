@@ -65,18 +65,24 @@ export default function Home() {
 
   // 身份门：加载中显示占位，未录入则强制 onboarding。
   if (profile === undefined) {
-    return <main className="flex h-screen items-center justify-center bg-brown-900 text-brown-300">加载中…</main>;
+    return <main className="flex screen-h items-center justify-center bg-brown-900 text-brown-300">加载中…</main>;
   }
   if (profile === null) {
     return (
-      <main className="h-screen bg-brown-900">
+      <main
+        className="screen-h bg-brown-900"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
         <Onboarding userId={userId} onDone={() => undefined} />
       </main>
     );
   }
 
   return (
-    <main className="flex h-screen flex-col overflow-hidden font-body game-background bg-brown-900">
+    <main className="flex screen-h flex-col overflow-hidden font-body game-background bg-brown-900">
       <ReactModal
         isOpen={helpModalOpen}
         onRequestClose={() => setHelpModalOpen(false)}
@@ -146,7 +152,13 @@ export default function Home() {
 
       {/* 活动专属体验：作为覆盖层叠在小镇之上，关闭即回到小镇（小镇状态不丢） */}
       {activeActivity && (
-        <div className="fixed inset-0 z-[60] bg-brown-900">
+        <div
+          className="fixed inset-0 z-[60] bg-brown-900"
+          style={{
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}
+        >
           <Experience
             key={activeActivity.activityKey}
             activity={activeActivity}
