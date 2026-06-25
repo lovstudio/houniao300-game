@@ -412,12 +412,38 @@ function ScheduleDetail({
               {item.dur ? ` · ${item.dur} 分钟` : ''}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="group flex items-center gap-2">
             <span className="w-10 shrink-0 text-brown-400">场地</span>
-            <button onClick={() => onVenue(item.venue)} className="text-left text-[#e4b58c] hover:underline">
+            <button
+              onClick={() => onVenue(item.venue)}
+              className="min-w-0 text-left text-[#e4b58c] hover:underline"
+            >
               {item.venue}
               {onmap ? '' : '（场外剧场）'}
             </button>
+            {onmap && (
+              <button
+                onClick={() => focusVenueOnMap(item.venue)}
+                title="在地图上定位"
+                aria-label="在地图上定位"
+                className="shrink-0 text-brown-400 opacity-40 transition hover:text-clay-300 group-hover:opacity-100"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10Z" />
+                  <circle cx="12" cy="11" r="2" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         <p className="mt-4 whitespace-pre-wrap rounded-lg bg-brown-700/40 p-3 text-sm leading-relaxed text-brown-100">
@@ -427,16 +453,8 @@ function ScheduleDetail({
           onClick={() => enterActivity(activityFromSchedule(item))}
           className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
         >
-          进入这个活动的专属体验 →
+          进入这个活动的专属体验
         </button>
-        {onmap && (
-          <button
-            onClick={() => focusVenueOnMap(item.venue)}
-            className="mt-2 w-full rounded bg-brown-700/60 px-3 py-2 text-sm font-semibold text-brown-100 hover:bg-brown-700"
-          >
-            在地图上定位场地
-          </button>
-        )}
       </div>
     </div>
   );
