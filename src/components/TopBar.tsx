@@ -1,0 +1,69 @@
+import InteractButton from './buttons/InteractButton';
+import SettingsMenu from './SettingsMenu';
+
+// 候鸟驿站招牌 — the festival masthead: a migratory-bird seal, the gold game title, and the control deck.
+
+function FlockSeal() {
+  return (
+    <span className="masthead-seal masthead-bird grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full sm:h-[52px] sm:w-[52px]">
+      {/* mirror the browser-tab favicon: sunset over dunes with a migratory bird */}
+      <svg width="44" height="44" viewBox="0 0 32 32" fill="none" aria-hidden>
+        <rect width="32" height="32" fill="#181425" />
+        {/* 落日 */}
+        <circle cx="23" cy="9" r="4" fill="#E4A672" />
+        {/* 沙丘 */}
+        <path d="M0 25 Q8 20 16 24 Q24 28 32 23 V32 H0 Z" fill="#B86F50" />
+        <path d="M0 28 Q9 25 17 28 Q25 31 32 28 V32 H0 Z" fill="#EAD4AA" />
+        {/* 候鸟 */}
+        <path d="M4 17 Q10 9 16 16 Q22 9 28 17" stroke="#EAD4AA" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </svg>
+    </span>
+  );
+}
+
+export default function TopBar({
+  controlMode,
+  cameraFollow,
+  isFullscreen,
+  onToggleControlMode,
+  onToggleCameraFollow,
+  onToggleFullscreen,
+  onHelp,
+}: {
+  controlMode: 'player' | 'camera';
+  cameraFollow: boolean;
+  isFullscreen: boolean;
+  onToggleControlMode: () => void;
+  onToggleCameraFollow: () => void;
+  onToggleFullscreen: () => void;
+  onHelp: () => void;
+}) {
+  return (
+    <header className="masthead z-30 shrink-0">
+      <div className="flex items-center justify-between gap-x-4 px-3 py-2 sm:px-5">
+        {/* brand block */}
+        <div className="masthead-in flex min-w-0 items-center gap-3">
+          <FlockSeal />
+          <h1 className="game-title font-display text-3xl leading-tight tracking-wide sm:text-[2.6rem]">候鸟沙城</h1>
+        </div>
+
+        {/* control deck — primary action + settings menu */}
+        <div className="masthead-in deck-group relative z-50 ml-auto flex items-center gap-1" style={{ animationDelay: '0.08s' }}>
+          <InteractButton />
+          <SettingsMenu
+            controlMode={controlMode}
+            cameraFollow={cameraFollow}
+            isFullscreen={isFullscreen}
+            onToggleControlMode={onToggleControlMode}
+            onToggleCameraFollow={onToggleCameraFollow}
+            onToggleFullscreen={onToggleFullscreen}
+            onHelp={onHelp}
+          />
+        </div>
+      </div>
+
+      {/* festival tent valance */}
+      <div className="masthead-valance" />
+    </header>
+  );
+}

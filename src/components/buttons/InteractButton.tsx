@@ -1,6 +1,6 @@
-import Button from './Button';
+import DeckButton from './DeckButton';
+import { JoinIcon, LeaveIcon } from './DeckIcons';
 import { toast } from 'react-toastify';
-import interactImg from '../../../assets/interact.svg';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 // import { SignInButton } from '@clerk/clerk-react';
@@ -68,8 +68,13 @@ export default function InteractButton() {
   //   );
   // }
   return (
-    <Button imgUrl={interactImg} onClick={joinOrLeaveGame}>
+    <DeckButton
+      onClick={joinOrLeaveGame}
+      active={isPlaying}
+      title={isPlaying ? '离开模拟世界' : '加入模拟世界'}
+      icon={isPlaying ? <LeaveIcon /> : <JoinIcon />}
+    >
       {isPlaying ? '离开' : '加入'}
-    </Button>
+    </DeckButton>
   );
 }

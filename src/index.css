@@ -65,6 +65,269 @@ body {
   padding-right: 0.12em;
 }
 
+/* ── Top masthead: 候鸟驿站招牌 ───────────────────────────── */
+.masthead {
+  position: relative;
+  background:
+    radial-gradient(120% 140% at 12% -30%, rgba(204, 120, 76, 0.32), transparent 55%),
+    radial-gradient(rgba(255, 236, 200, 0.05) 1px, transparent 1px) 0 0 / 6px 6px,
+    linear-gradient(180deg, #3a2a1e 0%, #2c1d14 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.18), 0 6px 22px rgba(20, 12, 6, 0.5);
+}
+/* festival tent valance (scalloped clay edge hanging under the bar) */
+.masthead-valance {
+  height: 9px;
+  background: linear-gradient(180deg, #c0654a, #a8553c);
+  -webkit-mask: radial-gradient(9px at 50% 9px, transparent 96%, #000) 0 0 / 18px 100% repeat-x;
+  mask: radial-gradient(9px at 50% 9px, transparent 96%, #000) 0 0 / 18px 100% repeat-x;
+  filter: drop-shadow(0 2px 1px rgba(20, 12, 6, 0.4));
+}
+.masthead-seal {
+  background: radial-gradient(circle at 38% 32%, #fbf3e2, #ecd8b6);
+  box-shadow: inset 0 0 0 2px #c0654a, inset 0 0 0 5px rgba(192, 101, 74, 0.25),
+    0 3px 0 #6e2146, 0 5px 10px rgba(20, 12, 6, 0.4);
+}
+.masthead-bird {
+  animation: birdBob 3.6s ease-in-out infinite;
+  transform-origin: 50% 60%;
+}
+@keyframes birdBob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-2.5px) rotate(2deg); }
+}
+.masthead-deck {
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.45), rgba(20, 12, 6, 0.2));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 220, 170, 0.08);
+}
+@keyframes mastheadIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.masthead-in {
+  animation: mastheadIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Control deck: grouped warm buttons ─────────────────── */
+/* layout (flex/gap) comes from Tailwind utilities so `hidden lg:flex` still wins */
+.deck-group {
+  padding: 4px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.5), rgba(20, 12, 6, 0.28));
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.08), inset 0 0 0 1px rgba(255, 220, 170, 0.06);
+}
+.deck-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.08s ease, box-shadow 0.16s ease;
+}
+.deck-btn .deck-ico {
+  display: grid;
+  place-items: center;
+  opacity: 0.85;
+}
+.deck-btn-off {
+  background: rgba(255, 236, 200, 0.05);
+  color: #e7d3b3;
+}
+.deck-btn-off:hover {
+  background: rgba(255, 236, 200, 0.13);
+  color: #fff3e0;
+}
+.deck-btn-on {
+  background: linear-gradient(180deg, #c8694c, #a8553c);
+  color: #fff5e6;
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.35), 0 2px 7px rgba(20, 12, 6, 0.45);
+}
+.deck-btn-on .deck-ico {
+  opacity: 1;
+}
+.deck-btn-on:hover {
+  filter: brightness(1.06);
+}
+.deck-btn:active {
+  transform: translateY(1px);
+}
+@media (max-width: 640px) {
+  .deck-btn {
+    height: 30px;
+    padding: 0 9px;
+    font-size: 12px;
+  }
+  .deck-btn .deck-ico svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* ── Settings popover ───────────────────────────────────── */
+.settings-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: 232px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #3a2a1e, #2c1d14);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.16), 0 12px 32px rgba(20, 12, 6, 0.55),
+    0 0 0 1px rgba(255, 220, 170, 0.1);
+  transform-origin: top right;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.settings-pop-closed {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  pointer-events: none;
+  visibility: hidden;
+}
+.settings-pop-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  visibility: visible;
+}
+.settings-section {
+  padding: 8px 10px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #b8946a;
+}
+.settings-section:first-child {
+  padding-top: 4px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: #e7d3b3;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.setting-row:hover {
+  background: rgba(255, 236, 200, 0.09);
+  color: #fff3e0;
+}
+.setting-ico {
+  display: grid;
+  place-items: center;
+  opacity: 0.8;
+}
+.setting-label {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.setting-val {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: #caa979;
+  background: rgba(255, 236, 200, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 170, 0.1);
+}
+.setting-val-on {
+  color: #fff5e6;
+  background: linear-gradient(180deg, #c8694c, #a8553c);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.3);
+}
+.setting-chev {
+  display: grid;
+  place-items: center;
+  opacity: 0.5;
+}
+
+/* ── Bottom status bar ──────────────────────────────────── */
+.status-bar {
+  height: 36px;
+  padding: 0 4px 0 14px;
+  font-size: 12.5px;
+  color: #cdb89a;
+  background:
+    radial-gradient(rgba(255, 236, 200, 0.04) 1px, transparent 1px) 0 0 / 7px 7px,
+    linear-gradient(0deg, #2c1d14 0%, #3a2a1e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.16), 0 -6px 22px rgba(20, 12, 6, 0.5);
+  border-top: 1px solid rgba(255, 220, 170, 0.1);
+}
+/* display/flex live on Tailwind utilities so `hidden sm:flex` still wins */
+.status-seg {
+  padding: 0 14px;
+  height: 18px;
+  white-space: nowrap;
+}
+/* directional dividers — attached so a hidden neighbour leaves no stray line */
+.status-bar .div-l {
+  border-left: 1px solid rgba(255, 220, 170, 0.12);
+}
+@media (min-width: 640px) {
+  .status-bar .div-l-sm {
+    border-left: 1px solid rgba(255, 220, 170, 0.12);
+  }
+}
+.status-prog {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-left: 8px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f6ecd9;
+  background: linear-gradient(180deg, #c8694c, #a8553c);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.3), 0 2px 6px rgba(20, 12, 6, 0.4);
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.08s ease;
+}
+.status-prog:hover {
+  filter: brightness(1.07);
+}
+.status-prog:active {
+  transform: translateY(1px);
+}
+
+/* ── Programme dialog ───────────────────────────────────── */
+.sched-backdrop {
+  background: rgba(20, 12, 6, 0.55);
+  backdrop-filter: blur(2px);
+  animation: schedFade 0.16s ease both;
+}
+.sched-dialog {
+  border-radius: 16px;
+  background: #efe2cb;
+  background-image: radial-gradient(rgba(120, 80, 40, 0.06) 1px, transparent 1px);
+  background-size: 7px 7px;
+  color: #2a1c14;
+  box-shadow: 0 24px 60px rgba(20, 12, 6, 0.6), 0 0 0 1px rgba(20, 12, 6, 0.5);
+  animation: schedPop 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes schedFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes schedPop {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
 .game-frame {
   border-width: 36px;
   border-image-source: url(../assets/ui/frame.svg);

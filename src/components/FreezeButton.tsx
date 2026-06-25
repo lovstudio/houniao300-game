@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import Button from './buttons/Button';
+import SettingRow from './buttons/SettingRow';
+import { SnowflakeIcon } from './buttons/DeckIcons';
 
 export default function FreezeButton() {
   const stopAllowed = useQuery(api.testing.stopAllowed) ?? false;
@@ -22,15 +23,13 @@ export default function FreezeButton() {
   };
 
   return !stopAllowed ? null : (
-    <>
-      <Button
-        onClick={flipSwitch}
-        className="hidden lg:block"
-        title="冻结世界时，智能体需要一些时间停下手头的事，然后才会进入冻结状态。"
-        imgUrl="/assets/star.svg"
-      >
-        {frozen ? '解冻' : '冻结'}
-      </Button>
-    </>
+    <SettingRow
+      icon={<SnowflakeIcon />}
+      label="冻结世界"
+      value={frozen ? '已冻结' : '运行中'}
+      active={frozen}
+      onClick={flipSwitch}
+      title="冻结世界时，智能体需要一些时间停下手头的事，然后才会进入冻结状态。"
+    />
   );
 }

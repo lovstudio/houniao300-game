@@ -542,6 +542,17 @@ export function drawSandCityModel(
   addLabel(container, project, '公路复古艺术展区', 1305, 645);
   addLabel(container, project, '300.梯威', 1180, 880);
   addLabel(container, project, '二级城墙', 1480, 805);
+
+  // Clip the whole model to the map rectangle: the sea / shallow water / foam are
+  // projected past the shoreline (negative x, y beyond the bottom) and would
+  // otherwise bleed outside the map container. The mask is a child so it tracks
+  // the container's own transform.
+  const clip = new PIXI.Graphics();
+  clip.beginFill(0xffffff);
+  clip.drawRect(0, 0, worldWidth, worldHeight);
+  clip.endFill();
+  container.addChild(clip);
+  container.mask = clip;
 }
 
 function pointInRoughForest(x: number, y: number) {

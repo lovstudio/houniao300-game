@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import volumeImg from '../../../assets/volume.svg';
 import { sound } from '@pixi/sound';
-import Button from './Button';
+import SettingRow from './SettingRow';
+import { MusicIcon } from './DeckIcons';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -39,15 +39,13 @@ export default function MusicButton() {
   }, [handleKeyPress]);
 
   return (
-    <>
-      <Button
-        onClick={() => void flipSwitch()}
-        className="hidden lg:block"
-        title="播放 AI 生成的音乐（按 m 播放/静音）"
-        imgUrl={volumeImg}
-      >
-        {isPlaying ? '静音' : '音乐'}
-      </Button>
-    </>
+    <SettingRow
+      icon={<MusicIcon />}
+      label="音乐"
+      value={isPlaying ? '播放中' : '关'}
+      active={isPlaying}
+      onClick={() => void flipSwitch()}
+      title="播放 AI 生成的音乐（按 m 播放/静音）"
+    />
   );
 }
