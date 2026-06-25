@@ -32,7 +32,9 @@ export default PixiComponent('Viewport', {
   create(props: ViewportProps) {
     const { app, children, viewportRef, ...viewportProps } = props;
     const minScale = viewportMinScale(props);
-    const initialScale = Math.min(3, Math.max(minScale, 1.15));
+    // 移动端窄屏：初始按 minScale 铺满，避免强制 1.15× 只看到一小块地图；桌面端保持近景。
+    const initialScale =
+      props.screenWidth < 768 ? minScale : Math.min(3, Math.max(minScale, 1.15));
     const viewport = new Viewport({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       events: app.renderer.events,

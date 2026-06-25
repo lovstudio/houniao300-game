@@ -44,8 +44,10 @@ export default function TopBar({
         {/* brand block */}
         <div className="masthead-in flex min-w-0 items-center gap-2.5">
           <FlockSeal />
-          <h1 className="game-title font-display text-3xl leading-tight tracking-wide sm:text-[2.6rem]">候鸟沙城</h1>
-          <span className="shrink-0 self-center rounded-full bg-brown-700/60 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide tabular-nums text-[#caa979]">
+          <h1 className="game-title whitespace-nowrap font-display text-2xl leading-tight tracking-wide sm:text-[2.6rem]">
+            候鸟沙城
+          </h1>
+          <span className="hidden shrink-0 self-center rounded-full bg-brown-700/60 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide tabular-nums text-[#caa979] sm:inline">
             v{__APP_VERSION__}
           </span>
         </div>

@@ -14,6 +14,7 @@ import {
   type SchedItem,
 } from '../../data/schedule';
 import { focusMapVenue } from '../lib/mapFocus';
+import { openPanel } from '../lib/panelBus';
 
 // Bottom status bar + a dialog-triggered festival programme grid.
 // The slim bar shows festival day · now-playing · online players · clock;
@@ -143,7 +144,11 @@ export default function Timeline() {
 
           <button
             className="status-prog shrink-0"
-            onClick={() => setDialogOpen(true)}
+            onClick={() => {
+              // 移动端没有常驻侧栏：打开抽屉的节目单 tab（可进活动）；桌面端开甘特弹窗。
+              if (window.innerWidth < 1024) openPanel('schedule');
+              else setDialogOpen(true);
+            }}
             title="打开节目单（潮汐节目单）"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">

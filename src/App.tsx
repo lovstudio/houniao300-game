@@ -166,7 +166,7 @@ export default function Home() {
         onHelp={() => setHelpModalOpen(true)}
       />
 
-      <div className="relative isolate min-h-0 flex-1 overflow-hidden shadow-2xl">
+      <div className="relative min-h-0 flex-1 overflow-hidden shadow-2xl">
         <Game
           controlMode={controlMode}
           cameraFollow={cameraFollow}

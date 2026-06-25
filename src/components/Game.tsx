@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import PixiGame from './PixiGame.tsx';
+import { setPanelOpenHandler } from '../lib/panelBus.ts';
 
 import { useElementSize } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
@@ -42,6 +43,12 @@ export default function Game({
   useEffect(() => {
     if (selectedElement) setPanelOpen(true);
   }, [selectedElement]);
+
+  // 底部「节目单」（移动端）通过总线打开本抽屉。
+  useEffect(() => {
+    setPanelOpenHandler(() => setPanelOpen(true));
+    return () => setPanelOpenHandler(null);
+  }, []);
 
   const worldStatus = useQuery(api.world.defaultWorldStatus);
   const worldId = worldStatus?.worldId;
@@ -88,31 +95,21 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </Stage>
             </div>
           </div>
-          {/* 移动端浮动入口：打开节目单/状态/广播面板 */}
-          {!panelOpen && (
-            <button
-              onClick={() => setPanelOpen(true)}
-              style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
-              className="absolute right-3 z-30 rounded-full bg-clay-700 px-4 py-3 font-display text-sm text-white shadow-solid lg:hidden"
-            >
-              节目单 · 面板
-            </button>
-          )}
         </div>
 
-        {/* 移动端抽屉遮罩 */}
+        {/* 移动端抽屉遮罩（z 高于招牌 z-30） */}
         {panelOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-[55] bg-black/50 lg:hidden"
             onClick={() => setPanelOpen(false)}
           />
         )}
 
-        {/* 右侧面板：移动端为右侧滑入抽屉，桌面端为栅格常驻第二列 */}
+        {/* 右侧面板：移动端为右侧滑入抽屉（z 高于招牌），桌面端为栅格常驻第二列 */}
         <div
           className={clsx(
             'flex min-h-0 flex-col overflow-hidden bg-brown-800/95 text-brown-100',
-            'fixed inset-y-0 right-0 z-50 w-[86%] max-w-sm border-l-8 border-brown-900 shadow-2xl transition-transform duration-300',
+            'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm border-l-8 border-brown-900 shadow-2xl transition-transform duration-300',
             'pt-[env(safe-area-inset-top)] lg:pt-0',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
             'lg:static lg:z-auto lg:w-96 lg:max-w-none lg:translate-x-0 lg:border-l-8 lg:shadow-none',

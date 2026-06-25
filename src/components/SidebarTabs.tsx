@@ -9,6 +9,7 @@ import { SelectElement } from './Player';
 import { SCHEDULE, VENUES, VENUE_COORDS, CATEGORY_COLORS, DATES, type SchedItem } from '../../data/schedule';
 import { focusMapVenue, focusMapTile, setVenueSelectHandler } from '../lib/mapFocus';
 import { enterActivity, activityFromSchedule } from '../lib/activityEnter';
+import { setPanelTabHandler } from '../lib/panelBus';
 import { toast } from 'react-toastify';
 
 type Tab = 'state' | 'chat' | 'schedule';
@@ -63,6 +64,12 @@ export default function SidebarTabs({
       onActivate?.();
     }
   }, [playerId]);
+
+  // 底部「节目单」（移动端）请求切到指定 tab。
+  useEffect(() => {
+    setPanelTabHandler((t) => setTab(t));
+    return () => setPanelTabHandler(null);
+  }, []);
 
   // a venue marker on the map was clicked: open the schedule tab on that venue
   useEffect(() => {
