@@ -61,6 +61,8 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0px 0.08em 0px #6e2146);
+  /* background-clip:text + letter-spacing clips the last glyph in Chrome; pad the clip box */
+  padding-right: 0.12em;
 }
 
 .game-frame {
