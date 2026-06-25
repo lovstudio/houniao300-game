@@ -54,43 +54,33 @@ export default function Home() {
         isOpen={helpModalOpen}
         onRequestClose={() => setHelpModalOpen(false)}
         style={modalStyles}
-        contentLabel="Help modal"
+        contentLabel="帮助弹窗"
         ariaHideApp={false}
       >
         <div className="font-body">
-          <h1 className="text-center text-6xl font-bold font-display game-title">Help</h1>
+          <h1 className="text-center text-6xl font-bold font-display game-title">帮助</h1>
           <p>
-            Welcome to 候鸟沙城. The game supports both anonymous <i>spectators</i> and logged in{' '}
-            <i>interactivity</i>.
+            欢迎来到候鸟沙城。游戏同时支持匿名<i>旁观</i>和登录后的<i>互动</i>。
           </p>
-          <h2 className="text-4xl mt-4">Spectating</h2>
+          <h2 className="text-4xl mt-4">旁观</h2>
           <p>
-            Click and drag to move around the town, and scroll in and out to zoom. You can click on
-            an individual character to view its chat history.
+            点击并拖拽即可在小镇里移动视角，滚动滚轮可以放大缩小。你可以点击单个角色，查看它的聊天记录。
           </p>
-          <h2 className="text-4xl mt-4">Interactivity</h2>
+          <h2 className="text-4xl mt-4">互动</h2>
           <p>
-            If you log in, you can join the simulation and directly talk to different agents! After
-            logging in, click the "Interact" button, and your character will appear somewhere on the
-            map with a highlighted circle underneath you.
+            登录后，你就能加入这个模拟世界，直接和不同的智能体对话！登录后点击"加入"按钮，你的角色就会出现在地图的某个位置，脚下带有一圈高亮的光环。
           </p>
-          <p className="text-2xl mt-2">Controls:</p>
-          <p className="mt-4">Click to navigate around.</p>
+          <p className="text-2xl mt-2">操作：</p>
+          <p className="mt-4">点击即可移动。</p>
           <p className="mt-4">
-            In Player mode, use WASD or the arrow keys to move your character. In Camera mode, the
-            same keys pan the camera. Press C to switch modes, V to toggle player follow, + and - to
-            zoom, 0 to show the full map, and F to toggle fullscreen.
+            在"角色"模式下，用 WASD 或方向键移动你的角色；在"镜头"模式下，同样的按键用来平移镜头。按 C
+            切换模式，按 V 切换跟随角色，按 + 和 - 缩放，按 0 显示完整地图，按 F 切换全屏。
           </p>
           <p className="mt-4">
-            To talk to an agent, click on them and then click "Start conversation," which will ask
-            them to start walking towards you. Once they're nearby, the conversation will start, and
-            you can speak to each other. You can leave at any time by closing the conversation pane
-            or moving away. They may propose a conversation to you - you'll see a button to accept
-            in the messages panel.
+            想和智能体对话，先点击它，再点击"发起对话"，它就会朝你走来。等它走近，对话便会开始，你们就可以互相交谈。你随时可以关闭对话面板或走开来结束对话。对方也可能主动向你发起对话——这时你会在消息面板里看到一个接受按钮。
           </p>
           <p className="mt-4">
-            候鸟沙城 only supports {MAX_HUMAN_PLAYERS} humans at a time. If you're idle for five
-            minutes, you'll be automatically removed from the simulation.
+            候鸟沙城同一时间最多只支持 {MAX_HUMAN_PLAYERS} 名真人玩家。如果你闲置超过五分钟，将会被自动移出模拟世界。
           </p>
         </div>
       </ReactModal>
@@ -117,33 +107,33 @@ export default function Home() {
             <InteractButton />
             <button
               className="button text-white shadow-solid text-xl pointer-events-auto"
-              title="Switch control mode (C)"
+              title="切换操作模式 (C)"
               onClick={toggleControlMode}
             >
               <div className="inline-block bg-clay-700">
-                <span>{controlMode === 'player' ? 'Player' : 'Camera'}</span>
+                <span>{controlMode === 'player' ? '角色' : '镜头'}</span>
               </div>
             </button>
             <button
               className="button text-white shadow-solid text-xl pointer-events-auto"
-              title="Toggle player follow (V)"
+              title="切换跟随角色 (V)"
               onClick={toggleCameraFollow}
             >
               <div className="inline-block bg-clay-700">
-                <span>{cameraFollow ? 'Follow' : 'Free'}</span>
+                <span>{cameraFollow ? '跟随' : '自由'}</span>
               </div>
             </button>
             <button
               className="button text-white shadow-solid text-xl pointer-events-auto"
-              title="Toggle fullscreen (F)"
+              title="切换全屏 (F)"
               onClick={() => void toggleFullscreen()}
             >
               <div className="inline-block bg-clay-700">
-                <span>{isFullscreen ? 'Window' : 'Full'}</span>
+                <span>{isFullscreen ? '窗口' : '全屏'}</span>
               </div>
             </button>
             <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
-              Help
+              帮助
             </Button>
           </div>
         </div>
