@@ -425,7 +425,7 @@ function ScheduleDetail({
         </p>
         <button
           onClick={() => enterActivity(activityFromSchedule(item))}
-          className="mt-4 w-full rounded bg-clay-600 px-3 py-2.5 font-display text-base font-bold text-white shadow-solid hover:bg-clay-500"
+          className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
         >
           进入这个活动的专属体验 →
         </button>
