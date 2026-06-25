@@ -4,9 +4,15 @@ const OPENAI_EMBEDDING_DIMENSION = 1536;
 const TOGETHER_EMBEDDING_DIMENSION = 768;
 const OLLAMA_EMBEDDING_DIMENSION = 1024;
 
-export const EMBEDDING_DIMENSION: number = OLLAMA_EMBEDDING_DIMENSION;
+// This value is baked into the schema's vector index (agent/schema.ts), so it MUST be a
+// literal — Convex disallows process.env during schema evaluation. The deployment uses
+// ZenMux (OpenAI-compatible) with text-embedding-3-small → 1536 dims.
+export const EMBEDDING_DIMENSION: number = OPENAI_EMBEDDING_DIMENSION;
 
 export function detectMismatchedLLMProvider() {
+  // A custom OpenAI-compatible gateway (e.g. ZenMux) sets its own url/key/models and may
+  // use any embedding dimension, so it opts out of the provider-specific checks below.
+  if (process.env.LLM_PROVIDER === 'custom' || process.env.LLM_API_URL) return;
   switch (EMBEDDING_DIMENSION) {
     case OPENAI_EMBEDDING_DIMENSION:
       if (!process.env.OPENAI_API_KEY) {
