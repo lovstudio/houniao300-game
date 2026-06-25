@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import PixiGame from './PixiGame.tsx';
 
 import { useElementSize } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
-import PlayerDetails from './PlayerDetails.tsx';
+import SidebarTabs from './SidebarTabs.tsx';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
 import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
@@ -47,8 +47,6 @@ export default function Game({
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
-  const scrollViewRef = useRef<HTMLDivElement>(null);
-
   if (!worldId || !engineId || !game) {
     return null;
   }
@@ -84,17 +82,13 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           </div>
         </div>
         {/* Right column area */}
-        <div
-          className="flex min-h-0 flex-col overflow-y-auto shrink-0 px-4 py-6 sm:px-6 lg:w-96 xl:pr-6 border-t-8 sm:border-t-0 sm:border-l-8 border-brown-900 bg-brown-800/95 text-brown-100"
-          ref={scrollViewRef}
-        >
-          <PlayerDetails
+        <div className="flex min-h-0 shrink-0 flex-col overflow-hidden border-t-8 border-brown-900 bg-brown-800/95 text-brown-100 sm:border-l-8 sm:border-t-0 lg:w-96">
+          <SidebarTabs
             worldId={worldId}
             engineId={engineId}
             game={game}
             playerId={selectedElement?.id}
             setSelectedElement={setSelectedElement}
-            scrollViewRef={scrollViewRef}
           />
         </div>
       </div>

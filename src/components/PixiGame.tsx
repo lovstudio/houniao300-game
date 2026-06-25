@@ -12,6 +12,11 @@ import { useSendInput } from '../hooks/sendInput.ts';
 import { toastOnError } from '../toasts.ts';
 import { DebugPath } from './DebugPath.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
+import { VenuePing } from './VenuePing.tsx';
+import { setMapFocusHandler } from '../lib/mapFocus.ts';
+
+const MAP_SOURCE_WIDTH = 1703;
+const MAP_SOURCE_HEIGHT = 1279;
 import { SHOW_DEBUG_UI, type ControlMode } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
@@ -85,6 +90,8 @@ export const PixiGame = (props: {
   const humanPlayerId = [...props.game.world.players.values()].find(
     (p) => p.human === humanTokenIdentifier,
   )?.id;
+
+  const [ping, setPing] = useState<{ x: number; y: number; t: number } | null>(null);
 
   const moveTo = useSendInput(props.engineId, 'moveTo');
   const activeMovementKeyRef = useRef<string | null>(null);
@@ -583,6 +590,37 @@ export const PixiGame = (props: {
     });
   }, [humanPlayerId]);
 
+  // Let the bottom Timeline focus the camera on a venue and drop a ping marker.
+  useEffect(() => {
+    setMapFocusHandler((sourceX, sourceY) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const x = (sourceX / MAP_SOURCE_WIDTH) * worldWidthPx;
+      const y = (sourceY / MAP_SOURCE_HEIGHT) * worldHeightPx;
+      props.onSetCameraFollow(false); // hold the framing on the venue
+      const minScale = viewportMinScale({
+        screenHeight: props.height,
+        screenWidth: props.width,
+        worldHeight: worldHeightPx,
+        worldWidth: worldWidthPx,
+      });
+      viewport.animate({
+        position: new PIXI.Point(x, y),
+        scale: Math.max(minScale, 1.3),
+        time: 700,
+        ease: 'easeInOutCubic',
+      });
+      setPing({ x, y, t: Date.now() });
+    });
+    return () => setMapFocusHandler(null);
+  }, [worldWidthPx, worldHeightPx, props.onSetCameraFollow]);
+
+  useEffect(() => {
+    if (!ping) return;
+    const id = window.setTimeout(() => setPing(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [ping]);
+
   return (
     <PixiViewport
       app={pixiApp}
@@ -597,6 +635,7 @@ export const PixiGame = (props: {
         onpointerup={onMapPointerUp}
         onpointerdown={onMapPointerDown}
       />
+      {ping && <VenuePing x={ping.x} y={ping.y} t={ping.t} tileDim={tileDim} />}
       {players.map(
         (p) =>
           // Only show the path for the human player in non-debug mode.
