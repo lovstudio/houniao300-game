@@ -2,7 +2,8 @@ import Game, { type ControlMode } from './components/Game.tsx';
 import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
 import Onboarding from './components/Onboarding.tsx';
-import { setActivityEnterHandler, type ActivityDescriptor } from './lib/activityEnter.ts';
+import { setActivityEnterHandler, activityFromSchedule, type ActivityDescriptor } from './lib/activityEnter.ts';
+import { SCHEDULE } from '../data/schedule.ts';
 import { getAnonUserId } from './lib/identity.ts';
 
 import { ToastContainer } from 'react-toastify';
@@ -40,6 +41,21 @@ export default function Home() {
     setActivityEnterHandler((activity) => setActiveActivity(activity));
     return () => setActivityEnterHandler(null);
   }, []);
+
+  // 扫码深链：?exp=<activityKey> 落地后自动打开对应活动的连环画体验。
+  // 等身份就绪（新用户会先停在 onboarding），完成后再自动进入。
+  useEffect(() => {
+    if (!profile) return;
+    const raw = new URLSearchParams(window.location.search).get('exp');
+    if (!raw) return;
+    const key = decodeURIComponent(raw);
+    const item = SCHEDULE.find((s) => `${s.date}|${s.time}|${s.venue}|${s.title}` === key);
+    // 清掉 query，避免关闭体验回小镇后又被重新打开。
+    const u = new URL(window.location.href);
+    u.searchParams.delete('exp');
+    window.history.replaceState({}, '', u.toString());
+    if (item) setActiveActivity(activityFromSchedule(item));
+  }, [profile]);
 
   const toggleFullscreen = async () => {
     if (document.fullscreenElement) {

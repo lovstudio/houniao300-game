@@ -447,8 +447,11 @@ function EndScreen({
         <ComicPoster
           title={activity.title}
           userName={badge.userName}
+          venue={activity.hostName}
+          activityKey={activity.activityKey}
           badgeTitle={badge.title}
           badgeSummary={badge.summary}
+          reflection={reflection.trim() || badge.reflection}
           panels={panels.map((p) => ({ imageUrl: p.imageUrl, narration: p.narration }))}
           onClose={() => setShowPoster(false)}
         />
