@@ -32,7 +32,13 @@ export default function Experience({
       />
     );
   }
-  return <ComicPlayer experienceId={experienceId} onExit={onExit} />;
+  return (
+    <ComicPlayer
+      experienceId={experienceId}
+      onExit={onExit}
+      onReplay={() => setExperienceId(null)}
+    />
+  );
 }
 
 // ---------- 活动介绍 + 开始 + 本活动勋章墙 ----------
@@ -122,9 +128,11 @@ function ActivityIntro({
 function ComicPlayer({
   experienceId,
   onExit,
+  onReplay,
 }: {
   experienceId: Id<'experiences'>;
   onExit: () => void;
+  onReplay: () => void;
 }) {
   const data = useQuery(api.experience.getExperience, { experienceId });
   const answer = useAction(api.experience.answerPanel);
@@ -182,12 +190,31 @@ function ComicPlayer({
           </p>
         )}
 
-        {/* 完成 -> 勋章 */}
+        {/* 完成 -> 勋章 + 收尾交互 */}
         {experience.status === 'completed' && badge && (
           <div className="mx-auto mt-6 flex max-w-2xl flex-col items-center gap-3 border-2 border-clay-500 bg-brown-800 p-6 text-center">
             <Medallion title={badge.title} large />
             <p className="font-display text-2xl text-brown-100">{badge.title}</p>
             <p className="text-brown-200">{badge.summary}</p>
+            <p className="mt-2 text-sm text-brown-400">
+              这是只属于你的一条连环画——点击{' '}
+              <span className="lg:hidden">下方</span>
+              <span className="hidden lg:inline">右侧</span>任意一幕都能回看。
+            </p>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={onReplay}
+                className="rounded bg-clay-700 px-5 py-2.5 font-display text-white hover:bg-clay-500"
+              >
+                再玩一次（全新结局）
+              </button>
+              <button
+                onClick={onExit}
+                className="rounded border-2 border-brown-700 px-5 py-2.5 font-display text-brown-100 hover:border-clay-500"
+              >
+                返回小镇
+              </button>
+            </div>
           </div>
         )}
 
