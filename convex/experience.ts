@@ -52,10 +52,18 @@ const ENDING_ARCHETYPES = [
   '把名字写进风里｜燃烧过、参与过，然后轻轻消失',
 ];
 
+// badgeTitle 必须收敛到这 5 个命名原型之一（｜前那段），结局墙才能干净地按类型聚合。
+// 单一真相源：从 ENDING_ARCHETYPES 派生，不另维护重复列表。
+const ENDING_NAMES = ENDING_ARCHETYPES.map((e) => e.split('｜')[0].trim());
+
 function validateStep(step: DirectorStep, willFinal: boolean): string | null {
   if (!step.imagePrompt?.trim() || !step.narration?.trim()) return '缺少 imagePrompt 或 narration';
   if (willFinal) {
     if (!step.badgeTitle?.trim() || !step.badgeSummary?.trim()) return '收尾格缺少 badgeTitle/badgeSummary';
+    // 结局名强约束：必须逐字命中 5 个原型名之一，否则触发重试（题词 badgeSummary 不限内容）。
+    if (!ENDING_NAMES.includes(step.badgeTitle.trim())) {
+      return `badgeTitle「${step.badgeTitle.trim()}」不在命名原型内，必须逐字取自：${ENDING_NAMES.join('、')}`;
+    }
   } else if (!step.question?.trim() || !step.options || step.options.length < 2) {
     return '非收尾格缺少 question 或 options';
   }
@@ -85,7 +93,7 @@ async function director(
     '  options: string[]    // 3-4 个中文选项（收尾格省略）',
     '  allowCustom: boolean // 是否允许用户自定义输入（收尾格省略）',
     '  final: boolean       // 是否为收尾格',
-    '  badgeTitle: string   // 仅收尾格：命中的命名结局（取原型名，4-10 字，给"我是X型"身份感）',
+    '  badgeTitle: string   // 仅收尾格：必须逐字等于下方某个命名原型的"结局名"（｜前那段），原样复制，不得自创、不得加标点',
     '  badgeSummary: string // 仅收尾格：一句可当签名档的题词（≤20 字，诗性/反差/留白，禁止套话）',
     ...(isFirst
       ? [
@@ -107,7 +115,8 @@ async function director(
     '本故事将收束到以下命名结局原型之一（格式：结局名｜一句注解）：',
     ...ENDING_ARCHETYPES.map((e) => `  - ${e}`),
     '每个用户选项都隐含一种倾向；请根据"历史"里用户的累积选择，自然地把剧情导向最契合的那个结局。',
-    '收尾时：badgeTitle 取命中结局的"结局名"（｜前那部分），badgeSummary 是为这位用户量身的金句题词。',
+    '收尾时：badgeTitle 必须从上面 5 个原型里挑一个，逐字复制其"结局名"（｜前那部分），不得自创新名、不得改写、不得添加任何标点或修饰；badgeSummary 才是为这位用户量身的自由金句题词。',
+    `badgeTitle 只能是以下之一：${ENDING_NAMES.join(' / ')}。`,
     // 跨格视觉一致性：每格都带上首格锁定的主角描述，且 imagePrompt 必须复刻同一主角与色板。
     ...(opts.protagonistDesc
       ? [
@@ -567,10 +576,15 @@ export const answerPanel = action({
     }
 
     if (isFinal) {
-      // 不做平庸兜底：命名结局 + 金句题词由 director 保证（validateStep），缺则上游已重试。
+      // 命名结局 + 金句题词由 director 保证（validateStep 已强约束 + 重试）。
+      // 最后兜底：万一模型重试后仍给出非原型名（极少数顽固情况），就贴到第一个原型，
+      // 绝不让收尾抛错而中断整段游玩；这里只校正 title，绝不引入平庸填充词。
+      const finalTitle = ENDING_NAMES.includes(step.badgeTitle?.trim() ?? '')
+        ? step.badgeTitle!.trim()
+        : ENDING_NAMES[0];
       await ctx.runMutation(internal.experience.awardBadge, {
         experienceId,
-        title: step.badgeTitle!,
+        title: finalTitle,
         summary: step.badgeSummary!,
       });
     }
