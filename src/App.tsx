@@ -1,13 +1,17 @@
 import Game, { type ControlMode } from './components/Game.tsx';
 import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
+import Onboarding from './components/Onboarding.tsx';
 import { setActivityEnterHandler, type ActivityDescriptor } from './lib/activityEnter.ts';
+import { getAnonUserId } from './lib/identity.ts';
 
 import { ToastContainer } from 'react-toastify';
 // import { UserButton } from '@clerk/clerk-react';
 // import { Authenticated, Unauthenticated } from 'convex/react';
 // import LoginButton from './components/buttons/LoginButton.tsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from 'convex/react';
+import { api } from '../convex/_generated/api';
 import ReactModal from 'react-modal';
 import TopBar from './components/TopBar.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
@@ -19,6 +23,10 @@ export default function Home() {
   const [cameraFollow, setCameraFollow] = useState(true);
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
+
+  // 全局玩家身份：未完成 onboarding 前，强制停在录入页。
+  const userId = useMemo(getAnonUserId, []);
+  const profile = useQuery(api.profile.getProfile, { userId });
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -54,6 +62,18 @@ export default function Home() {
       }
       return nextFollow;
     });
+
+  // 身份门：加载中显示占位，未录入则强制 onboarding。
+  if (profile === undefined) {
+    return <main className="flex h-screen items-center justify-center bg-brown-900 text-brown-300">加载中…</main>;
+  }
+  if (profile === null) {
+    return (
+      <main className="h-screen bg-brown-900">
+        <Onboarding userId={userId} onDone={() => undefined} />
+      </main>
+    );
+  }
 
   return (
     <main className="flex h-screen flex-col overflow-hidden font-body game-background bg-brown-900">

@@ -3,20 +3,9 @@ import { useAction, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { ActivityDescriptor } from '../lib/activityEnter';
+import { getAnonUserId } from '../lib/identity';
+import { Avatar } from '../lib/avatars';
 import clsx from 'clsx';
-
-// 匿名用户身份（鉴权接入后可替换为真实 user）。
-function useAnonUser() {
-  return useMemo(() => {
-    let id = localStorage.getItem('hn_uid');
-    if (!id) {
-      id = 'u_' + Math.random().toString(36).slice(2, 10);
-      localStorage.setItem('hn_uid', id);
-    }
-    const name = localStorage.getItem('hn_uname') ?? '';
-    return { id, name };
-  }, []);
-}
 
 // 进入某个活动的专属游戏。游戏隶属于该活动且独立。
 export default function Experience({
@@ -26,17 +15,18 @@ export default function Experience({
   activity: ActivityDescriptor;
   onExit: () => void;
 }) {
-  const anon = useAnonUser();
-  const [userName, setUserName] = useState(anon.name);
+  const userId = useMemo(getAnonUserId, []);
+  const profile = useQuery(api.profile.getProfile, { userId });
   const [experienceId, setExperienceId] = useState<Id<'experiences'> | null>(null);
 
   if (!experienceId) {
     return (
       <ActivityIntro
         activity={activity}
-        userId={anon.id}
-        userName={userName}
-        setUserName={setUserName}
+        userId={userId}
+        userName={profile?.name ?? '候鸟'}
+        avatarUrl={profile?.avatarUrl ?? null}
+        avatarPreset={profile?.avatarPreset ?? null}
         onStart={setExperienceId}
         onExit={onExit}
       />
@@ -50,14 +40,16 @@ function ActivityIntro({
   activity,
   userId,
   userName,
-  setUserName,
+  avatarUrl,
+  avatarPreset,
   onStart,
   onExit,
 }: {
   activity: ActivityDescriptor;
   userId: string;
   userName: string;
-  setUserName: (v: string) => void;
+  avatarUrl: string | null;
+  avatarPreset: string | null;
   onStart: (id: Id<'experiences'>) => void;
   onExit: () => void;
 }) {
@@ -66,11 +58,9 @@ function ActivityIntro({
   const [starting, setStarting] = useState(false);
 
   const handleStart = async () => {
-    const name = userName.trim() || '匿名候鸟';
-    localStorage.setItem('hn_uname', name);
     setStarting(true);
     try {
-      const id = await start({ activity, userId, userName: name });
+      const id = await start({ activity, userId, userName });
       onStart(id);
     } finally {
       setStarting(false);
@@ -81,7 +71,10 @@ function ActivityIntro({
     <div className="h-full overflow-y-auto bg-brown-900 px-6 py-8 text-brown-100">
       <div className="mx-auto max-w-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-sm text-brown-300">活动专属体验</span>
+          <div className="flex items-center gap-2">
+            <Avatar url={avatarUrl} preset={avatarPreset} size="sm" />
+            <span className="text-sm text-brown-200">{userName}</span>
+          </div>
           <button className="text-sm text-brown-300 underline" onClick={onExit}>
             返回小镇
           </button>
@@ -94,21 +87,13 @@ function ActivityIntro({
           {activity.background}
         </p>
 
-        <input
-          className="mb-4 w-full max-w-sm rounded border-2 border-brown-700 bg-brown-800 px-3 py-2 text-brown-100 placeholder:text-brown-500"
-          placeholder="给自己起个名字（用于勋章墙）"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-        />
-        <div>
-          <button
-            className="bg-clay-700 px-5 py-2.5 font-display text-white shadow-solid disabled:opacity-50"
-            disabled={starting}
-            onClick={() => void handleStart()}
-          >
-            {starting ? '正在生成首幕…' : '开始体验'}
-          </button>
-        </div>
+        <button
+          className="rounded bg-clay-700 px-5 py-2.5 font-display text-white hover:bg-clay-500 disabled:opacity-50"
+          disabled={starting}
+          onClick={() => void handleStart()}
+        >
+          {starting ? '正在生成首幕…' : '开始体验'}
+        </button>
 
         {badges && badges.length > 0 && (
           <div className="mt-10">
@@ -118,7 +103,7 @@ function ActivityIntro({
             <div className="grid gap-3 sm:grid-cols-2">
               {badges.map((b) => (
                 <div key={b._id} className="flex items-center gap-3 border-2 border-brown-700 bg-brown-800 p-3">
-                  <Medallion title={b.title} />
+                  <Avatar url={b.avatarUrl} preset={b.avatarPreset} size="md" />
                   <div className="min-w-0">
                     <p className="truncate font-display text-brown-100">{b.title}</p>
                     <p className="truncate text-xs text-brown-300">{b.userName}</p>

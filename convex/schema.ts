@@ -12,6 +12,16 @@ export default defineSchema({
   }),
 
   // ---- AIGC 连环画体验模块（独立于 AI Town 引擎）----
+  // 全局玩家身份（landing 强制录入一次）。鉴权接入后 userId 可换成真实 user。
+  profiles: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    gender: v.union(v.literal('male'), v.literal('female'), v.literal('other')),
+    avatarPreset: v.optional(v.string()), // 选预置头像时记预置 id
+    avatarStorageId: v.optional(v.string()), // AI 生成头像时记 storage id
+    updatedAt: v.number(),
+  }).index('userId', ['userId']),
+
   // 一个活动 = 节目单里的一项，每个活动有自己独立的游戏。
   // activityKey 由节目单条目唯一标识（date+time+venue+title），首次进入时按 key 懒创建。
   events: defineTable({

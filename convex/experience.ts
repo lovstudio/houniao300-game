@@ -237,11 +237,24 @@ export const activityBadges = query({
       .withIndex('activityKey', (q) => q.eq('activityKey', activityKey))
       .first();
     if (!event) return [];
-    return await ctx.db
+    const badges = await ctx.db
       .query('badges')
       .withIndex('eventId', (q) => q.eq('eventId', event._id))
       .order('desc')
       .take(100);
+    return await Promise.all(
+      badges.map(async (b) => {
+        const profile = await ctx.db
+          .query('profiles')
+          .withIndex('userId', (q) => q.eq('userId', b.userId))
+          .first();
+        return {
+          ...b,
+          avatarPreset: profile?.avatarPreset,
+          avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
+        };
+      }),
+    );
   },
 });
 
