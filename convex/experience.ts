@@ -28,7 +28,13 @@ function parseJson(content: string): DirectorStep {
     .trim();
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
-  return JSON.parse(start >= 0 && end >= 0 ? cleaned.slice(start, end + 1) : cleaned);
+  const raw = start >= 0 && end >= 0 ? cleaned.slice(start, end + 1) : cleaned;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // 容忍模型偶发的尾逗号（temperature 较高 + CJK 内容时常见）。
+    return JSON.parse(raw.replace(/,(\s*[}\]])/g, '$1'));
+  }
 }
 
 async function director(
@@ -61,17 +67,27 @@ async function director(
     必须收尾: opts.forceFinal,
   });
 
-  const { content } = await chatCompletion({
-    // 叙事质量是体验的核心，默认用高质量模型（可用 DIRECTOR_MODEL 覆盖）。
-    model: process.env.DIRECTOR_MODEL ?? 'anthropic/claude-sonnet-4.6',
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    temperature: 0.9,
-    max_tokens: 800,
-  });
-  return parseJson(content as string);
+  // 叙事质量是体验的核心，默认用高质量模型（可用 DIRECTOR_MODEL 覆盖）。
+  // 模型偶发输出非法 JSON 会让整格生成失败、前端白屏，故最多重试 3 次；
+  // 重试时降温以换取更确定的 JSON 结构。
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { content } = await chatCompletion({
+      model: process.env.DIRECTOR_MODEL ?? 'anthropic/claude-sonnet-4.6',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: attempt === 0 ? 0.9 : 0.4,
+      max_tokens: 1000,
+    });
+    try {
+      return parseJson(content as string);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(`导演输出无法解析为 JSON（已重试）：${lastErr}`);
 }
 
 // ============================================================
