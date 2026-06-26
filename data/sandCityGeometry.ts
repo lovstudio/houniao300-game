@@ -158,6 +158,7 @@ export const SOLID_POLYGONS: SourcePoint[][] = [
 ];
 
 const BARRIER_COLLISION_PADDING = 10;
+const THIN_BARRIER_MAX_WIDTH = 12;
 
 function pointInRect({ x, y }: { x: number; y: number }, rect: SourceRect, padding = 0) {
   return (
@@ -170,6 +171,39 @@ function pointInRect({ x, y }: { x: number; y: number }, rect: SourceRect, paddi
 
 function pointInCircle({ x, y }: { x: number; y: number }, circle: SourceCircle) {
   return (x - circle.x) ** 2 + (y - circle.y) ** 2 <= circle.radius ** 2;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function tilePositionInSpaceBarrier(
+  position: { x: number; y: number },
+  mapWidth: number,
+  mapHeight: number,
+) {
+  const point = gridPositionToSourcePoint(position, mapWidth, mapHeight);
+  const tileWidth = SOURCE_WIDTH / mapWidth;
+  for (const rect of SPACE_BARRIERS) {
+    if (!pointInRect(point, rect, BARRIER_COLLISION_PADDING)) continue;
+
+    const minColumn = Math.floor(((rect.x - BARRIER_COLLISION_PADDING) / SOURCE_WIDTH) * mapWidth);
+    const maxColumn = Math.floor(
+      ((rect.x + rect.width + BARRIER_COLLISION_PADDING) / SOURCE_WIDTH) * mapWidth,
+    );
+    if (rect.width <= THIN_BARRIER_MAX_WIDTH && maxColumn > minColumn) {
+      const centerColumn = clamp(
+        Math.round((rect.x + rect.width / 2) / tileWidth),
+        0,
+        mapWidth - 1,
+      );
+      if (position.x === centerColumn) return true;
+      continue;
+    }
+
+    return true;
+  }
+  return false;
 }
 
 export function pointInPolygon(point: SourcePoint, polygon: SourcePoint[]) {
@@ -211,7 +245,14 @@ export function tilePositionBlockedBySolidGeometry(
   mapWidth: number,
   mapHeight: number,
 ) {
-  return sourcePointInSolidGeometry(gridPositionToSourcePoint(position, mapWidth, mapHeight));
+  if (tilePositionInSpaceBarrier(position, mapWidth, mapHeight)) return true;
+
+  const point = gridPositionToSourcePoint(position, mapWidth, mapHeight);
+  const sourcePoint: SourcePoint = [point.x, point.y];
+  if (SOLID_RECTS.some((rect) => pointInRect(point, rect))) return true;
+  if (DIAMOND_WALL_BARRIERS.some((rect) => pointInRect(point, rect))) return true;
+  if (SOLID_CIRCLES.some((circle) => pointInCircle(point, circle))) return true;
+  return SOLID_POLYGONS.some((polygon) => pointInPolygon(sourcePoint, polygon));
 }
 
 export function sandCityGeometryControlsCollision(mapWidth: number, mapHeight: number) {
