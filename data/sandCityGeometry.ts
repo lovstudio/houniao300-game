@@ -23,6 +23,11 @@ export type SourceSegment = {
 export const SOURCE_WIDTH = 1703;
 export const SOURCE_HEIGHT = 1279;
 
+export const EXCHANGE_BUILDING_RECT: SourceRect = { x: 1307, y: 209, width: 81, height: 298 };
+export const RETRO_ART_BUILDING_RECT: SourceRect = { x: 1427, y: 311, width: 95, height: 155 };
+export const LADDER_300_BUILDING_RECT: SourceRect = { x: 1449, y: 815, width: 72, height: 205 };
+export const CLUB_ROUND_STAGE_CIRCLE: SourceCircle = { x: 1396, y: 968, radius: 25 };
+
 function segmentToPolygon({ from, to, width }: SourceSegment): SourcePoint[] {
   const [x1, y1] = from;
   const [x2, y2] = to;
@@ -38,56 +43,55 @@ function segmentToPolygon({ from, to, width }: SourceSegment): SourcePoint[] {
 }
 
 export const BIRD_RESTAURANT_WALL_SEGMENTS: SourceSegment[] = [
-  { from: [1146, 612], to: [1228, 584], width: 24, divisions: 5 },
-  { from: [1146, 638], to: [1146, 730], width: 24, divisions: 5 },
-  { from: [1148, 730], to: [1208, 766], width: 24, divisions: 4 },
-  { from: [1208, 766], to: [1260, 770], width: 24, divisions: 4 },
-  { from: [1260, 770], to: [1340, 732], width: 24, divisions: 5 },
-  { from: [1284, 594], to: [1320, 570], width: 24, divisions: 3 },
-  { from: [1320, 570], to: [1352, 604], width: 24, divisions: 3 },
-  { from: [1344, 626], to: [1344, 730], width: 24, divisions: 6 },
+  { from: [1268, 508], to: [1336, 480], width: 18, divisions: 6 },
+  { from: [1268, 512], to: [1270, 737], width: 18, divisions: 8 },
+  { from: [1270, 737], to: [1317, 792], width: 18, divisions: 5 },
+  { from: [1317, 792], to: [1352, 785], width: 18, divisions: 4 },
+  { from: [1352, 785], to: [1405, 731], width: 18, divisions: 6 },
+  { from: [1405, 533], to: [1405, 731], width: 18, divisions: 7 },
+  { from: [1366, 491], to: [1405, 533], width: 18, divisions: 4 },
 ];
 
 export const BIRD_RESTAURANT_WALLS: SourcePoint[][] =
   BIRD_RESTAURANT_WALL_SEGMENTS.map(segmentToPolygon);
 
 export const ICE_JOYS_BUILDING_RECTS: SourceRect[] = [
-  { x: 1362, y: 604, width: 104, height: 104 },
+  { x: 1428, y: 590, width: 96, height: 130 },
 ];
 
 export const ICE_JOYS_SIDE_SLATS: SourceRect[] = [
-  { x: 1468, y: 552, width: 8, height: 78 },
-  { x: 1468, y: 708, width: 8, height: 88 },
+  { x: 1530, y: 550, width: 8, height: 42 },
+  { x: 1530, y: 724, width: 8, height: 40 },
 ];
 
 export const CLUB_BUILDING_RECTS: SourceRect[] = [
-  { x: 1306, y: 762, width: 76, height: 78 },
+  { x: 1336, y: 790, width: 70, height: 96 },
 ];
 
 export const SECONDARY_WALL_STRUCTURES: SourcePoint[][] = [
   [
-    [1530, 420],
-    [1604, 488],
-    [1556, 552],
-    [1488, 476],
+    [1550, 457],
+    [1598, 566],
+    [1573, 643],
+    [1532, 534],
   ],
   [
-    [1472, 486],
-    [1540, 486],
-    [1540, 642],
-    [1472, 642],
+    [1553, 566],
+    [1582, 566],
+    [1584, 673],
+    [1555, 673],
   ],
   [
-    [1542, 510],
-    [1588, 510],
-    [1588, 588],
-    [1542, 588],
+    [1583, 616],
+    [1604, 616],
+    [1605, 667],
+    [1584, 667],
   ],
   [
-    [1512, 596],
-    [1604, 682],
-    [1532, 760],
-    [1468, 666],
+    [1554, 686],
+    [1599, 788],
+    [1571, 873],
+    [1534, 770],
   ],
 ];
 
@@ -119,17 +123,17 @@ export const SOLID_RECTS: SourceRect[] = [
   { x: 492, y: 828, width: 76, height: 38 }, // 候鸟电影院
   { x: 655, y: 560, width: 88, height: 90 }, // 候鸟工作坊
   { x: 875, y: 260, width: 245, height: 62 }, // 候鸟黑客松
-  { x: 1228, y: 310, width: 130, height: 174 }, // 候鸟交易所
-  { x: 1418, y: 448, width: 140, height: 86 }, // 公路复古艺术展区
+  EXCHANGE_BUILDING_RECT, // 候鸟交易所
+  RETRO_ART_BUILDING_RECT, // 公路复古艺术展区
   ...ICE_JOYS_BUILDING_RECTS,
   ...ICE_JOYS_SIDE_SLATS,
   ...CLUB_BUILDING_RECTS,
-  { x: 1452, y: 788, width: 86, height: 132 }, // 300.梯威
+  LADDER_300_BUILDING_RECT, // 300.梯威
 ];
 
 export const SOLID_CIRCLES: SourceCircle[] = [
   { x: 148, y: 395, radius: 55 }, // 候鸟中心
-  { x: 1368, y: 886, radius: 26 }, // 候鸟俱乐部圆形结构
+  CLUB_ROUND_STAGE_CIRCLE, // 候鸟俱乐部圆形结构
 ];
 
 export const TERRAIN_SOLID_POLYGONS: SourcePoint[][] = [
@@ -173,8 +177,8 @@ export const BUILDING_SOLID_POLYGONS: SourcePoint[][] = BIRD_RESTAURANT_WALLS;
 export const DIAMOND_WALL_BARRIERS: SourceRect[] = [
   { x: 232, y: 118, width: 55, height: 320 },
   { x: 236, y: 481, width: 56, height: 386 },
-  { x: 1578, y: 324, width: 58, height: 374 },
-  { x: 1584, y: 702, width: 58, height: 428 },
+  { x: 1548, y: 220, width: 48, height: 460 },
+  { x: 1548, y: 650, width: 48, height: 440 },
 ];
 
 export const SOLID_POLYGONS: SourcePoint[][] = [
