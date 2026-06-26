@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { QRCodeSVG } from 'qrcode.react';
+import { ToastContainer, toast } from 'react-toastify';
 import { api } from '../../convex/_generated/api';
 import { Avatar } from '../lib/avatars';
 import type { Id } from '../../convex/_generated/dataModel';
-import ComicPoster from './ComicPoster';
+import { downloadComicPoster } from './ComicPoster';
 
 // 公测实时结局墙：投屏大屏，直播真实玩家的 AIGC 连环画结局。
 // 通过 ?wall=1 进入，useQuery 订阅，新结局自动上墙。无路由依赖。
@@ -43,7 +44,10 @@ function ComicLightbox({
   onClose: () => void;
 }) {
   const comic = useQuery(api.experience.experienceComic, { experienceId });
-  const [showPoster, setShowPoster] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // 本篇连环画的永久链接：扫码 / 转发 / 复制都指向它，直接打开这条连环画灯箱。
+  const permalink = `${window.location.origin}/?comic=${experienceId}`;
 
   // Esc 关闭。
   useEffect(() => {
@@ -57,6 +61,37 @@ function ComicLightbox({
   const playSame = () => {
     if (comic?.activityKey) {
       window.location.href = `/?exp=${encodeURIComponent(comic.activityKey)}`;
+    }
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(permalink);
+      toast.success('链接已复制');
+    } catch {
+      toast.error('复制失败，请手动长按链接');
+    }
+  };
+
+  const downloadImage = async () => {
+    if (!comic || !comic.activityKey) return;
+    setDownloading(true);
+    try {
+      await downloadComicPoster({
+        title: comic.eventTitle,
+        userName: comic.userName,
+        venue: comic.venue ?? undefined,
+        activityKey: comic.activityKey,
+        badgeTitle: comic.badgeTitle ?? undefined,
+        badgeSummary: comic.badgeSummary ?? undefined,
+        reflection: comic.reflection ?? undefined,
+        panels: comic.panels.map((p) => ({ imageUrl: p.imageUrl, narration: p.narration })),
+      });
+    } catch (e) {
+      console.error('长图导出失败', e);
+      toast.error('长图导出失败，可直接截图保存');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -88,9 +123,18 @@ function ComicLightbox({
             <div className="flex h-48 items-center justify-center text-brown-300">正在翻开这段连环画…</div>
           )}
 
-          {/* 空/失效态 */}
+          {/* 空/失效态：链接失效或连环画不存在，给出友好提示 + 开始 CTA */}
           {comic === null && (
-            <div className="flex h-48 items-center justify-center text-brown-300">这段连环画暂时无法读取。</div>
+            <div className="flex h-56 flex-col items-center justify-center gap-3 text-center">
+              <p className="font-display text-xl text-brown-200">没找到这条连环画</p>
+              <p className="text-sm text-brown-300">它可能已被移除，或链接不正确。</p>
+              <button
+                onClick={goStart}
+                className="mt-1 rounded bg-clay-700 px-5 py-2.5 font-display text-base text-white hover:bg-clay-500"
+              >
+                开始我的连环画 →
+              </button>
+            </div>
           )}
 
           {comic && (
@@ -138,38 +182,42 @@ function ComicLightbox({
                 )}
               </div>
 
-              {/* 直接显示的扫码深链：看到这条连环画即可扫码玩同款，无需多点一步 */}
-              {comic.activityKey && (
-                <div className="mt-4 flex items-center gap-4 border-2 border-clay-700 bg-brown-900 px-5 py-4">
+              {/* 一体化分享区：扫码看本篇 + 复制链接 + 下载长图 + 玩同款 */}
+              <div className="mt-5 border-2 border-clay-700 bg-brown-900 px-5 py-5">
+                {/* 扫码看本篇：二维码编码本篇永久链接，扫码即打开这条连环画 */}
+                <div className="flex items-center gap-4">
                   <div className="shrink-0 rounded p-2" style={{ background: SAND }}>
-                    <QRCodeSVG
-                      value={`${window.location.origin}/?exp=${encodeURIComponent(comic.activityKey)}`}
-                      size={96}
-                      fgColor={INK}
-                      bgColor={SAND}
-                      level="M"
-                    />
+                    <QRCodeSVG value={permalink} size={96} fgColor={INK} bgColor={SAND} level="M" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-display text-base text-clay-100">扫码玩同款连环画</p>
+                    <p className="font-display text-base text-clay-100">扫码或转发，让朋友看到这条连环画</p>
                     <p className="mt-1 text-sm leading-relaxed text-brown-300">
-                      手机扫一扫，立刻开启这场活动属于你自己的结局
+                      手机扫一扫，或复制链接发给朋友，直接打开这一篇
                     </p>
                   </div>
                 </div>
-              )}
 
-              {/* 生成含二维码的分享海报（复用玩家自己的 ComicPoster） */}
-              {comic.activityKey && comic.panels.length > 0 && (
-                <button
-                  onClick={() => setShowPoster(true)}
-                  className="mt-4 w-full rounded border-2 border-clay-700 px-4 py-2.5 font-display text-base text-clay-100 hover:border-clay-500 hover:text-white"
-                >
-                  生成连环画海报（含二维码）
-                </button>
-              )}
+                {/* 分享本篇：复制链接 + 下载长图 */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => void copyLink()}
+                    className="rounded border-2 border-clay-700 px-4 py-2.5 font-display text-base text-clay-100 hover:border-clay-500 hover:text-white"
+                  >
+                    复制链接
+                  </button>
+                  {comic.panels.length > 0 && (
+                    <button
+                      onClick={() => void downloadImage()}
+                      disabled={downloading}
+                      className="rounded border-2 border-clay-700 px-4 py-2.5 font-display text-base text-clay-100 hover:border-clay-500 hover:text-white disabled:opacity-50"
+                    >
+                      {downloading ? '生成中…' : '下载长图'}
+                    </button>
+                  )}
+                </div>
+              </div>
 
-              {/* 玩同款活动深链 */}
+              {/* 玩同款活动深链：开启属于自己的全新一篇（区别于分享本篇） */}
               {comic.activityKey && (
                 <button
                   onClick={playSame}
@@ -183,21 +231,6 @@ function ComicLightbox({
         </div>
       </div>
     </div>
-
-      {/* 含二维码的分享海报（与玩家自己生成的完全一致） */}
-      {showPoster && comic && comic.activityKey && (
-        <ComicPoster
-          title={comic.eventTitle}
-          userName={comic.userName}
-          venue={comic.venue ?? undefined}
-          activityKey={comic.activityKey}
-          badgeTitle={comic.badgeTitle ?? undefined}
-          badgeSummary={comic.badgeSummary ?? undefined}
-          reflection={comic.reflection ?? undefined}
-          panels={comic.panels.map((p) => ({ imageUrl: p.imageUrl, narration: p.narration }))}
-          onClose={() => setShowPoster(false)}
-        />
-      )}
     </>
   );
 }
@@ -221,11 +254,12 @@ function JoinQR() {
   );
 }
 
-export default function EndingsWall() {
+export default function EndingsWall({ initialComicId }: { initialComicId?: Id<'experiences'> | null } = {}) {
   const data = useQuery(api.experience.wallFeed);
   // 让相对时间随墙刷新（每 30s 重渲染一次）。
   const [, force] = useState(0);
-  const [openId, setOpenId] = useState<Id<'experiences'> | null>(null);
+  // 永久链接 ?comic=<id> 落地时直接打开该篇灯箱。
+  const [openId, setOpenId] = useState<Id<'experiences'> | null>(initialComicId ?? null);
   useEffect(() => {
     const t = setInterval(() => force((n) => n + 1), 30000);
     return () => clearInterval(t);
@@ -346,6 +380,9 @@ export default function EndingsWall() {
 
       {/* 灯箱 */}
       {openId && <ComicLightbox experienceId={openId} onClose={() => setOpenId(null)} />}
+
+      {/* 分享反馈（复制链接等）：墙视图独立挂载，置于灯箱之上 */}
+      <ToastContainer position="bottom-center" autoClose={2000} closeOnClick theme="dark" style={{ zIndex: 90 }} />
     </main>
   );
 }

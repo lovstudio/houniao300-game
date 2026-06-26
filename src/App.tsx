@@ -14,6 +14,7 @@ import { ToastContainer } from 'react-toastify';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
+import type { Id } from '../convex/_generated/dataModel';
 import ReactModal from 'react-modal';
 import TopBar from './components/TopBar.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
@@ -29,6 +30,12 @@ export default function Home() {
   // 公测实时结局墙：?wall=1 进入，跳过身份门，纯公共投屏大屏视图。
   const isWall = useMemo(
     () => new URLSearchParams(window.location.search).get('wall') === '1',
+    [],
+  );
+
+  // 连环画永久链接：?comic=<experienceId> 落地，跳过身份门，直接打开该篇灯箱（公共只读）。
+  const comicId = useMemo(
+    () => new URLSearchParams(window.location.search).get('comic'),
     [],
   );
 
@@ -85,6 +92,11 @@ export default function Home() {
       }
       return nextFollow;
     });
+
+  // 连环画永久链接：直接打开该篇灯箱（复用结局墙，跳过身份门）。
+  if (comicId) {
+    return <EndingsWall initialComicId={comicId as Id<'experiences'>} />;
+  }
 
   // 公测实时结局墙：公共大屏，不经身份门，直接渲染。
   if (isWall) {

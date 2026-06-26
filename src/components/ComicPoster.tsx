@@ -33,6 +33,42 @@ function dateLine(activityKey: string): string {
   return date && time ? `6/${date} · ${time}` : '';
 }
 
+// 可复用的「直接下载长图」：不打开海报弹窗，离屏渲染二维码后合成 PNG 并触发下载。
+// 供结局墙灯箱的「下载长图」按钮直接调用（与玩家自己的 ComicPoster 同一套画布逻辑）。
+export async function downloadComicPoster(args: {
+  title: string;
+  userName: string;
+  venue?: string;
+  activityKey: string;
+  badgeTitle?: string;
+  badgeSummary?: string;
+  reflection?: string;
+  panels: PosterPanel[];
+}): Promise<void> {
+  const link = deepLink(args.activityKey);
+  const dl = dateLine(args.activityKey);
+  // 离屏生成一张高分二维码 canvas，避免依赖任何已挂载的 DOM 节点。
+  const qrModule = await import('qrcode');
+  const qrCanvas = document.createElement('canvas');
+  await qrModule.toCanvas(qrCanvas, link, {
+    width: 256,
+    margin: 0,
+    color: { dark: INK, light: SAND },
+    errorCorrectionLevel: 'M',
+  });
+  await composeAndDownload({
+    title: args.title,
+    userName: args.userName,
+    venue: args.venue,
+    dl,
+    badgeTitle: args.badgeTitle,
+    badgeSummary: args.badgeSummary,
+    reflection: args.reflection,
+    panels: args.panels,
+    qrCanvas,
+  });
+}
+
 // 胶片齿孔条（DOM）：深色条上一排沙金穿孔。
 function Sprockets() {
   return (
