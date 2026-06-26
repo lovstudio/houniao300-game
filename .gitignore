@@ -47,3 +47,8 @@ convex_local*
 .env.local.selfhosted
 /.vercel
 /dist
+
+# local agent artifacts (E2E screenshots, scratch)
+/output
+/tmp
+poster-qr-isolated.png
