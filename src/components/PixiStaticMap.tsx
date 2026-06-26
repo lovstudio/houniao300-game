@@ -6,8 +6,8 @@ import {
   CLUB_BUILDING_RECTS,
   ICE_JOYS_BUILDING_RECTS,
   ICE_JOYS_SIDE_SLATS,
+  SECONDARY_WALL_STRUCTURES,
   SPACE_BARRIERS,
-  type SourceRect,
 } from '../../data/sandCityGeometry';
 import { INSTALLATIONS, type Installation } from '../../data/installations';
 import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
@@ -457,49 +457,75 @@ function drawBirdRestaurant(container: PIXI.Container, project: Projector) {
   const shadow = new PIXI.Graphics();
   shadow.beginFill(0x5f4225, 0.14);
   for (const wall of BIRD_RESTAURANT_WALLS) {
-    drawPolygon(shadow, project, offsetPoints(wall, 7, 9));
+    drawPolygon(shadow, project, offsetPoints(wall, 5, 7));
   }
   shadow.endFill();
   container.addChild(shadow);
 
   const building = new PIXI.Graphics();
   for (const [index, wall] of BIRD_RESTAURANT_WALLS.entries()) {
-    building.lineStyle(2.1 * project.scale, 0xb8a27f, 0.94);
-    building.beginFill(index === 2 ? 0xe9decc : 0xf3eee4, 0.96);
+    building.lineStyle(1.6 * project.scale, 0x726b61, 0.88);
+    building.beginFill(index % 2 === 0 ? 0xbdb5aa : 0xada59b, 0.96);
     drawPolygon(building, project, wall);
     building.endFill();
+
+    const [first] = wall;
+    for (let i = 1; i < wall.length - 1; i++) {
+      const [x, y] = wall[i];
+      const t = i / wall.length;
+      building.lineStyle(0.9 * project.scale, 0x817568, 0.45);
+      building.moveTo(project.x(first[0] + (x - first[0]) * t), project.y(first[1] + (y - first[1]) * t));
+      building.lineTo(project.x(x), project.y(y));
+    }
   }
 
-  building.lineStyle(1 * project.scale, 0xc9b99d, 0.88);
-  for (let i = 0; i < 5; i++) {
-    const x = 1160 + i * 17;
-    building.moveTo(project.x(x), project.y(624 + i * 5));
-    building.lineTo(project.x(x + 18), project.y(714 + i * 3));
-  }
-  for (let i = 0; i < 5; i++) {
-    const x = 1290 + i * 14;
-    building.moveTo(project.x(x), project.y(610 + i * 5));
-    building.lineTo(project.x(x + 16), project.y(714 + i * 5));
-  }
+  building.lineStyle(1.1 * project.scale, 0x8f806d, 0.7);
+  drawPolyline(building, project, [[1156, 635], [1218, 680], [1150, 730]], 1.1, 0x8f806d, 0.65);
+  drawPolyline(building, project, [[1288, 620], [1332, 676], [1274, 724]], 1.1, 0x8f806d, 0.65);
+  drawPolyline(building, project, [[1188, 766], [1245, 792], [1314, 724]], 1.1, 0x8f806d, 0.65);
 
   building.beginFill(0xa58c62, 0.72);
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
-      building.drawCircle(
-        project.x(1166 + col * 14),
-        project.y(634 + row * 18),
-        2.3 * project.scale,
-      );
-      building.drawCircle(
-        project.x(1308 + col * 13),
-        project.y(630 + row * 18),
-        2.3 * project.scale,
-      );
+  for (let row = 0; row < 7; row++) {
+    for (let col = 0; col < 3; col++) {
+      const leftX = 1162 + col * 17 + (row % 2) * 2;
+      const rightX = 1290 + col * 17 - (row % 2) * 2;
+      const y = 628 + row * 18;
+      if (row < 6) {
+        building.drawRect(project.x(leftX), project.y(y), 6 * project.scale, 6 * project.scale);
+      }
+      if (row > 0) {
+        building.drawRect(project.x(rightX), project.y(y - 4), 6 * project.scale, 6 * project.scale);
+      }
     }
   }
   building.endFill();
 
   container.addChild(building);
+}
+
+function drawSecondaryWallStructures(container: PIXI.Container, project: Projector) {
+  const wall = new PIXI.Graphics();
+  wall.beginFill(0x5f4225, 0.13);
+  for (const block of SECONDARY_WALL_STRUCTURES) {
+    drawPolygon(wall, project, offsetPoints(block, 6, 7));
+  }
+  wall.endFill();
+
+  for (const block of SECONDARY_WALL_STRUCTURES) {
+    wall.lineStyle(1.6 * project.scale, 0x746b63, 0.9);
+    wall.beginFill(0xb7b0aa, 0.96);
+    drawPolygon(wall, project, block);
+    wall.endFill();
+    wall.lineStyle(0.9 * project.scale, 0x6f675f, 0.36);
+    for (let i = 0; i < block.length; i++) {
+      const from = block[i];
+      const to = block[(i + 1) % block.length];
+      wall.moveTo(project.x((from[0] + to[0]) / 2), project.y((from[1] + to[1]) / 2));
+      wall.lineTo(project.x((from[0] + to[0]) / 2 + 16), project.y((from[1] + to[1]) / 2 + 14));
+    }
+  }
+
+  container.addChild(wall);
 }
 
 function drawIceJoysBuilding(container: PIXI.Container, project: Projector) {
@@ -616,7 +642,21 @@ function drawClubDetails(container: PIXI.Container, project: Projector) {
     club.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 4 * project.scale);
     club.endFill();
 
-    club.lineStyle(1 * project.scale, 0x8d6937, 0.3);
+    club.beginFill(0xb6aea4, 0.96);
+    const sideWidth = 16 * project.scale;
+    club.drawRect(rect.x, rect.y, sideWidth, rect.height);
+    club.drawRect(rect.x + rect.width - sideWidth, rect.y, sideWidth, rect.height);
+    club.endFill();
+
+    club.lineStyle(0.9 * project.scale, 0x746b63, 0.65);
+    for (let y = rect.y + 12 * project.scale; y < rect.y + rect.height; y += 15 * project.scale) {
+      club.moveTo(rect.x, y);
+      club.lineTo(rect.x + sideWidth, y);
+      club.moveTo(rect.x + rect.width - sideWidth, y);
+      club.lineTo(rect.x + rect.width, y);
+    }
+
+    club.lineStyle(1 * project.scale, 0x8d6937, 0.26);
     for (let i = 1; i < 3; i++) {
       const x = rect.x + (rect.width / 3) * i;
       club.moveTo(x, rect.y + 7 * project.scale);
@@ -830,6 +870,7 @@ function drawSandCityPlan(
   drawDiamondWall(container, project, 258, 498, 11, 15, 34);
   drawDiamondWall(container, project, 1602, 342, 10, 16, 36);
   drawDiamondWall(container, project, 1608, 720, 12, 16, 36);
+  drawSecondaryWallStructures(container, project);
 
   drawPlanSlats(container, project);
 
