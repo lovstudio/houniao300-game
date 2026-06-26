@@ -56,7 +56,8 @@ export default defineSchema({
     experienceId: v.id('experiences'),
     index: v.number(),
     imagePrompt: v.string(),
-    imageStorageId: v.optional(v.string()), // 图片异步生成后回填
+    imageUrl: v.optional(v.string()), // 七牛 CDN https URL（新图首选）
+    imageStorageId: v.optional(v.string()), // Convex storage（旧图兼容 / 七牛失败回退）
     narration: v.string(),
     question: v.optional(v.string()),
     options: v.array(v.string()),

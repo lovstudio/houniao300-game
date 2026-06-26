@@ -1,9 +1,10 @@
 import { v } from 'convex/values';
-import { query, mutation, action, internalMutation, internalQuery, ActionCtx } from './_generated/server';
+import { query, mutation, action, internalMutation, internalQuery, ActionCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { chatCompletion } from './util/llm';
 import { generateImage } from './util/image';
+import { uploadToQiniu } from './util/qiniu';
 
 // ============================================================
 // 导演（LLM）：基于活动背景 + 历史问答，决定下一格连环画。
@@ -225,9 +226,17 @@ export const insertPanel = internalMutation({
 });
 
 export const setPanelImage = internalMutation({
-  args: { panelId: v.id('panels'), imageStorageId: v.string() },
-  handler: async (ctx, { panelId, imageStorageId }) =>
-    await ctx.db.patch(panelId, { imageStorageId }),
+  args: {
+    panelId: v.id('panels'),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.string()),
+  },
+  handler: async (ctx, { panelId, imageUrl, imageStorageId }) => {
+    const patch: Partial<Doc<'panels'>> = {};
+    if (imageUrl) patch.imageUrl = imageUrl;
+    if (imageStorageId) patch.imageStorageId = imageStorageId;
+    if (Object.keys(patch).length) await ctx.db.patch(panelId, patch);
+  },
 });
 
 // 首格生成后锁定主角描述 + 首格图（作为后续每格 image edit 的参考图）。
@@ -334,6 +343,22 @@ export const experienceState = internalQuery({
 // ============================================================
 // 公开 query
 // ============================================================
+// 统一把一格图解析成可用 URL：新图存 imageUrl（七牛 CDN），旧图回退 Convex storage getUrl。
+async function resolvePanelImageUrl(
+  ctx: QueryCtx,
+  panel: { imageUrl?: string; imageStorageId?: string } | null | undefined,
+): Promise<string | null> {
+  if (!panel) return null;
+  if (panel.imageUrl) return panel.imageUrl;
+  if (panel.imageStorageId) return await ctx.storage.getUrl(panel.imageStorageId);
+  return null;
+}
+
+// 该体验里有图的收尾格（用于结局墙缩略图）：有 imageUrl 或 imageStorageId 都算。
+function panelHasImage(p: { imageUrl?: string; imageStorageId?: string }): boolean {
+  return !!(p.imageUrl || p.imageStorageId);
+}
+
 export const listEvents = query({
   handler: async (ctx) =>
     await ctx.db
@@ -356,7 +381,7 @@ export const getExperience = query({
     const panels = await Promise.all(
       panelsRaw.map(async (p) => ({
         ...p,
-        imageUrl: p.imageStorageId ? await ctx.storage.getUrl(p.imageStorageId) : null,
+        imageUrl: await resolvePanelImageUrl(ctx, p),
       })),
     );
     const badge = await ctx.db
@@ -410,7 +435,7 @@ export const activityBadges = query({
           ...b,
           avatarPreset: profile?.avatarPreset,
           avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
-          endingImageUrl: ending?.imageStorageId ? await ctx.storage.getUrl(ending.imageStorageId) : null,
+          endingImageUrl: await resolvePanelImageUrl(ctx, ending),
           endingNarration: ending?.narration ?? '',
         };
       }),
@@ -437,7 +462,7 @@ export const wallFeed = query({
           .withIndex('experienceId', (q) => q.eq('experienceId', b.experienceId))
           .collect();
         panels.sort((a, c) => c.index - a.index);
-        const ending = panels.find((p) => p.isFinal && p.imageStorageId) ?? panels.find((p) => p.imageStorageId);
+        const ending = panels.find((p) => p.isFinal && panelHasImage(p)) ?? panels.find((p) => panelHasImage(p));
         return {
           _id: b._id,
           experienceId: b.experienceId,
@@ -450,7 +475,7 @@ export const wallFeed = query({
           activityKey: event?.activityKey ?? null,
           avatarPreset: profile?.avatarPreset ?? null,
           avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
-          imageUrl: ending?.imageStorageId ? await ctx.storage.getUrl(ending.imageStorageId) : null,
+          imageUrl: await resolvePanelImageUrl(ctx, ending),
         };
       }),
     );
@@ -492,7 +517,7 @@ export const experienceComic = query({
       panelsRaw.map(async (p) => ({
         index: p.index,
         narration: p.narration,
-        imageUrl: p.imageStorageId ? await ctx.storage.getUrl(p.imageStorageId) : null,
+        imageUrl: await resolvePanelImageUrl(ctx, p),
       })),
     );
     return {
@@ -525,9 +550,18 @@ export const saveReflection = mutation({
 // ============================================================
 // 公开 action：核心交互闭环
 // ============================================================
+// 生图结果：blob 供首格做后续 image edit 参考；imageUrl/imageStorageId 二选一供回填。
+type GenImage = { blob: Blob; imageUrl?: string; imageStorageId?: string };
+
 // 生图容错：优先用首格图做 image edit；若失败（如偶发内容审核 400）退回纯 t2i；
-// 再失败则该格暂无图——绝不让单格生图失败阻断整条剧情/收尾。返回 storageId 或 null。
-async function genImageSafe(ctx: ActionCtx, prompt: string, reference?: Blob): Promise<string | null> {
+// 再失败则该格暂无图——绝不让单格生图失败阻断整条剧情/收尾。返回 GenImage 或 null。
+// 生成成功后优先转存七牛 CDN（imageUrl）；上传失败回退 Convex storage（imageStorageId），绝不漏图。
+async function genImageSafe(
+  ctx: ActionCtx,
+  prompt: string,
+  unique: string,
+  reference?: Blob,
+): Promise<GenImage | null> {
   let blob: Blob | null = null;
   try {
     blob = await generateImage(prompt, reference);
@@ -542,7 +576,15 @@ async function genImageSafe(ctx: ActionCtx, prompt: string, reference?: Blob): P
       console.error('文生图失败', e1);
     }
   }
-  return blob ? await ctx.storage.store(blob) : null;
+  if (!blob) return null;
+  try {
+    const imageUrl = await uploadToQiniu(blob, unique);
+    return { blob, imageUrl };
+  } catch (e) {
+    console.error('七牛上传失败，回退 Convex storage', e);
+    const imageStorageId = await ctx.storage.store(blob);
+    return { blob, imageStorageId };
+  }
 }
 
 // 生成首格（导演 + 文生图），供两个入口复用。
@@ -563,15 +605,24 @@ async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'
     allowCustom: step.allowCustom ?? true,
     isFinal: false,
   });
-  const storageId = await genImageSafe(ctx, step.imagePrompt);
-  if (storageId) {
-    await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+  const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-0-${Date.now()}`);
+  if (gen) {
+    await ctx.runMutation(internal.experience.setPanelImage, {
+      panelId,
+      imageUrl: gen.imageUrl,
+      imageStorageId: gen.imageStorageId,
+    });
   }
-  // 锁定主角 + 首格图，供后续每格做 image edit 参考，保持跨格视觉一致。
+  // 首格图须存一份到 Convex storage 作为后续每格 image edit 的参考（即使展示图已转存七牛），
+  // 因为 answerPanel 通过 ctx.storage.get(firstPanelStorageId) 取参考 blob。
+  const refStorageId = gen
+    ? gen.imageStorageId ?? (await ctx.storage.store(gen.blob))
+    : undefined;
+  // 锁定主角 + 首格参考图，供后续每格做 image edit，保持跨格视觉一致。
   await ctx.runMutation(internal.experience.setExperienceLock, {
     experienceId,
     protagonistDesc: step.protagonist,
-    firstPanelStorageId: storageId ?? undefined,
+    firstPanelStorageId: refStorageId,
   });
 }
 
@@ -658,9 +709,13 @@ export const answerPanel = action({
     const reference = state.experience.firstPanelStorageId
       ? (await ctx.storage.get(state.experience.firstPanelStorageId)) ?? undefined
       : undefined;
-    const storageId = await genImageSafe(ctx, step.imagePrompt, reference);
-    if (storageId) {
-      await ctx.runMutation(internal.experience.setPanelImage, { panelId, imageStorageId: storageId });
+    const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-${nextIndex}-${Date.now()}`, reference);
+    if (gen) {
+      await ctx.runMutation(internal.experience.setPanelImage, {
+        panelId,
+        imageUrl: gen.imageUrl,
+        imageStorageId: gen.imageStorageId,
+      });
     }
 
     if (isFinal) {

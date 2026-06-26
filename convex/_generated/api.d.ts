@@ -50,6 +50,7 @@ import type * as util_isSimpleObject from "../util/isSimpleObject.js";
 import type * as util_llm from "../util/llm.js";
 import type * as util_minheap from "../util/minheap.js";
 import type * as util_object from "../util/object.js";
+import type * as util_qiniu from "../util/qiniu.js";
 import type * as util_sleep from "../util/sleep.js";
 import type * as util_types from "../util/types.js";
 import type * as util_xxhash from "../util/xxhash.js";
@@ -104,6 +105,7 @@ declare const fullApi: ApiFromModules<{
   "util/llm": typeof util_llm;
   "util/minheap": typeof util_minheap;
   "util/object": typeof util_object;
+  "util/qiniu": typeof util_qiniu;
   "util/sleep": typeof util_sleep;
   "util/types": typeof util_types;
   "util/xxhash": typeof util_xxhash;
