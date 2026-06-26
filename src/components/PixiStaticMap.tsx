@@ -1,6 +1,7 @@
 import { PixiComponent, applyDefaultProps } from '@pixi/react';
 import * as PIXI from 'pixi.js';
 import { WorldMap } from '../../convex/aiTown/worldMap';
+import { SPACE_BARRIERS } from '../../data/sandCityGeometry';
 import { INSTALLATIONS, type Installation } from '../../data/installations';
 import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
 
@@ -20,13 +21,6 @@ type PlanBlock = {
   fill?: number;
   stroke?: number;
   radius?: number;
-};
-
-type PlanSlat = {
-  x: number;
-  y: number;
-  width?: number;
-  height: number;
 };
 
 function createProjector(worldWidth: number, worldHeight: number) {
@@ -190,21 +184,6 @@ const planBlocks: PlanBlock[] = [
   { x: 1452, y: 788, width: 86, height: 132, fill: 0xe0b86f, stroke: 0xaa7f43, radius: 5 },
 ];
 
-const planSlats: PlanSlat[] = [
-  { x: 452, y: 320, height: 210 },
-  { x: 500, y: 450, height: 250 },
-  { x: 602, y: 350, height: 260 },
-  { x: 668, y: 292, height: 245 },
-  { x: 744, y: 318, height: 325 },
-  { x: 823, y: 280, height: 370 },
-  { x: 912, y: 355, height: 405 },
-  { x: 986, y: 330, height: 230 },
-  { x: 1078, y: 390, height: 300 },
-  { x: 1140, y: 445, height: 220 },
-  { x: 1188, y: 664, height: 215 },
-  { x: 1280, y: 690, height: 180 },
-];
-
 function drawPlanBlock(container: PIXI.Container, project: Projector, block: PlanBlock) {
   const rect = project.rect(block.x, block.y, block.width, block.height);
   const shadow = new PIXI.Graphics();
@@ -244,8 +223,8 @@ function drawPlanBlock(container: PIXI.Container, project: Projector, block: Pla
 
 function drawPlanSlats(container: PIXI.Container, project: Projector) {
   const graphics = new PIXI.Graphics();
-  for (const slat of planSlats) {
-    const rect = project.rect(slat.x, slat.y, slat.width ?? 7, slat.height);
+  for (const slat of SPACE_BARRIERS) {
+    const rect = project.rect(slat.x, slat.y, slat.width, slat.height);
     graphics.lineStyle(1.2 * project.scale, 0x9c7742, 0.72);
     graphics.beginFill(0xd4b071, 0.72);
     graphics.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1 * project.scale);

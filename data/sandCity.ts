@@ -1,4 +1,5 @@
 import * as gentle from './gentle';
+import { SPACE_BARRIERS, type SourceRect } from './sandCityGeometry';
 
 const SOURCE_WIDTH = 1703;
 const SOURCE_HEIGHT = 1279;
@@ -60,6 +61,17 @@ function blockSourceRect(x: number, y: number, w: number, h: number) {
     [x + w, y + h],
     [x, y + h],
   ]);
+}
+
+function blockSpaceBarrier({ x, y, width, height }: SourceRect) {
+  const collisionWidth = Math.max(width, 34);
+  const collisionHeight = Math.max(height, 34);
+  blockSourceRect(
+    x - (collisionWidth - width) / 2,
+    y - (collisionHeight - height) / 2,
+    collisionWidth,
+    collisionHeight,
+  );
 }
 
 function blockDiamondWall(x: number, y: number, count: number, size: number, step: number) {
@@ -125,21 +137,8 @@ blockSourcePolygon([
   [1250, 420],
 ]); // 候鸟交易所
 
-for (const [x, y, height] of [
-  [452, 320, 210],
-  [500, 450, 250],
-  [602, 350, 260],
-  [668, 292, 245],
-  [744, 318, 325],
-  [823, 280, 370],
-  [912, 355, 405],
-  [986, 330, 230],
-  [1078, 390, 300],
-  [1140, 445, 220],
-  [1188, 664, 215],
-  [1280, 690, 180],
-] as const) {
-  blockSourceRect(x, y, 7, height);
+for (const barrier of SPACE_BARRIERS) {
+  blockSpaceBarrier(barrier);
 }
 
 blockDiamondWall(254, 135, 9, 15, 34);
