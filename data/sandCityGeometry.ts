@@ -13,57 +13,43 @@ export type SourceCircle = {
   radius: number;
 };
 
+export type SourceSegment = {
+  from: SourcePoint;
+  to: SourcePoint;
+  width: number;
+  divisions: number;
+};
+
 export const SOURCE_WIDTH = 1703;
 export const SOURCE_HEIGHT = 1279;
 
-export const BIRD_RESTAURANT_WALLS: SourcePoint[][] = [
-  [
-    [1150, 606],
-    [1226, 576],
-    [1238, 596],
-    [1160, 624],
-  ],
-  [
-    [1136, 640],
-    [1160, 648],
-    [1160, 726],
-    [1138, 734],
-    [1128, 680],
-  ],
-  [
-    [1138, 736],
-    [1192, 768],
-    [1204, 750],
-    [1164, 724],
-  ],
-  [
-    [1282, 588],
-    [1318, 562],
-    [1352, 600],
-    [1336, 620],
-    [1304, 596],
-  ],
-  [
-    [1340, 630],
-    [1358, 656],
-    [1354, 734],
-    [1330, 716],
-    [1324, 664],
-  ],
-  [
-    [1262, 752],
-    [1326, 724],
-    [1356, 748],
-    [1312, 790],
-    [1248, 782],
-  ],
-  [
-    [1194, 768],
-    [1248, 782],
-    [1262, 752],
-    [1210, 752],
-  ],
+function segmentToPolygon({ from, to, width }: SourceSegment): SourcePoint[] {
+  const [x1, y1] = from;
+  const [x2, y2] = to;
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  const nx = (-(y2 - y1) / length) * (width / 2);
+  const ny = ((x2 - x1) / length) * (width / 2);
+  return [
+    [x1 + nx, y1 + ny],
+    [x2 + nx, y2 + ny],
+    [x2 - nx, y2 - ny],
+    [x1 - nx, y1 - ny],
+  ];
+}
+
+export const BIRD_RESTAURANT_WALL_SEGMENTS: SourceSegment[] = [
+  { from: [1146, 612], to: [1228, 584], width: 24, divisions: 5 },
+  { from: [1146, 638], to: [1146, 730], width: 24, divisions: 5 },
+  { from: [1148, 730], to: [1208, 766], width: 24, divisions: 4 },
+  { from: [1208, 766], to: [1260, 770], width: 24, divisions: 4 },
+  { from: [1260, 770], to: [1340, 732], width: 24, divisions: 5 },
+  { from: [1284, 594], to: [1320, 570], width: 24, divisions: 3 },
+  { from: [1320, 570], to: [1352, 604], width: 24, divisions: 3 },
+  { from: [1344, 626], to: [1344, 730], width: 24, divisions: 6 },
 ];
+
+export const BIRD_RESTAURANT_WALLS: SourcePoint[][] =
+  BIRD_RESTAURANT_WALL_SEGMENTS.map(segmentToPolygon);
 
 export const ICE_JOYS_BUILDING_RECTS: SourceRect[] = [
   { x: 1362, y: 604, width: 104, height: 104 },

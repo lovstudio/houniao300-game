@@ -2,6 +2,7 @@ import { PixiComponent, applyDefaultProps } from '@pixi/react';
 import * as PIXI from 'pixi.js';
 import { WorldMap } from '../../convex/aiTown/worldMap';
 import {
+  BIRD_RESTAURANT_WALL_SEGMENTS,
   BIRD_RESTAURANT_WALLS,
   CLUB_BUILDING_RECTS,
   ICE_JOYS_BUILDING_RECTS,
@@ -468,34 +469,36 @@ function drawBirdRestaurant(container: PIXI.Container, project: Projector) {
     building.beginFill(index % 2 === 0 ? 0xbdb5aa : 0xada59b, 0.96);
     drawPolygon(building, project, wall);
     building.endFill();
+  }
 
-    const [first] = wall;
-    for (let i = 1; i < wall.length - 1; i++) {
-      const [x, y] = wall[i];
-      const t = i / wall.length;
-      building.lineStyle(0.9 * project.scale, 0x817568, 0.45);
-      building.moveTo(project.x(first[0] + (x - first[0]) * t), project.y(first[1] + (y - first[1]) * t));
-      building.lineTo(project.x(x), project.y(y));
+  building.lineStyle(0.95 * project.scale, 0x766c61, 0.58);
+  for (const segment of BIRD_RESTAURANT_WALL_SEGMENTS) {
+    const [x1, y1] = segment.from;
+    const [x2, y2] = segment.to;
+    const length = Math.hypot(x2 - x1, y2 - y1);
+    const nx = (-(y2 - y1) / length) * (segment.width / 2);
+    const ny = ((x2 - x1) / length) * (segment.width / 2);
+    for (let i = 1; i < segment.divisions; i++) {
+      const t = i / segment.divisions;
+      const cx = x1 + (x2 - x1) * t;
+      const cy = y1 + (y2 - y1) * t;
+      building.moveTo(project.x(cx + nx), project.y(cy + ny));
+      building.lineTo(project.x(cx - nx), project.y(cy - ny));
     }
   }
 
-  building.lineStyle(1.1 * project.scale, 0x8f806d, 0.7);
-  drawPolyline(building, project, [[1156, 635], [1218, 680], [1150, 730]], 1.1, 0x8f806d, 0.65);
-  drawPolyline(building, project, [[1288, 620], [1332, 676], [1274, 724]], 1.1, 0x8f806d, 0.65);
-  drawPolyline(building, project, [[1188, 766], [1245, 792], [1314, 724]], 1.1, 0x8f806d, 0.65);
+  drawPolyline(building, project, [[1162, 642], [1218, 684], [1164, 724]], 1, 0x8f806d, 0.5);
+  drawPolyline(building, project, [[1290, 622], [1330, 678], [1280, 724]], 1, 0x8f806d, 0.5);
+  drawPolyline(building, project, [[1196, 760], [1248, 782], [1318, 736]], 1, 0x8f806d, 0.5);
 
   building.beginFill(0xa58c62, 0.72);
-  for (let row = 0; row < 7; row++) {
+  for (let row = 0; row < 6; row++) {
     for (let col = 0; col < 3; col++) {
-      const leftX = 1162 + col * 17 + (row % 2) * 2;
-      const rightX = 1290 + col * 17 - (row % 2) * 2;
+      const leftX = 1168 + col * 17;
+      const rightX = 1292 + col * 17;
       const y = 628 + row * 18;
-      if (row < 6) {
-        building.drawRect(project.x(leftX), project.y(y), 6 * project.scale, 6 * project.scale);
-      }
-      if (row > 0) {
-        building.drawRect(project.x(rightX), project.y(y - 4), 6 * project.scale, 6 * project.scale);
-      }
+      building.drawRect(project.x(leftX), project.y(y), 6 * project.scale, 6 * project.scale);
+      building.drawRect(project.x(rightX), project.y(y), 6 * project.scale, 6 * project.scale);
     }
   }
   building.endFill();
