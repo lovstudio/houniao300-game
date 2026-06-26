@@ -16,6 +16,55 @@ export type SourceCircle = {
 export const SOURCE_WIDTH = 1703;
 export const SOURCE_HEIGHT = 1279;
 
+export const BIRD_RESTAURANT_WALLS: SourcePoint[][] = [
+  [
+    [1144, 610],
+    [1188, 560],
+    [1247, 579],
+    [1224, 622],
+    [1186, 612],
+    [1169, 651],
+    [1177, 712],
+    [1218, 748],
+    [1191, 781],
+    [1139, 739],
+    [1126, 670],
+  ],
+  [
+    [1278, 590],
+    [1318, 552],
+    [1365, 590],
+    [1346, 632],
+    [1315, 613],
+    [1301, 653],
+    [1322, 704],
+    [1294, 744],
+    [1267, 712],
+    [1279, 646],
+  ],
+  [
+    [1194, 755],
+    [1268, 734],
+    [1328, 710],
+    [1365, 748],
+    [1312, 804],
+    [1242, 792],
+  ],
+];
+
+export const ICE_JOYS_BUILDING_RECTS: SourceRect[] = [
+  { x: 1362, y: 604, width: 104, height: 104 },
+];
+
+export const ICE_JOYS_SIDE_SLATS: SourceRect[] = [
+  { x: 1468, y: 552, width: 8, height: 78 },
+  { x: 1468, y: 708, width: 8, height: 88 },
+];
+
+export const CLUB_BUILDING_RECTS: SourceRect[] = [
+  { x: 1306, y: 762, width: 76, height: 78 },
+];
+
 // Thin divider rectangles extracted from the top plan in works-location PDF.
 // Coordinates use the same 1703 x 1279 source grid as PixiStaticMap.
 export const SPACE_BARRIERS: SourceRect[] = [
@@ -45,10 +94,10 @@ export const SOLID_RECTS: SourceRect[] = [
   { x: 655, y: 560, width: 88, height: 90 }, // 候鸟工作坊
   { x: 875, y: 260, width: 245, height: 62 }, // 候鸟黑客松
   { x: 1228, y: 310, width: 130, height: 174 }, // 候鸟交易所
-  { x: 1298, y: 684, width: 58, height: 42 }, // 鸟其林附属结构
-  { x: 1280, y: 745, width: 70, height: 86 }, // 候鸟俱乐部附属建筑
   { x: 1418, y: 448, width: 140, height: 86 }, // 公路复古艺术展区
-  { x: 1328, y: 783, width: 112, height: 132 }, // 候鸟俱乐部
+  ...ICE_JOYS_BUILDING_RECTS,
+  ...ICE_JOYS_SIDE_SLATS,
+  ...CLUB_BUILDING_RECTS,
   { x: 1452, y: 788, width: 86, height: 132 }, // 300.梯威
 ];
 
@@ -91,28 +140,9 @@ export const TENT_POLYGONS: SourcePoint[][] = [
   makeTentPolygon(882, 190, 62, 54),
   makeTentPolygon(962, 188, 58, 52),
   makeTentPolygon(1042, 190, 58, 52),
-  makeTentPolygon(1380, 728, 58, 54),
 ];
 
-export const BUILDING_SOLID_POLYGONS: SourcePoint[][] = [
-  [
-    [1178, 544],
-    [1248, 526],
-    [1308, 570],
-    [1314, 642],
-    [1264, 694],
-    [1190, 672],
-    [1158, 604],
-  ],
-  [
-    [1278, 600],
-    [1344, 614],
-    [1370, 684],
-    [1328, 742],
-    [1268, 704],
-    [1252, 652],
-  ],
-];
+export const BUILDING_SOLID_POLYGONS: SourcePoint[][] = BIRD_RESTAURANT_WALLS;
 
 export const DIAMOND_WALL_BARRIERS: SourceRect[] = [
   { x: 232, y: 118, width: 55, height: 320 },
@@ -127,7 +157,7 @@ export const SOLID_POLYGONS: SourcePoint[][] = [
   ...TENT_POLYGONS,
 ];
 
-const BARRIER_COLLISION_PADDING = 8;
+const BARRIER_COLLISION_PADDING = 10;
 
 function pointInRect({ x, y }: { x: number; y: number }, rect: SourceRect, padding = 0) {
   return (
