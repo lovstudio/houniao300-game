@@ -93,62 +93,6 @@ function drawDashedLine(
   }
 }
 
-function addLabel(
-  container: PIXI.Container,
-  project: Projector,
-  text: string,
-  x: number,
-  y: number,
-  venue?: string,
-) {
-  const wrapper = new PIXI.Container();
-  wrapper.x = project.x(x);
-  wrapper.y = project.y(y);
-
-  const label = new PIXI.Text(text, {
-    fill: 0xffffff,
-    fontFamily: 'sans-serif',
-    fontSize: 22 * project.scale,
-    fontWeight: '700',
-    letterSpacing: 0,
-    lineJoin: 'round',
-    stroke: 0x211a12,
-    strokeThickness: 2 * project.scale,
-  });
-  label.x = 9 * project.scale;
-  label.y = 5 * project.scale;
-  label.resolution = 2;
-
-  const background = new PIXI.Graphics();
-  background.lineStyle(1.2 * project.scale, 0xe4c781, 0.55);
-  background.beginFill(0x1d1710, 0.82);
-  background.drawRoundedRect(
-    0,
-    0,
-    label.width + 18 * project.scale,
-    label.height + 10 * project.scale,
-    3 * project.scale,
-  );
-  background.endFill();
-
-  wrapper.addChild(background);
-  wrapper.addChild(label);
-
-  if (venue) {
-    wrapper.eventMode = 'static';
-    wrapper.cursor = 'pointer';
-    const stop = (e: PIXI.FederatedPointerEvent) => e.stopPropagation();
-    wrapper.on('pointerdown', stop);
-    wrapper.on('pointerup', stop);
-    wrapper.on('pointertap', (e: PIXI.FederatedPointerEvent) => {
-      e.stopPropagation();
-      selectVenueOnMap(venue);
-    });
-  }
-
-  container.addChild(wrapper);
-}
-
 const INSTALLATION_COLORS: Record<string, number> = {
   A: 0x1da76e,
   B: 0x2e9f8d,
@@ -241,7 +185,6 @@ const planBlocks: PlanBlock[] = [
   { x: 492, y: 828, width: 76, height: 38, fill: 0xf2e4ce, stroke: 0xb99d74, radius: 5 },
   { x: 655, y: 560, width: 88, height: 90, fill: 0xe5c18a, stroke: 0xb28548, radius: 4 },
   { x: 880, y: 260, width: 238, height: 62, fill: 0xe2d0b0, stroke: 0xae936d, radius: 4 },
-  { x: 1282, y: 596, width: 72, height: 78, fill: 0xf2eee6, stroke: 0xb8a27f, radius: 5 },
   { x: 1418, y: 448, width: 140, height: 86, fill: 0xd8ad67, stroke: 0xaa7f43, radius: 5 },
   { x: 1328, y: 783, width: 112, height: 132, fill: 0xf2e5cf, stroke: 0xb99d74, radius: 5 },
   { x: 1452, y: 788, width: 86, height: 132, fill: 0xe0b86f, stroke: 0xaa7f43, radius: 5 },
@@ -348,6 +291,7 @@ function drawTextOnPlan(
   y: number,
   fontSize = 18,
   align: 'left' | 'center' | 'right' = 'center',
+  venue?: string,
 ) {
   const label = new PIXI.Text(text, {
     align,
@@ -361,7 +305,44 @@ function drawTextOnPlan(
   label.resolution = 2;
   label.x = project.x(x);
   label.y = project.y(y);
+  if (venue) {
+    label.eventMode = 'static';
+    label.cursor = 'pointer';
+    const stop = (e: PIXI.FederatedPointerEvent) => e.stopPropagation();
+    label.on('pointerdown', stop);
+    label.on('pointerup', stop);
+    label.on('pointertap', (e: PIXI.FederatedPointerEvent) => {
+      e.stopPropagation();
+      selectVenueOnMap(venue);
+    });
+  }
   container.addChild(label);
+}
+
+function addVenueHotspot(
+  container: PIXI.Container,
+  project: Projector,
+  venue: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const rect = project.rect(x, y, width, height);
+  const hit = new PIXI.Graphics();
+  hit.beginFill(0xffffff, 0.001);
+  hit.drawRect(rect.x, rect.y, rect.width, rect.height);
+  hit.endFill();
+  hit.eventMode = 'static';
+  hit.cursor = 'pointer';
+  const stop = (e: PIXI.FederatedPointerEvent) => e.stopPropagation();
+  hit.on('pointerdown', stop);
+  hit.on('pointerup', stop);
+  hit.on('pointertap', (e: PIXI.FederatedPointerEvent) => {
+    e.stopPropagation();
+    selectVenueOnMap(venue);
+  });
+  container.addChild(hit);
 }
 
 function drawVenueDetails(container: PIXI.Container, project: Projector) {
@@ -481,6 +462,139 @@ function drawSketchCircle(
   circle.lineStyle(1 * project.scale, 0xffffff, 0.4);
   circle.drawCircle(project.x(x - 4), project.y(y - 5), radius * 0.72 * project.scale);
   container.addChild(circle);
+}
+
+function drawBirdRestaurant(container: PIXI.Container, project: Projector) {
+  const shadow = new PIXI.Graphics();
+  shadow.beginFill(0x5f4225, 0.14);
+  drawPolygon(shadow, project, [
+    [1194, 552],
+    [1268, 532],
+    [1330, 574],
+    [1360, 650],
+    [1324, 724],
+    [1242, 750],
+    [1182, 680],
+    [1164, 612],
+  ]);
+  shadow.endFill();
+  container.addChild(shadow);
+
+  const building = new PIXI.Graphics();
+  building.lineStyle(2.2 * project.scale, 0xb8a27f, 0.94);
+  building.beginFill(0xf3eee4, 0.96);
+  drawPolygon(building, project, [
+    [1178, 544],
+    [1248, 526],
+    [1308, 570],
+    [1314, 642],
+    [1264, 694],
+    [1190, 672],
+    [1158, 604],
+  ]);
+  building.endFill();
+  building.beginFill(0xf0e7d9, 0.96);
+  drawPolygon(building, project, [
+    [1278, 600],
+    [1344, 614],
+    [1370, 684],
+    [1328, 742],
+    [1268, 704],
+    [1252, 652],
+  ]);
+  building.endFill();
+
+  building.lineStyle(1.1 * project.scale, 0xc9b99d, 0.88);
+  for (let i = 0; i < 6; i++) {
+    const x = 1188 + i * 17;
+    building.moveTo(project.x(x), project.y(560 + i * 5));
+    building.lineTo(project.x(x + 8), project.y(654 + i * 4));
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = 1288 + i * 12;
+    building.moveTo(project.x(x), project.y(620 + i * 4));
+    building.lineTo(project.x(x + 5), project.y(708 + i * 3));
+  }
+
+  building.lineStyle(1.3 * project.scale, 0xa98f68, 0.82);
+  building.drawRoundedRect(
+    project.x(1298),
+    project.y(684),
+    project.x(58),
+    project.y(42),
+    4 * project.scale,
+  );
+  container.addChild(building);
+}
+
+function drawExchangeBuilding(container: PIXI.Container, project: Projector) {
+  const exchange = new PIXI.Graphics();
+  const outer = project.rect(1228, 310, 130, 174);
+  exchange.beginFill(0x5f4225, 0.13);
+  exchange.drawRoundedRect(
+    outer.x + 7 * project.scale,
+    outer.y + 8 * project.scale,
+    outer.width,
+    outer.height,
+    6 * project.scale,
+  );
+  exchange.endFill();
+
+  exchange.lineStyle(2 * project.scale, 0xb89b70, 0.9);
+  exchange.beginFill(0xf1e5d2, 0.92);
+  exchange.drawRoundedRect(outer.x, outer.y, outer.width, outer.height, 6 * project.scale);
+  exchange.endFill();
+
+  exchange.beginFill(0xd8b57a, 0.72);
+  for (let i = 0; i < 6; i++) {
+    const rect = project.rect(1234 + i * 18, 322, 11, 16);
+    exchange.drawRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  exchange.endFill();
+
+  exchange.lineStyle(1.4 * project.scale, 0x9f8054, 0.82);
+  for (let i = 0; i < 6; i++) {
+    const x = 1240 + i * 18;
+    exchange.moveTo(project.x(x), project.y(350));
+    exchange.lineTo(project.x(x), project.y(468));
+  }
+
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 5; col++) {
+      exchange.beginFill(0xa58c62, 0.82);
+      exchange.drawCircle(
+        project.x(1252 + col * 15),
+        project.y(370 + row * 15),
+        2.8 * project.scale,
+      );
+      exchange.endFill();
+    }
+  }
+
+  container.addChild(exchange);
+}
+
+function drawClubDetails(container: PIXI.Container, project: Projector) {
+  const club = new PIXI.Graphics();
+  const body = project.rect(1328, 783, 112, 132);
+  club.lineStyle(1.2 * project.scale, 0xc9ad83, 0.82);
+  club.moveTo(body.x + body.width * 0.22, body.y + 10 * project.scale);
+  club.lineTo(body.x + body.width * 0.22, body.y + body.height - 12 * project.scale);
+  club.moveTo(body.x + body.width * 0.78, body.y + 12 * project.scale);
+  club.lineTo(body.x + body.width * 0.78, body.y + body.height - 14 * project.scale);
+  club.beginFill(0xf0e2cc, 0.96);
+  club.drawRoundedRect(
+    project.x(1280),
+    project.y(745),
+    project.x(70),
+    project.y(86),
+    4 * project.scale,
+  );
+  club.endFill();
+  club.lineStyle(1.4 * project.scale, 0xb99d74, 0.82);
+  club.moveTo(project.x(1288), project.y(753));
+  club.lineTo(project.x(1340), project.y(748));
+  container.addChild(club);
 }
 
 function drawSandCityPlan(
@@ -689,6 +803,9 @@ function drawSandCityPlan(
     drawPlanBlock(container, project, block);
   }
 
+  drawExchangeBuilding(container, project);
+  drawBirdRestaurant(container, project);
+  drawClubDetails(container, project);
   drawSketchCircle(container, project, 148, 395, 55, 0xe8ddc8);
   drawSketchCircle(container, project, 1368, 886, 26, 0xe0d0b6);
   drawCanvasTent(container, project, 886, 190, 62, 54);
@@ -700,35 +817,30 @@ function drawSandCityPlan(
 
   drawTextOnPlan(container, project, '候鸟巡游花车停放处', 132, 258, 16);
   drawTextOnPlan(container, project, '候鸟中心', 148, 395, 16);
-  drawTextOnPlan(container, project, '沙城一级城墙', 298, 372, 16);
-  drawTextOnPlan(container, project, '伏园', 420, 198, 17);
+  drawTextOnPlan(container, project, '沙城一级城墙', 298, 372, 16, 'center', '一级城墙');
+  drawTextOnPlan(container, project, '伏园', 420, 198, 17, 'center', '伏园');
   drawTextOnPlan(container, project, '婚姻登记处', 398, 558, 16);
-  drawTextOnPlan(container, project, '候鸟电影院', 528, 850, 14);
-  drawTextOnPlan(container, project, '候鸟工作坊', 700, 606, 15);
-  drawTextOnPlan(container, project, '候鸟黑客松', 1000, 286, 15);
-  drawTextOnPlan(container, project, '时间广场', 1010, 352, 15);
+  drawTextOnPlan(container, project, '候鸟电影院', 528, 850, 14, 'center', '候鸟电影院');
+  drawTextOnPlan(container, project, '候鸟工作坊', 700, 606, 15, 'center', '候鸟工作坊');
+  drawTextOnPlan(container, project, '候鸟黑客松', 1000, 286, 15, 'center', '候鸟黑客松');
+  drawTextOnPlan(container, project, '时间广场', 1010, 352, 15, 'center', '时间广场');
   drawTextOnPlan(container, project, '候鸟交易所', 1284, 362, 15);
   drawTextOnPlan(container, project, '鸟其林', 1244, 626, 16);
   drawTextOnPlan(container, project, '冰JOYS\n灵感发酵局', 1392, 648, 15);
-  drawTextOnPlan(container, project, '公路复古艺术展区', 1488, 492, 15);
-  drawTextOnPlan(container, project, '300.梯威', 1496, 850, 15);
+  drawTextOnPlan(container, project, '公路复古艺术展区', 1488, 492, 15, 'center', '艺术作品展区');
+  drawTextOnPlan(container, project, '候鸟俱乐部', 1370, 766, 15, 'center', '候鸟俱乐部');
+  drawTextOnPlan(container, project, '300.梯威', 1496, 850, 15, 'center', '300.梯威');
   drawTextOnPlan(container, project, '沙城二级城墙', 1646, 612, 16);
 
-  addLabel(container, project, '巡游花车', 46, 86);
-  addLabel(container, project, '候鸟中心', 94, 438);
-  addLabel(container, project, '一级城墙', 282, 338, '一级城墙');
-  addLabel(container, project, '伏园', 350, 92, '伏园');
-  addLabel(container, project, '婚姻登记处', 360, 602);
-  addLabel(container, project, '候鸟电影院', 470, 878, '候鸟电影院');
-  addLabel(container, project, '候鸟工作坊', 640, 662, '候鸟工作坊');
-  addLabel(container, project, '候鸟黑客松', 895, 218, '候鸟黑客松');
-  addLabel(container, project, '时间广场', 965, 402, '时间广场');
-  addLabel(container, project, '候鸟交易所', 1240, 420);
-  addLabel(container, project, '鸟其林', 1208, 690);
-  addLabel(container, project, '候鸟俱乐部', 1268, 752, '候鸟俱乐部');
-  addLabel(container, project, '公路复古艺术展区', 1422, 552, '艺术作品展区');
-  addLabel(container, project, '300.梯威', 1458, 934, '300.梯威');
-  addLabel(container, project, '二级城墙', 1550, 688);
+  addVenueHotspot(container, project, '一级城墙', 230, 130, 105, 650);
+  addVenueHotspot(container, project, '伏园', 327, 110, 225, 205);
+  addVenueHotspot(container, project, '候鸟电影院', 470, 800, 130, 95);
+  addVenueHotspot(container, project, '候鸟工作坊', 620, 535, 155, 150);
+  addVenueHotspot(container, project, '候鸟黑客松', 865, 210, 280, 130);
+  addVenueHotspot(container, project, '时间广场', 930, 330, 225, 235);
+  addVenueHotspot(container, project, '候鸟俱乐部', 1260, 720, 190, 210);
+  addVenueHotspot(container, project, '艺术作品展区', 1400, 425, 180, 135);
+  addVenueHotspot(container, project, '300.梯威', 1435, 765, 125, 180);
 
   addInstallationMarkers(container, project);
 }
