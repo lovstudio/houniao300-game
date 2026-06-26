@@ -115,7 +115,7 @@ export default function SettingsMenu({
               value={showCollisionOverlay ? '开' : '关'}
               active={showCollisionOverlay}
               onClick={onToggleCollisionOverlay}
-              title="显示当前地图不可走区域：黄=几何，蓝=格子，红=重合。"
+              title="显示当前路径规划实际不可走区域。"
             />
           </>
         )}

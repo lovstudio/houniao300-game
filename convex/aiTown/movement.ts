@@ -1,5 +1,8 @@
 import { movementSpeed } from '../../data/characters';
-import { tilePositionBlockedBySolidGeometry } from '../../data/sandCityGeometry';
+import {
+  sandCityGeometryControlsCollision,
+  tilePositionBlockedBySolidGeometry,
+} from '../../data/sandCityGeometry';
 import { COLLISION_THRESHOLD } from '../constants';
 import { compressPath, distance, manhattanDistance, pointsEqual } from '../util/geometry';
 import { MinHeap } from '../util/minheap';
@@ -176,12 +179,15 @@ export function blockedWithPositions(position: Point, otherPositions: Point[], m
   if (position.x < 0 || position.y < 0 || position.x >= map.width || position.y >= map.height) {
     return 'out of bounds';
   }
-  if (tilePositionBlockedBySolidGeometry(position, map.width, map.height)) {
-    return 'solid geometry';
-  }
-  for (const layer of map.objectTiles) {
-    if (layer[Math.floor(position.x)][Math.floor(position.y)] !== -1) {
-      return 'world blocked';
+  if (sandCityGeometryControlsCollision(map.width, map.height)) {
+    if (tilePositionBlockedBySolidGeometry(position, map.width, map.height)) {
+      return 'solid geometry';
+    }
+  } else {
+    for (const layer of map.objectTiles) {
+      if (layer[Math.floor(position.x)][Math.floor(position.y)] !== -1) {
+        return 'world blocked';
+      }
     }
   }
   for (const otherPosition of otherPositions) {

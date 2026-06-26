@@ -15,7 +15,10 @@ import { DebugCollisionOverlay } from './DebugCollisionOverlay.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
 import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
-import { tilePositionBlockedBySolidGeometry } from '../../data/sandCityGeometry.ts';
+import {
+  sandCityGeometryControlsCollision,
+  tilePositionBlockedBySolidGeometry,
+} from '../../data/sandCityGeometry.ts';
 import type { ControlMode } from './Game.tsx';
 import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
@@ -69,17 +72,22 @@ function isMapDestinationBlocked(destination: { x: number; y: number }, state: R
     return true;
   }
   if (
-    tilePositionBlockedBySolidGeometry(
-      destination,
-      state.game.worldMap.width,
-      state.game.worldMap.height,
-    )
+    sandCityGeometryControlsCollision(state.game.worldMap.width, state.game.worldMap.height)
   ) {
-    return true;
-  }
-  for (const layer of state.game.worldMap.objectTiles) {
-    if (layer[destination.x]?.[destination.y] !== -1) {
+    if (
+      tilePositionBlockedBySolidGeometry(
+        destination,
+        state.game.worldMap.width,
+        state.game.worldMap.height,
+      )
+    ) {
       return true;
+    }
+  } else {
+    for (const layer of state.game.worldMap.objectTiles) {
+      if (layer[destination.x]?.[destination.y] !== -1) {
+        return true;
+      }
     }
   }
   for (const player of state.players) {

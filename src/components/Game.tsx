@@ -103,16 +103,8 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               <div className="mb-1 font-semibold">碰撞染色</div>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
                 <span className="inline-flex items-center gap-1">
-                  <i className="h-2.5 w-2.5 rounded-sm bg-[#ffc145]" />
-                  几何
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <i className="h-2.5 w-2.5 rounded-sm bg-[#4fb7ff]" />
-                  格子
-                </span>
-                <span className="inline-flex items-center gap-1">
                   <i className="h-2.5 w-2.5 rounded-sm bg-[#ff4d3d]" />
-                  重合
+                  有效阻挡
                 </span>
               </div>
             </div>

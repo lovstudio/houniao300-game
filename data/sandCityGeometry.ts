@@ -183,3 +183,7 @@ export function tilePositionBlockedBySolidGeometry(
 ) {
   return sourcePointInSolidGeometry(gridPositionToSourcePoint(position, mapWidth, mapHeight));
 }
+
+export function sandCityGeometryControlsCollision(mapWidth: number, mapHeight: number) {
+  return mapWidth === 64 && mapHeight === 48;
+}
