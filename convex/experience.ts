@@ -397,12 +397,14 @@ export const wallFeed = query({
         const ending = panels.find((p) => p.isFinal && p.imageStorageId) ?? panels.find((p) => p.imageStorageId);
         return {
           _id: b._id,
+          experienceId: b.experienceId,
           title: b.title,
           summary: b.summary,
           reflection: b.reflection ?? null,
           userName: b.userName,
           awardedAt: b.awardedAt,
           eventTitle: event?.title ?? '',
+          activityKey: event?.activityKey ?? null,
           avatarPreset: profile?.avatarPreset ?? null,
           avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
           imageUrl: ending?.imageStorageId ? await ctx.storage.getUrl(ending.imageStorageId) : null,
@@ -419,6 +421,48 @@ export const wallFeed = query({
       .sort((a, b) => b.count - a.count);
 
     return { items, total: allBadges.length, distribution };
+  },
+});
+
+// 结局墙点开某张卡片：只读取出该体验的完整连环画（所有格按序）+ 结局/题词/玩家/活动。
+// 公开、只读，供大屏/手机端浏览。
+export const experienceComic = query({
+  args: { experienceId: v.id('experiences') },
+  handler: async (ctx, { experienceId }) => {
+    const experience = await ctx.db.get(experienceId);
+    if (!experience) return null;
+    const event = await ctx.db.get(experience.eventId);
+    const profile = await ctx.db
+      .query('profiles')
+      .withIndex('userId', (q) => q.eq('userId', experience.userId))
+      .first();
+    const badge = await ctx.db
+      .query('badges')
+      .withIndex('experienceId', (q) => q.eq('experienceId', experienceId))
+      .first();
+    const panelsRaw = await ctx.db
+      .query('panels')
+      .withIndex('experienceId', (q) => q.eq('experienceId', experienceId))
+      .collect();
+    panelsRaw.sort((a, b) => a.index - b.index);
+    const panels = await Promise.all(
+      panelsRaw.map(async (p) => ({
+        index: p.index,
+        narration: p.narration,
+        imageUrl: p.imageStorageId ? await ctx.storage.getUrl(p.imageStorageId) : null,
+      })),
+    );
+    return {
+      panels,
+      userName: experience.userName,
+      avatarPreset: profile?.avatarPreset ?? null,
+      avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
+      eventTitle: event?.title ?? '',
+      activityKey: event?.activityKey ?? null,
+      badgeTitle: badge?.title ?? null,
+      badgeSummary: badge?.summary ?? null,
+      reflection: badge?.reflection ?? null,
+    };
   },
 });
 
