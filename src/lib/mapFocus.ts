@@ -41,3 +41,16 @@ export function setVenueSelectHandler(fn: VenueSelectListener | null) {
 export function selectVenueOnMap(venue: string) {
   venueSelectListener?.(venue);
 }
+
+// Reverse direction: an installation marker on the map was clicked; open its detail.
+export type InstallationSelectListener = (installationId: string) => void;
+
+let installationSelectListener: InstallationSelectListener | null = null;
+
+export function setInstallationSelectHandler(fn: InstallationSelectListener | null) {
+  installationSelectListener = fn;
+}
+
+export function selectInstallationOnMap(installationId: string) {
+  installationSelectListener?.(installationId);
+}

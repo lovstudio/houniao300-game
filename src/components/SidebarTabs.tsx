@@ -6,18 +6,38 @@ import PlayerDetails from './PlayerDetails';
 import { GameId } from '../../convex/aiTown/ids';
 import { ServerGame } from '../hooks/serverGame';
 import { SelectElement } from './Player';
-import { SCHEDULE, VENUES, VENUE_COORDS, CATEGORY_COLORS, DATES, type SchedItem } from '../../data/schedule';
-import { focusMapVenue, focusMapTile, setVenueSelectHandler } from '../lib/mapFocus';
+import {
+  SCHEDULE,
+  VENUES,
+  VENUE_COORDS,
+  CATEGORY_COLORS,
+  DATES,
+  type SchedItem,
+} from '../../data/schedule';
+import {
+  focusMapVenue,
+  focusMapTile,
+  setInstallationSelectHandler,
+  setVenueSelectHandler,
+} from '../lib/mapFocus';
+import {
+  INSTALLATIONS,
+  INSTALLATION_SOURCE,
+  INSTALLATION_ZONES,
+  type Installation,
+  type InstallationZone,
+} from '../../data/installations';
 import { enterActivity, activityFromSchedule } from '../lib/activityEnter';
 import { setPanelTabHandler } from '../lib/panelBus';
 import { toast } from 'react-toastify';
 
-type Tab = 'state' | 'chat' | 'schedule';
+type Tab = 'state' | 'chat' | 'schedule' | 'works';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'state', label: '状态' },
   { id: 'chat', label: '广播' },
   { id: 'schedule', label: '节目单' },
+  { id: 'works', label: '作品' },
 ];
 
 const TODAY_DAY = (() => {
@@ -56,6 +76,9 @@ export default function SidebarTabs({
   const [tab, setTab] = useState<Tab>('state');
   // bumped each time a venue marker is clicked on the map, to drive the schedule tab
   const [venueFocus, setVenueFocus] = useState<{ venue: string; n: number } | null>(null);
+  const [installationFocus, setInstallationFocus] = useState<{ id: string; n: number } | null>(
+    null,
+  );
 
   // jump to the state tab (which now hosts character details) on map selection
   useEffect(() => {
@@ -79,6 +102,16 @@ export default function SidebarTabs({
       onActivate?.();
     });
     return () => setVenueSelectHandler(null);
+  }, []);
+
+  // an installation marker on the map was clicked: open the works tab on that detail
+  useEffect(() => {
+    setInstallationSelectHandler((id) => {
+      setInstallationFocus((prev) => ({ id, n: (prev?.n ?? 0) + 1 }));
+      setTab('works');
+      onActivate?.();
+    });
+    return () => setInstallationSelectHandler(null);
   }, []);
 
   return (
@@ -123,6 +156,7 @@ export default function SidebarTabs({
           />
         )}
         {tab === 'schedule' && <ScheduleTab venueFocus={venueFocus} />}
+        {tab === 'works' && <WorksTab installationFocus={installationFocus} />}
       </div>
     </div>
   );
@@ -132,7 +166,9 @@ function ChatDot({ worldId }: { worldId: Id<'worlds'> }) {
   const msgs = useQuery(api.messages.listRecentMessages, { worldId, limit: 1 });
   const fresh = msgs?.[0] && Date.now() - msgs[0].t < 60_000;
   if (!fresh) return null;
-  return <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[#e4b58c]" />;
+  return (
+    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[#e4b58c]" />
+  );
 }
 
 function GlobalChat({
@@ -160,35 +196,35 @@ function GlobalChat({
       </p>
       <div ref={ref} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
         {msgs.map((m) => {
-        const hue = authorHue(m.author);
-        return (
-          <div key={m.id} className="flex gap-2.5">
-            <button
-              onClick={() => onSelectAgent(m.author as GameId<'players'>)}
-              className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white transition hover:ring-2 hover:ring-white/40"
-              style={{ background: `hsl(${hue} 45% 42%)` }}
-              title={`查看 ${m.authorName}`}
-            >
-              {m.authorName.slice(0, 1)}
-            </button>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2">
-                <button
-                  onClick={() => onSelectAgent(m.author as GameId<'players'>)}
-                  className="truncate text-sm font-semibold text-brown-100 hover:underline"
-                  style={{ color: `hsl(${hue} 55% 72%)` }}
-                >
-                  {m.authorName}
-                </button>
-                <span className="shrink-0 text-[10px] text-brown-400">{timeAgo(m.t)}</span>
-              </div>
-              <div className="mt-0.5 break-words rounded-lg rounded-tl-sm bg-brown-700/55 px-2.5 py-1.5 text-sm leading-snug text-brown-100">
-                {m.text}
+          const hue = authorHue(m.author);
+          return (
+            <div key={m.id} className="flex gap-2.5">
+              <button
+                onClick={() => onSelectAgent(m.author as GameId<'players'>)}
+                className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white transition hover:ring-2 hover:ring-white/40"
+                style={{ background: `hsl(${hue} 45% 42%)` }}
+                title={`查看 ${m.authorName}`}
+              >
+                {m.authorName.slice(0, 1)}
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <button
+                    onClick={() => onSelectAgent(m.author as GameId<'players'>)}
+                    className="truncate text-sm font-semibold text-brown-100 hover:underline"
+                    style={{ color: `hsl(${hue} 55% 72%)` }}
+                  >
+                    {m.authorName}
+                  </button>
+                  <span className="shrink-0 text-[10px] text-brown-400">{timeAgo(m.t)}</span>
+                </div>
+                <div className="mt-0.5 break-words rounded-lg rounded-tl-sm bg-brown-700/55 px-2.5 py-1.5 text-sm leading-snug text-brown-100">
+                  {m.text}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
       </div>
     </div>
   );
@@ -197,7 +233,183 @@ function GlobalChat({
 function focusVenueOnMap(venue: string) {
   const c = VENUE_COORDS[venue];
   if (c) focusMapVenue(c[0], c[1], venue);
-  else toast.info(`「${venue}」是候鸟300外场剧场，沙城地图联动即将支持`, { toastId: `off-${venue}` });
+  else
+    toast.info(`「${venue}」是候鸟300外场剧场，沙城地图联动即将支持`, { toastId: `off-${venue}` });
+}
+
+function focusInstallationOnMap(installation: Installation) {
+  focusMapVenue(installation.x, installation.y, installation.id);
+}
+
+function WorksTab({ installationFocus }: { installationFocus: { id: string; n: number } | null }) {
+  const [zone, setZone] = useState<InstallationZone | 'all'>('all');
+  const [query, setQuery] = useState('');
+  const [detail, setDetail] = useState<Installation | null>(null);
+
+  useEffect(() => {
+    if (!installationFocus) return;
+    const installation = INSTALLATIONS.find((item) => item.id === installationFocus.id);
+    if (!installation) return;
+    setDetail(installation);
+    setZone(installation.zone);
+    setQuery('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [installationFocus?.n]);
+
+  if (detail) {
+    return (
+      <InstallationDetail
+        installation={detail}
+        onBack={() => setDetail(null)}
+        onLocate={() => focusInstallationOnMap(detail)}
+      />
+    );
+  }
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const items = INSTALLATIONS.filter((item) => {
+    const zoneMatch = zone === 'all' || item.zone === zone;
+    if (!zoneMatch) return false;
+    if (!normalizedQuery) return true;
+    return `${item.id} ${item.artist} ${item.title} ${item.zone}`
+      .toLowerCase()
+      .includes(normalizedQuery);
+  });
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-brown-700/40 px-3 py-3">
+        <div className="flex items-baseline gap-2">
+          <h3 className="font-display text-xl leading-none text-brown-100">作品点位</h3>
+          <span className="text-xs text-brown-400">{INSTALLATIONS.length} 件</span>
+        </div>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索编号、艺术家、作品名"
+          className="mt-3 w-full rounded border border-brown-700/70 bg-brown-900/45 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-400 focus:border-clay-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="shrink-0 overflow-x-auto px-3 py-2">
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setZone('all')}
+            className={
+              'shrink-0 rounded px-2.5 py-1 text-xs font-semibold transition ' +
+              (zone === 'all'
+                ? 'bg-clay-700 text-white'
+                : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+            }
+          >
+            全部
+          </button>
+          {INSTALLATION_ZONES.map((name) => (
+            <button
+              key={name}
+              onClick={() => setZone(name)}
+              className={
+                'shrink-0 rounded px-2.5 py-1 text-xs font-semibold transition ' +
+                (zone === name
+                  ? 'bg-clay-700 text-white'
+                  : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+              }
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        {items.length ? (
+          <div className="space-y-1.5">
+            {items.map((item) => (
+              <InstallationRow key={item.id} item={item} onClick={() => setDetail(item)} />
+            ))}
+          </div>
+        ) : (
+          <Centered>没有匹配的作品点位。</Centered>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InstallationRow({ item, onClick }: { item: Installation; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex w-full gap-2.5 rounded border border-brown-700/40 bg-brown-900/18 px-2.5 py-2 text-left transition hover:border-clay-600/70 hover:bg-brown-700/38"
+    >
+      <span className="grid h-7 w-9 shrink-0 place-items-center rounded bg-[#1da76e] text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]">
+        {item.id}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-brown-100 group-hover:underline">
+          {item.title}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-brown-300">{item.artist}</span>
+        <span className="mt-1 inline-flex rounded bg-brown-700/55 px-1.5 py-0.5 text-[10px] text-brown-300">
+          {item.zone}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function InstallationDetail({
+  installation,
+  onBack,
+  onLocate,
+}: {
+  installation: Installation;
+  onBack: () => void;
+  onLocate: () => void;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+        <button
+          onClick={onBack}
+          className="shrink-0 rounded bg-brown-700/50 px-2 py-1 text-xs text-brown-200 hover:bg-brown-700"
+        >
+          ← 返回
+        </button>
+        <span className="ml-auto rounded bg-[#1da76e] px-2 py-0.5 text-xs font-black text-white">
+          {installation.id}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        <h3 className="font-display text-2xl leading-tight text-brown-100">{installation.title}</h3>
+        <div className="mt-3 space-y-2 text-sm text-brown-200">
+          <div className="flex gap-2">
+            <span className="w-12 shrink-0 text-brown-400">艺术家</span>
+            <span className="min-w-0 flex-1">{installation.artist}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-12 shrink-0 text-brown-400">区域</span>
+            <span>{installation.zone}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-12 shrink-0 text-brown-400">来源</span>
+            <span>{INSTALLATION_SOURCE}</span>
+          </div>
+        </div>
+        {installation.note && (
+          <p className="mt-4 rounded-lg bg-brown-700/35 p-3 text-sm leading-relaxed text-brown-200">
+            {installation.note}
+          </p>
+        )}
+        <button
+          onClick={onLocate}
+          className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
+        >
+          在地图上定位
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } | null }) {
@@ -245,7 +457,9 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
           >
             ← 场地
           </button>
-          <span className="min-w-0 flex-1 truncate font-display text-lg text-brown-100">{venue}</span>
+          <span className="min-w-0 flex-1 truncate font-display text-lg text-brown-100">
+            {venue}
+          </span>
           {onmap && (
             <button
               onClick={() => focusVenueOnMap(venue)}
@@ -306,7 +520,9 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
             onClick={() => setDate(d)}
             className={
               'shrink-0 rounded px-2.5 py-1 text-sm font-bold tabular-nums transition ' +
-              (d === date ? 'bg-clay-700 text-white' : 'bg-brown-700/50 text-brown-200 hover:bg-brown-700')
+              (d === date
+                ? 'bg-clay-700 text-white'
+                : 'bg-brown-700/50 text-brown-200 hover:bg-brown-700')
             }
           >
             6/{d}
@@ -341,7 +557,9 @@ function ViewToggle({
           onClick={() => setView(o.id)}
           className={
             'rounded px-2.5 py-1 text-xs font-semibold transition ' +
-            (view === o.id ? 'bg-brown-700 text-white' : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+            (view === o.id
+              ? 'bg-brown-700 text-white'
+              : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
           }
         >
           {o.label}
@@ -373,14 +591,19 @@ function ScheduleRow({
       </div>
       <div className="w-1 shrink-0 rounded-full" style={{ background: CATEGORY_COLORS[s.cat] }} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-brown-100 group-hover:underline">{s.title}</div>
+        <div className="truncate text-sm font-medium text-brown-100 group-hover:underline">
+          {s.title}
+        </div>
         <div className="mt-0.5 flex items-center gap-1 text-[11px] text-brown-300">
           <span
             className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
           />
           <span className="truncate">{s.venue}</span>
-          <span className="ml-auto shrink-0 rounded px-1" style={{ background: CATEGORY_COLORS[s.cat] + '33' }}>
+          <span
+            className="ml-auto shrink-0 rounded px-1"
+            style={{ background: CATEGORY_COLORS[s.cat] + '33' }}
+          >
             {s.cat}
           </span>
         </div>
@@ -524,7 +747,10 @@ function StateTab({
     <div className="h-full overflow-y-auto px-4 py-4">
       <div className="grid grid-cols-2 gap-2">
         {stats.map((s) => (
-          <div key={s.k} className="rounded-lg border border-brown-700/50 bg-brown-700/30 px-3 py-2.5">
+          <div
+            key={s.k}
+            className="rounded-lg border border-brown-700/50 bg-brown-700/30 px-3 py-2.5"
+          >
             <div className="font-display text-3xl leading-none text-[#e4b58c]">{s.v}</div>
             <div className="mt-1 text-xs text-brown-300">{s.k}</div>
           </div>
@@ -549,7 +775,9 @@ function StateTab({
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-brown-700/40"
               >
                 <span
-                  className={'h-2 w-2 shrink-0 rounded-full ' + (talking ? 'bg-[#c0654a]' : 'bg-brown-500')}
+                  className={
+                    'h-2 w-2 shrink-0 rounded-full ' + (talking ? 'bg-[#c0654a]' : 'bg-brown-500')
+                  }
                 />
                 <span className="truncate text-sm text-brown-100">{nameOf(p.id as string)}</span>
                 <span className="ml-auto shrink-0 text-[11px] text-brown-400">

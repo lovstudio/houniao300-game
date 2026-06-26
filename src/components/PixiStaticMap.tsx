@@ -1,7 +1,8 @@
 import { PixiComponent, applyDefaultProps } from '@pixi/react';
 import * as PIXI from 'pixi.js';
 import { WorldMap } from '../../convex/aiTown/worldMap';
-import { selectVenueOnMap } from '../lib/mapFocus';
+import { INSTALLATIONS, type Installation } from '../../data/installations';
+import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
 
 const TILE = 32;
 const SOURCE_WIDTH = 1703;
@@ -208,6 +209,94 @@ function addLabel(
   }
 
   container.addChild(wrapper);
+}
+
+const INSTALLATION_COLORS: Record<string, number> = {
+  A: 0x1da76e,
+  B: 0x2e9f8d,
+  C: 0x1f9b77,
+  D: 0x38a765,
+  E: 0x20a892,
+  F: 0x169a86,
+  G: 0x2e8f69,
+  H: 0x1e9a9a,
+  I: 0x209a78,
+  J: 0x2cae80,
+  K: 0x34a069,
+};
+
+function addInstallationMarker(
+  container: PIXI.Container,
+  project: ReturnType<typeof createProjector>,
+  installation: Installation,
+) {
+  const accent = INSTALLATION_COLORS[installation.id.slice(0, 1)] ?? 0x1da76e;
+  const wrapper = new PIXI.Container();
+  wrapper.x = project.x(installation.x);
+  wrapper.y = project.y(installation.y);
+  wrapper.eventMode = 'static';
+  wrapper.cursor = 'pointer';
+
+  const dot = new PIXI.Graphics();
+  dot.lineStyle(1.5 * project.scale, 0xffffff, 0.95);
+  dot.beginFill(accent, 0.95);
+  dot.drawCircle(0, 0, 5 * project.scale);
+  dot.endFill();
+  wrapper.addChild(dot);
+
+  const text = new PIXI.Text(installation.id, {
+    fill: 0xffffff,
+    fontFamily: 'sans-serif',
+    fontSize: 12 * project.scale,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  });
+  text.resolution = 2;
+
+  const paddingX = 4 * project.scale;
+  const paddingY = 2.5 * project.scale;
+  const bg = new PIXI.Graphics();
+  const width = text.width + paddingX * 2;
+  const height = text.height + paddingY * 2;
+  bg.lineStyle(1.4 * project.scale, 0xf8f0df, 0.9);
+  bg.beginFill(accent, 0.96);
+  bg.drawRoundedRect(-width / 2, -height - 7 * project.scale, width, height, 3 * project.scale);
+  bg.endFill();
+  text.x = -text.width / 2;
+  text.y = -height - 7 * project.scale + paddingY;
+  wrapper.addChild(bg);
+  wrapper.addChild(text);
+  wrapper.hitArea = new PIXI.Rectangle(
+    -width / 2,
+    -height - 7 * project.scale,
+    width,
+    height + 14 * project.scale,
+  );
+
+  const stop = (e: PIXI.FederatedPointerEvent) => e.stopPropagation();
+  wrapper.on('pointerdown', stop);
+  wrapper.on('pointerup', stop);
+  wrapper.on('pointerover', () => {
+    wrapper.scale.set(1.08);
+  });
+  wrapper.on('pointerout', () => {
+    wrapper.scale.set(1);
+  });
+  wrapper.on('pointertap', (e: PIXI.FederatedPointerEvent) => {
+    e.stopPropagation();
+    selectInstallationOnMap(installation.id);
+  });
+
+  container.addChild(wrapper);
+}
+
+function addInstallationMarkers(
+  container: PIXI.Container,
+  project: ReturnType<typeof createProjector>,
+) {
+  for (const installation of INSTALLATIONS) {
+    addInstallationMarker(container, project, installation);
+  }
 }
 
 // Shoreline taken from the user's hand-drawn marks on the aerial photo: a steep upper
@@ -559,6 +648,7 @@ export function drawSandCityModel(
   addLabel(container, project, '公路复古艺术展区', 1305, 645, '艺术作品展区');
   addLabel(container, project, '300.梯威', 1180, 880, '300.梯威');
   addLabel(container, project, '二级城墙', 1480, 805);
+  addInstallationMarkers(container, project);
 
   // Clip the whole model to the map rectangle: the sea / shallow water / foam are
   // projected past the shoreline (negative x, y beyond the bottom) and would
