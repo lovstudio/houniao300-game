@@ -101,7 +101,7 @@ blockSourceRect(327, 122, 184, 168); // 伏园
 blockSourceRect(360, 520, 75, 75); // 婚姻登记处
 blockSourceRect(492, 828, 76, 38); // 候鸟电影院
 blockSourceRect(655, 560, 88, 90); // 候鸟工作坊
-blockSourceRect(880, 260, 238, 62); // 候鸟黑客松
+blockSourceRect(875, 260, 245, 62); // 候鸟黑客松
 blockSourceRect(1282, 596, 72, 78); // 鸟其林局部
 blockSourceRect(1418, 448, 140, 86); // 公路复古艺术展区
 blockSourceRect(1328, 783, 112, 132); // 候鸟俱乐部 / 300.梯威周边

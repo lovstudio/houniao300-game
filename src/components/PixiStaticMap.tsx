@@ -184,7 +184,7 @@ const planBlocks: PlanBlock[] = [
   { x: 360, y: 520, width: 75, height: 75, fill: 0xe7dcc8, stroke: 0xb99d74, radius: 4 },
   { x: 492, y: 828, width: 76, height: 38, fill: 0xf2e4ce, stroke: 0xb99d74, radius: 5 },
   { x: 655, y: 560, width: 88, height: 90, fill: 0xe5c18a, stroke: 0xb28548, radius: 4 },
-  { x: 880, y: 260, width: 238, height: 62, fill: 0xe2d0b0, stroke: 0xae936d, radius: 4 },
+  { x: 875, y: 260, width: 245, height: 62, fill: 0xe2d0b0, stroke: 0xae936d, radius: 4 },
   { x: 1418, y: 448, width: 140, height: 86, fill: 0xd8ad67, stroke: 0xaa7f43, radius: 5 },
   { x: 1328, y: 783, width: 112, height: 132, fill: 0xf2e5cf, stroke: 0xb99d74, radius: 5 },
   { x: 1452, y: 788, width: 86, height: 132, fill: 0xe0b86f, stroke: 0xaa7f43, radius: 5 },
@@ -808,9 +808,9 @@ function drawSandCityPlan(
   drawClubDetails(container, project);
   drawSketchCircle(container, project, 148, 395, 55, 0xe8ddc8);
   drawSketchCircle(container, project, 1368, 886, 26, 0xe0d0b6);
-  drawCanvasTent(container, project, 886, 190, 62, 54);
-  drawCanvasTent(container, project, 985, 188, 58, 52);
-  drawCanvasTent(container, project, 1076, 190, 58, 52);
+  drawCanvasTent(container, project, 882, 190, 62, 54);
+  drawCanvasTent(container, project, 962, 188, 58, 52);
+  drawCanvasTent(container, project, 1042, 190, 58, 52);
   drawCanvasTent(container, project, 1380, 728, 58, 54);
 
   drawVenueDetails(container, project);
@@ -822,7 +822,7 @@ function drawSandCityPlan(
   drawTextOnPlan(container, project, '婚姻登记处', 398, 558, 16);
   drawTextOnPlan(container, project, '候鸟电影院', 528, 850, 14, 'center', '候鸟电影院');
   drawTextOnPlan(container, project, '候鸟工作坊', 700, 606, 15, 'center', '候鸟工作坊');
-  drawTextOnPlan(container, project, '候鸟黑客松', 1000, 286, 15, 'center', '候鸟黑客松');
+  drawTextOnPlan(container, project, '候鸟黑客松', 998, 286, 15, 'center', '候鸟黑客松');
   drawTextOnPlan(container, project, '时间广场', 1010, 352, 15, 'center', '时间广场');
   drawTextOnPlan(container, project, '候鸟交易所', 1284, 362, 15);
   drawTextOnPlan(container, project, '鸟其林', 1244, 626, 16);
@@ -836,7 +836,7 @@ function drawSandCityPlan(
   addVenueHotspot(container, project, '伏园', 327, 110, 225, 205);
   addVenueHotspot(container, project, '候鸟电影院', 470, 800, 130, 95);
   addVenueHotspot(container, project, '候鸟工作坊', 620, 535, 155, 150);
-  addVenueHotspot(container, project, '候鸟黑客松', 865, 210, 280, 130);
+  addVenueHotspot(container, project, '候鸟黑客松', 855, 210, 290, 130);
   addVenueHotspot(container, project, '时间广场', 930, 330, 225, 235);
   addVenueHotspot(container, project, '候鸟俱乐部', 1260, 720, 190, 210);
   addVenueHotspot(container, project, '艺术作品展区', 1400, 425, 180, 135);

@@ -13,7 +13,7 @@ export const DATES = ["20", "21", "22", "23", "25"];
 // (source coords 1703x1279, matching the drawBuilding rects in PixiStaticMap), null if off-map
 export const VENUE_COORDS: Record<string, [number, number] | null> = {
   "时间广场": [1010, 390],
-  "候鸟黑客松": [1000, 286],
+  "候鸟黑客松": [998, 286],
   "候鸟工作坊": [700, 606],
   "一级城墙": [292, 610],
   "伏园": [420, 198],
