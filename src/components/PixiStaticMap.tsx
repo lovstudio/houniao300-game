@@ -13,6 +13,7 @@ import {
   RETRO_ART_BUILDING_RECT,
   SECONDARY_WALL_STRUCTURES,
   SPACE_BARRIERS,
+  WORKSHOP_BUILDING_RECT,
 } from '../../data/sandCityGeometry';
 import { INSTALLATIONS, type Installation } from '../../data/installations';
 import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
@@ -193,7 +194,7 @@ const planBlocks: PlanBlock[] = [
   { x: 327, y: 122, width: 184, height: 168, fill: 0xd9b06c, stroke: 0xa87938, radius: 14 },
   { x: 360, y: 520, width: 75, height: 75, fill: 0xe7dcc8, stroke: 0xb99d74, radius: 4 },
   { x: 492, y: 828, width: 76, height: 38, fill: 0xf2e4ce, stroke: 0xb99d74, radius: 5 },
-  { x: 655, y: 560, width: 88, height: 90, fill: 0xe5c18a, stroke: 0xb28548, radius: 4 },
+  { ...WORKSHOP_BUILDING_RECT, fill: 0xe5c18a, stroke: 0xb28548, radius: 4 },
   { x: 875, y: 260, width: 245, height: 62, fill: 0xe2d0b0, stroke: 0xae936d, radius: 4 },
   { ...RETRO_ART_BUILDING_RECT, fill: 0xd8ad67, stroke: 0xaa7f43, radius: 5 },
   { ...LADDER_300_BUILDING_RECT, fill: 0xe0b86f, stroke: 0xaa7f43, radius: 5 },
@@ -912,7 +913,7 @@ function drawSandCityPlan(
   drawTextOnPlan(container, project, '伏园', 420, 198, 17, 'center', '伏园');
   drawTextOnPlan(container, project, '婚姻登记处', 398, 558, 16);
   drawTextOnPlan(container, project, '候鸟电影院', 528, 850, 14, 'center', '候鸟电影院');
-  drawTextOnPlan(container, project, '候鸟工作坊', 700, 606, 15, 'center', '候鸟工作坊');
+  drawTextOnPlan(container, project, '候鸟工作坊', 766, 725, 15, 'center', '候鸟工作坊');
   drawTextOnPlan(container, project, '候鸟黑客松', 998, 286, 15, 'center', '候鸟黑客松');
   drawTextOnPlan(container, project, '时间广场', 1010, 352, 15, 'center', '时间广场');
   drawTextOnPlan(container, project, '候鸟交易所', 1348, 356, 15);
@@ -926,7 +927,7 @@ function drawSandCityPlan(
   addVenueHotspot(container, project, '一级城墙', 230, 130, 105, 650);
   addVenueHotspot(container, project, '伏园', 327, 110, 225, 205);
   addVenueHotspot(container, project, '候鸟电影院', 470, 800, 130, 95);
-  addVenueHotspot(container, project, '候鸟工作坊', 620, 535, 155, 150);
+  addVenueHotspot(container, project, '候鸟工作坊', 690, 625, 150, 195);
   addVenueHotspot(container, project, '候鸟黑客松', 855, 210, 290, 130);
   addVenueHotspot(container, project, '时间广场', 930, 330, 225, 235);
   addVenueHotspot(container, project, '候鸟俱乐部', 1325, 775, 125, 230);

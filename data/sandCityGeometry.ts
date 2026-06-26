@@ -23,7 +23,8 @@ export type SourceSegment = {
 export const SOURCE_WIDTH = 1703;
 export const SOURCE_HEIGHT = 1279;
 
-export const EXCHANGE_BUILDING_RECT: SourceRect = { x: 1307, y: 209, width: 81, height: 298 };
+export const WORKSHOP_BUILDING_RECT: SourceRect = { x: 720, y: 652, width: 92, height: 146 };
+export const EXCHANGE_BUILDING_RECT: SourceRect = { x: 1307, y: 240, width: 81, height: 220 };
 export const RETRO_ART_BUILDING_RECT: SourceRect = { x: 1427, y: 311, width: 95, height: 155 };
 export const LADDER_300_BUILDING_RECT: SourceRect = { x: 1449, y: 815, width: 72, height: 205 };
 export const CLUB_ROUND_STAGE_CIRCLE: SourceCircle = { x: 1396, y: 968, radius: 25 };
@@ -121,7 +122,7 @@ export const SOLID_RECTS: SourceRect[] = [
   { x: 327, y: 122, width: 184, height: 168 }, // 伏园
   { x: 360, y: 520, width: 75, height: 75 }, // 婚姻登记处
   { x: 492, y: 828, width: 76, height: 38 }, // 候鸟电影院
-  { x: 655, y: 560, width: 88, height: 90 }, // 候鸟工作坊
+  WORKSHOP_BUILDING_RECT, // 候鸟工作坊
   { x: 875, y: 260, width: 245, height: 62 }, // 候鸟黑客松
   EXCHANGE_BUILDING_RECT, // 候鸟交易所
   RETRO_ART_BUILDING_RECT, // 公路复古艺术展区
