@@ -6,6 +6,7 @@ import SettingRow from './buttons/SettingRow';
 import DeckButton from './buttons/DeckButton';
 import {
   CameraIcon,
+  CollisionIcon,
   ExpandIcon,
   FollowIcon,
   FreeMoveIcon,
@@ -14,22 +15,27 @@ import {
   PersonIcon,
   ShrinkIcon,
 } from './buttons/DeckIcons';
+import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 
 export default function SettingsMenu({
   controlMode,
   cameraFollow,
   isFullscreen,
+  showCollisionOverlay,
   onToggleControlMode,
   onToggleCameraFollow,
   onToggleFullscreen,
+  onToggleCollisionOverlay,
   onHelp,
 }: {
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
   isFullscreen: boolean;
+  showCollisionOverlay: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
+  onToggleCollisionOverlay: () => void;
   onHelp: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -99,6 +105,20 @@ export default function SettingsMenu({
             onHelp();
           }}
         />
+
+        {SHOW_DEV_TOOLS && (
+          <>
+            <div className="settings-section">调试</div>
+            <SettingRow
+              icon={<CollisionIcon />}
+              label="碰撞染色"
+              value={showCollisionOverlay ? '开' : '关'}
+              active={showCollisionOverlay}
+              onClick={onToggleCollisionOverlay}
+              title="显示当前地图不可走区域：黄=几何，蓝=格子，红=重合。"
+            />
+          </>
+        )}
       </div>
     </div>
   );

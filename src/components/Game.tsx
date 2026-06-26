@@ -13,8 +13,8 @@ import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
 import { DebugTimeManager } from './DebugTimeManager.tsx';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
+import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 
-export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 export type ControlMode = 'player' | 'camera';
 
 export default function Game({
@@ -23,12 +23,14 @@ export default function Game({
   onToggleControlMode,
   onToggleCameraFollow,
   onSetCameraFollow,
+  showCollisionOverlay,
 }: {
   controlMode: ControlMode;
   cameraFollow: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
+  showCollisionOverlay: boolean;
 }) {
   const convex = useConvex();
   const [selectedElement, setSelectedElement] = useState<{
@@ -88,6 +90,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     onToggleControlMode={onToggleControlMode}
                     onToggleCameraFollow={onToggleCameraFollow}
                     onSetCameraFollow={onSetCameraFollow}
+                    showCollisionOverlay={showCollisionOverlay}
                     historicalTime={historicalTime}
                     setSelectedElement={setSelectedElement}
                   />
@@ -95,6 +98,25 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </Stage>
             </div>
           </div>
+          {SHOW_DEV_TOOLS && showCollisionOverlay && (
+            <div className="pointer-events-none absolute left-3 top-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
+              <div className="mb-1 font-semibold">碰撞染色</div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                <span className="inline-flex items-center gap-1">
+                  <i className="h-2.5 w-2.5 rounded-sm bg-[#ffc145]" />
+                  几何
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <i className="h-2.5 w-2.5 rounded-sm bg-[#4fb7ff]" />
+                  格子
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <i className="h-2.5 w-2.5 rounded-sm bg-[#ff4d3d]" />
+                  重合
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 移动端抽屉遮罩（z 高于招牌 z-30） */}

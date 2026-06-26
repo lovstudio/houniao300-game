@@ -11,11 +11,13 @@ import { api } from '../../convex/_generated/api.js';
 import { useSendInput } from '../hooks/sendInput.ts';
 import { toastOnError } from '../toasts.ts';
 import { DebugPath } from './DebugPath.tsx';
+import { DebugCollisionOverlay } from './DebugCollisionOverlay.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
 import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
 import { tilePositionBlockedBySolidGeometry } from '../../data/sandCityGeometry.ts';
-import { SHOW_DEBUG_UI, type ControlMode } from './Game.tsx';
+import type { ControlMode } from './Game.tsx';
+import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
 import { Location, playerLocation } from '../../convex/aiTown/location.ts';
@@ -130,6 +132,7 @@ export const PixiGame = (props: {
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
+  showCollisionOverlay: boolean;
   setSelectedElement: SelectElement;
 }) => {
   // PIXI setup.
@@ -678,6 +681,9 @@ export const PixiGame = (props: {
         onpointerup={onMapPointerUp}
         onpointerdown={onMapPointerDown}
       />
+      {SHOW_DEV_TOOLS && props.showCollisionOverlay && (
+        <DebugCollisionOverlay map={props.game.worldMap} />
+      )}
       {ping && <VenuePing x={ping.x} y={ping.y} t={ping.t} tileDim={tileDim} />}
       {players.map(
         (p) =>

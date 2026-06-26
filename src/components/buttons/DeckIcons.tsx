@@ -97,6 +97,13 @@ export const GearIcon = () => (
   </svg>
 );
 
+export const CollisionIcon = () => (
+  <svg {...base} aria-hidden>
+    <path d="M4 4h16v16H4zM4 12h16M12 4v16" />
+    <path d="m7 17 10-10" />
+  </svg>
+);
+
 export const ChevronIcon = () => (
   <svg {...base} aria-hidden>
     <path d="m9 6 6 6-6 6" />

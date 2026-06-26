@@ -25,17 +25,21 @@ export default function TopBar({
   controlMode,
   cameraFollow,
   isFullscreen,
+  showCollisionOverlay,
   onToggleControlMode,
   onToggleCameraFollow,
   onToggleFullscreen,
+  onToggleCollisionOverlay,
   onHelp,
 }: {
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
   isFullscreen: boolean;
+  showCollisionOverlay: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
+  onToggleCollisionOverlay: () => void;
   onHelp: () => void;
 }) {
   return (
@@ -59,9 +63,11 @@ export default function TopBar({
             controlMode={controlMode}
             cameraFollow={cameraFollow}
             isFullscreen={isFullscreen}
+            showCollisionOverlay={showCollisionOverlay}
             onToggleControlMode={onToggleControlMode}
             onToggleCameraFollow={onToggleCameraFollow}
             onToggleFullscreen={onToggleFullscreen}
+            onToggleCollisionOverlay={onToggleCollisionOverlay}
             onHelp={onHelp}
           />
         </div>

@@ -24,6 +24,7 @@ export default function Home() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('player');
   const [cameraFollow, setCameraFollow] = useState(true);
+  const [showCollisionOverlay, setShowCollisionOverlay] = useState(false);
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
 
@@ -187,6 +188,8 @@ export default function Home() {
         onToggleCameraFollow={toggleCameraFollow}
         onToggleFullscreen={() => void toggleFullscreen()}
         onHelp={() => setHelpModalOpen(true)}
+        showCollisionOverlay={showCollisionOverlay}
+        onToggleCollisionOverlay={() => setShowCollisionOverlay((visible) => !visible)}
       />
 
       <div className="relative min-h-0 flex-1 overflow-hidden shadow-2xl">
@@ -196,6 +199,7 @@ export default function Home() {
           onToggleControlMode={toggleControlMode}
           onToggleCameraFollow={toggleCameraFollow}
           onSetCameraFollow={setCameraFollow}
+          showCollisionOverlay={showCollisionOverlay}
         />
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </div>
