@@ -14,14 +14,14 @@ import { DebugPath } from './DebugPath.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
 import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
-
-const MAP_SOURCE_WIDTH = 1703;
-const MAP_SOURCE_HEIGHT = 1279;
+import { tilePositionBlockedBySolidGeometry } from '../../data/sandCityGeometry.ts';
 import { SHOW_DEBUG_UI, type ControlMode } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
 import { Location, playerLocation } from '../../convex/aiTown/location.ts';
 
+const MAP_SOURCE_WIDTH = 1703;
+const MAP_SOURCE_HEIGHT = 1279;
 const KEYBOARD_MOVE_REPEAT_MS = 180;
 const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 4;
 const MAX_OPTIMISTIC_PATH_LENGTH = 2;
@@ -39,6 +39,57 @@ const MOVEMENT_KEYS = new Set([
   'w',
   's',
 ]);
+
+type RuntimeGameState = {
+  controlMode: ControlMode;
+  cameraFollow: boolean;
+  engineId: Id<'engines'>;
+  game: ServerGame;
+  height: number;
+  humanPlayerId?: string;
+  onSetCameraFollow: (enabled: boolean) => void;
+  onToggleCameraFollow: () => void;
+  onToggleControlMode: () => void;
+  players: any[];
+  tileDim: number;
+  width: number;
+  worldHeightPx: number;
+  worldWidthPx: number;
+};
+
+function isMapDestinationBlocked(destination: { x: number; y: number }, state: RuntimeGameState) {
+  if (
+    destination.x < 0 ||
+    destination.y < 0 ||
+    destination.x >= state.game.worldMap.width ||
+    destination.y >= state.game.worldMap.height
+  ) {
+    return true;
+  }
+  if (
+    tilePositionBlockedBySolidGeometry(
+      destination,
+      state.game.worldMap.width,
+      state.game.worldMap.height,
+    )
+  ) {
+    return true;
+  }
+  for (const layer of state.game.worldMap.objectTiles) {
+    if (layer[destination.x]?.[destination.y] !== -1) {
+      return true;
+    }
+  }
+  for (const player of state.players) {
+    if (player.id === state.humanPlayerId) continue;
+    const dx = player.position.x - destination.x;
+    const dy = player.position.y - destination.y;
+    if (Math.sqrt(dx * dx + dy * dy) < COLLISION_THRESHOLD) {
+      return true;
+    }
+  }
+  return false;
+}
 
 type GridDestination = { x: number; y: number };
 type SentDestination = GridDestination & { t: number };
@@ -103,22 +154,7 @@ export const PixiGame = (props: {
   const optimisticFrameRef = useRef<number>();
   const lastOptimisticFrameAtRef = useRef<number>();
   const lastSentDestinationRef = useRef<SentDestination | null>(null);
-  const latestGameStateRef = useRef<{
-    controlMode: ControlMode;
-    cameraFollow: boolean;
-    engineId: Id<'engines'>;
-    game: ServerGame;
-    height: number;
-    humanPlayerId?: string;
-    onSetCameraFollow: (enabled: boolean) => void;
-    onToggleCameraFollow: () => void;
-    onToggleControlMode: () => void;
-    players: any[];
-    tileDim: number;
-    width: number;
-    worldHeightPx: number;
-    worldWidthPx: number;
-  }>();
+  const latestGameStateRef = useRef<RuntimeGameState>();
 
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
@@ -158,11 +194,15 @@ export const PixiGame = (props: {
       x: gameSpacePx.x / tileDim,
       y: gameSpacePx.y / tileDim,
     };
-    setLastDestination({ t: Date.now(), ...gameSpaceTiles });
     const roundedTiles = {
       x: Math.floor(gameSpaceTiles.x),
       y: Math.floor(gameSpaceTiles.y),
     };
+    const state = latestGameStateRef.current;
+    if (!state || isMapDestinationBlocked(roundedTiles, state)) {
+      return;
+    }
+    setLastDestination({ t: Date.now(), ...gameSpaceTiles });
     console.log(`Moving to ${JSON.stringify(roundedTiles)}`);
     optimisticPathRef.current = [];
     lastSentDestinationRef.current = null;
@@ -263,28 +303,7 @@ export const PixiGame = (props: {
     const isDestinationBlocked = (destination: { x: number; y: number }) => {
       const state = currentState();
       if (!state) return true;
-      if (
-        destination.x < 0 ||
-        destination.y < 0 ||
-        destination.x >= state.game.worldMap.width ||
-        destination.y >= state.game.worldMap.height
-      ) {
-        return true;
-      }
-      for (const layer of state.game.worldMap.objectTiles) {
-        if (layer[destination.x]?.[destination.y] !== -1) {
-          return true;
-        }
-      }
-      for (const player of state.players) {
-        if (player.id === state.humanPlayerId) continue;
-        const dx = player.position.x - destination.x;
-        const dy = player.position.y - destination.y;
-        if (Math.sqrt(dx * dx + dy * dy) < COLLISION_THRESHOLD) {
-          return true;
-        }
-      }
-      return false;
+      return isMapDestinationBlocked(destination, state);
     };
     const sendHumanMove = (dx: number, dy: number) => {
       const state = currentState();
