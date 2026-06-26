@@ -11,7 +11,7 @@ import { ToastContainer } from 'react-toastify';
 // import { UserButton } from '@clerk/clerk-react';
 // import { Authenticated, Unauthenticated } from 'convex/react';
 // import LoginButton from './components/buttons/LoginButton.tsx';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -39,6 +39,12 @@ export default function Home() {
     [],
   );
 
+  // 扫码深链意图：?exp=<activityKey>。在首帧（onboarding 之前）就把它从 URL 里取出并固化下来，
+  // 这样即便新用户要先完成 onboarding（期间 URL 可能被清/被 WeChat 改写），意图也不会丢。
+  const pendingExpRef = useRef<string | null>(
+    new URLSearchParams(window.location.search).get('exp'),
+  );
+
   // 全局玩家身份：未完成 onboarding 前，强制停在录入页。
   const userId = useMemo(getAnonUserId, []);
   const profile = useQuery(api.profile.getProfile, { userId });
@@ -58,16 +64,21 @@ export default function Home() {
 
   // 扫码深链：?exp=<activityKey> 落地后自动打开对应活动的连环画体验。
   // 等身份就绪（新用户会先停在 onboarding），完成后再自动进入。
+  // 意图取自首帧固化的 pendingExpRef（不再依赖此刻的 URL），消费一次即清空，
+  // 避免新用户跨 onboarding 时丢失意图、或关闭体验回小镇后被重复打开。
   useEffect(() => {
     if (!profile) return;
-    const raw = new URLSearchParams(window.location.search).get('exp');
+    const raw = pendingExpRef.current;
     if (!raw) return;
+    pendingExpRef.current = null;
     const key = decodeURIComponent(raw);
     const item = SCHEDULE.find((s) => `${s.date}|${s.time}|${s.venue}|${s.title}` === key);
-    // 清掉 query，避免关闭体验回小镇后又被重新打开。
+    // 清掉 URL 里的 exp，避免刷新/分享时再次触发。
     const u = new URL(window.location.href);
-    u.searchParams.delete('exp');
-    window.history.replaceState({}, '', u.toString());
+    if (u.searchParams.has('exp')) {
+      u.searchParams.delete('exp');
+      window.history.replaceState({}, '', u.toString());
+    }
     if (item) setActiveActivity(activityFromSchedule(item));
   }, [profile]);
 
