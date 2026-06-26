@@ -62,163 +62,90 @@ function blockSourceRect(x: number, y: number, w: number, h: number) {
   ]);
 }
 
-const seaPolygon: SourcePoint[] = [
-  [0, 176],
-  [268, 450],
-  [508, 690],
-  [690, 875],
-  [951, 1050],
-  [1245, 1230],
-  [1340, 1279],
-  [0, 1279],
-];
-
-const pondPolygon: SourcePoint[] = [
-  [860, 888],
-  [960, 884],
-  [1038, 918],
-  [1050, 978],
-  [1008, 1032],
-  [912, 1050],
-  [838, 1020],
-  [820, 948],
-];
-
-const forestPolygon: SourcePoint[] = [
-  [560, 0],
-  [1515, 0],
-  [1510, 420],
-  [1390, 500],
-  [1210, 486],
-  [1040, 420],
-  [885, 392],
-  [744, 302],
-  [610, 218],
-];
-
-const hotelGreenPolygon: SourcePoint[] = [
-  [1265, 420],
-  [1703, 390],
-  [1703, 620],
-  [1430, 585],
-  [1250, 525],
-];
-
-const sandWallPolygons: SourcePoint[][] = [
-  [
-    [292, 245],
-    [514, 209],
-    [525, 238],
-    [307, 278],
-  ],
-  [
-    [412, 295],
-    [655, 244],
-    [667, 273],
-    [425, 326],
-  ],
-  [
-    [546, 345],
-    [804, 294],
-    [816, 324],
-    [560, 378],
-  ],
-  [
-    [273, 358],
-    [436, 316],
-    [449, 345],
-    [286, 390],
-  ],
-  [
-    [398, 424],
-    [584, 365],
-    [599, 395],
-    [416, 455],
-  ],
-  [
-    [525, 486],
-    [717, 423],
-    [733, 455],
-    [544, 517],
-  ],
-  [
-    [675, 555],
-    [875, 486],
-    [892, 520],
-    [694, 588],
-  ],
-  [
-    [808, 628],
-    [956, 575],
-    [973, 607],
-    [825, 660],
-  ],
-  [
-    [494, 591],
-    [635, 530],
-    [654, 562],
-    [515, 624],
-  ],
-  [
-    [602, 662],
-    [765, 594],
-    [784, 628],
-    [622, 696],
-  ],
-  [
-    [1458, 792],
-    [1660, 778],
-    [1664, 812],
-    [1464, 827],
-  ],
-  [
-    [1510, 848],
-    [1663, 835],
-    [1666, 867],
-    [1514, 881],
-  ],
-];
-
-blockSourcePolygon(seaPolygon);
-blockSourcePolygon(pondPolygon);
-blockSourcePolygon(forestPolygon);
-blockSourcePolygon(hotelGreenPolygon);
-
-// Main modeled objects from the HouNiao Sand City site plan.
-blockSourceRect(100, 128, 120, 72); // 候鸟中心
-blockSourceRect(248, 88, 245, 90); // 巡游花车停放处
-blockSourceRect(252, 160, 130, 66); // 一级城墙入口
-blockSourceRect(485, 112, 105, 66); // 伏园
-blockSourceRect(182, 270, 140, 74); // 婚姻登记处
-blockSourceRect(214, 392, 140, 76); // 候鸟电影院
-blockSourceRect(398, 366, 160, 92); // 候鸟工作坊
-blockSourceRect(702, 298, 192, 156); // 候鸟黑客松
-blockSourceRect(812, 430, 136, 76); // 时间广场
-blockSourceRect(1125, 480, 145, 92); // 候鸟交易所
-blockSourcePolygon([
-  [955, 548],
-  [1075, 556],
-  [1118, 624],
-  [1070, 698],
-  [958, 700],
-  [908, 628],
-]); // 鸟其林
-blockSourceRect(910, 710, 150, 70); // 候鸟俱乐部
-blockSourceRect(640, 620, 210, 112); // 候鸟沙城剧场
-blockSourceRect(1282, 612, 265, 122); // 公路复古艺术展区
-blockSourceRect(1180, 845, 190, 145); // 300.梯威
-blockSourceRect(1448, 780, 230, 120); // 二级城墙
-
-for (const wall of sandWallPolygons) {
-  blockSourcePolygon(wall);
-}
-
-// East-side glamping pods (kept in sync with podField() in PixiStaticMap).
-for (let r = 0; r < 6; r++) {
-  for (let c = 0; c < 6; c++) {
-    blockSourceRect(1448 + c * 44 + r * 4 - 12, 726 + r * 80 + c * 6 - 9, 24, 18);
+function blockDiamondWall(x: number, y: number, count: number, size: number, step: number) {
+  for (let i = 0; i < count; i++) {
+    const cy = y + i * step;
+    const lean = i % 2 === 0 ? -6 : 5;
+    blockSourcePolygon([
+      [x + lean, cy - size],
+      [x + size + lean, cy],
+      [x + lean, cy + size],
+      [x - size + lean, cy],
+    ]);
   }
 }
+
+// PDF plan boundaries, redrawn visually in PixiStaticMap with hand-drawn sand-city styling.
+blockSourcePolygon([
+  [0, 1038],
+  [410, 1038],
+  [620, 1072],
+  [875, 1060],
+  [1110, 1084],
+  [1370, 1118],
+  [1703, 1118],
+  [1703, 1279],
+  [0, 1279],
+]);
+
+blockSourcePolygon([
+  [0, 0],
+  [1703, 0],
+  [1703, 58],
+  [0, 58],
+]);
+
+// Main venues and structural footprints aligned to the PDF plan.
+blockSourceRect(42, 124, 176, 170); // 候鸟巡游花车停放处
+blockSourceRect(327, 122, 184, 168); // 伏园
+blockSourceRect(360, 520, 75, 75); // 婚姻登记处
+blockSourceRect(492, 828, 76, 38); // 候鸟电影院
+blockSourceRect(655, 560, 88, 90); // 候鸟工作坊
+blockSourceRect(880, 260, 238, 62); // 候鸟黑客松
+blockSourceRect(1282, 596, 72, 78); // 鸟其林局部
+blockSourceRect(1418, 448, 140, 86); // 公路复古艺术展区
+blockSourceRect(1328, 783, 112, 132); // 候鸟俱乐部 / 300.梯威周边
+blockSourceRect(1452, 788, 86, 132); // 300.梯威
+
+blockSourcePolygon([
+  [1180, 548],
+  [1268, 528],
+  [1344, 575],
+  [1360, 662],
+  [1304, 732],
+  [1205, 704],
+  [1168, 625],
+]); // 鸟其林主体
+
+blockSourcePolygon([
+  [1264, 300],
+  [1348, 304],
+  [1348, 476],
+  [1268, 476],
+  [1250, 420],
+]); // 候鸟交易所
+
+for (const [x, y, height] of [
+  [452, 320, 210],
+  [500, 450, 250],
+  [602, 350, 260],
+  [668, 292, 245],
+  [744, 318, 325],
+  [823, 280, 370],
+  [912, 355, 405],
+  [986, 330, 230],
+  [1078, 390, 300],
+  [1140, 445, 220],
+  [1188, 664, 215],
+  [1280, 690, 180],
+] as const) {
+  blockSourceRect(x, y, 7, height);
+}
+
+blockDiamondWall(254, 135, 9, 15, 34);
+blockDiamondWall(258, 498, 11, 15, 34);
+blockDiamondWall(1602, 342, 10, 16, 36);
+blockDiamondWall(1608, 720, 12, 16, 36);
 
 export const bgtiles = [emptyLayer()];
 export const objmap = [blockedLayer];

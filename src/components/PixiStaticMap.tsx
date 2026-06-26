@@ -10,6 +10,25 @@ const SOURCE_HEIGHT = 1279;
 
 type SourcePoint = [number, number];
 
+type Projector = ReturnType<typeof createProjector>;
+
+type PlanBlock = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill?: number;
+  stroke?: number;
+  radius?: number;
+};
+
+type PlanSlat = {
+  x: number;
+  y: number;
+  width?: number;
+  height: number;
+};
+
 function createProjector(worldWidth: number, worldHeight: number) {
   const scaleX = worldWidth / SOURCE_WIDTH;
   const scaleY = worldHeight / SOURCE_HEIGHT;
@@ -28,135 +47,55 @@ function createProjector(worldWidth: number, worldHeight: number) {
   };
 }
 
-function drawPolygon(
-  graphics: PIXI.Graphics,
-  project: ReturnType<typeof createProjector>,
-  points: SourcePoint[],
-) {
+function drawPolygon(graphics: PIXI.Graphics, project: Projector, points: SourcePoint[]) {
   graphics.drawPolygon(points.flatMap((point) => project.point(point)));
 }
 
-function drawBuilding(
-  container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  fill = 0xf3ead9,
-  radius = 8,
-) {
-  const rect = project.rect(x, y, width, height);
-  const shadow = new PIXI.Graphics();
-  shadow.beginFill(0x614a33, 0.2);
-  shadow.drawRoundedRect(
-    rect.x + 7 * project.scale,
-    rect.y + 9 * project.scale,
-    rect.width,
-    rect.height,
-    radius * project.scale,
-  );
-  shadow.endFill();
-  container.addChild(shadow);
-
-  const body = new PIXI.Graphics();
-  body.lineStyle(2.5 * project.scale, 0xb99d74, 0.95);
-  body.beginFill(fill);
-  body.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, radius * project.scale);
-  body.endFill();
-  body.lineStyle(1.4 * project.scale, 0xffffff, 0.35);
-  body.moveTo(rect.x + 10 * project.scale, rect.y + 10 * project.scale);
-  body.lineTo(rect.x + rect.width - 12 * project.scale, rect.y + 5 * project.scale);
-  container.addChild(body);
-}
-
-function drawTent(
-  container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) {
-  const tent = new PIXI.Graphics();
-  tent.lineStyle(1.5 * project.scale, 0xc5b79f, 0.9);
-  tent.beginFill(0xf2eee6);
-  drawPolygon(tent, project, [
-    [x + width * 0.5, y],
-    [x + width, y + height * 0.75],
-    [x + width * 0.8, y + height],
-    [x + width * 0.2, y + height],
-    [x, y + height * 0.75],
-  ]);
-  tent.endFill();
-  container.addChild(tent);
-}
-
-function drawPod(
-  container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
-  x: number,
-  y: number,
-  r = 13,
-) {
-  const shadow = new PIXI.Graphics();
-  shadow.beginFill(0x5a432c, 0.22);
-  shadow.drawEllipse(
-    project.x(x + 3),
-    project.y(y + 4),
-    r * 1.05 * project.scale,
-    r * 0.7 * project.scale,
-  );
-  shadow.endFill();
-  container.addChild(shadow);
-
-  const pod = new PIXI.Graphics();
-  pod.lineStyle(1.2 * project.scale, 0xcfc4b2, 0.9);
-  pod.beginFill(0xf6f3ec);
-  pod.drawEllipse(project.x(x), project.y(y), r * project.scale, r * 0.78 * project.scale);
-  pod.endFill();
-  // ridge highlight to suggest a rounded canvas dome
-  pod.lineStyle(1 * project.scale, 0xffffff, 0.5);
-  pod.moveTo(project.x(x - r * 0.6), project.y(y - r * 0.1));
-  pod.quadraticCurveTo(
-    project.x(x),
-    project.y(y - r * 0.55),
-    project.x(x + r * 0.6),
-    project.y(y - r * 0.1),
-  );
-  container.addChild(pod);
-}
-
-function drawSandWall(
-  container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
+function drawPolyline(
+  graphics: PIXI.Graphics,
+  project: Projector,
   points: SourcePoint[],
+  width: number,
+  color: number,
+  alpha = 1,
 ) {
-  const shadow = new PIXI.Graphics();
-  shadow.beginFill(0x5a432c, 0.18);
-  drawPolygon(
-    shadow,
-    project,
-    points.map(([x, y]) => [x + 8, y + 8]),
-  );
-  shadow.endFill();
-  container.addChild(shadow);
+  const [first, ...rest] = points;
+  graphics.lineStyle(width * project.scale, color, alpha);
+  graphics.moveTo(...project.point(first));
+  for (const point of rest) {
+    graphics.lineTo(...project.point(point));
+  }
+}
 
-  const wall = new PIXI.Graphics();
-  wall.lineStyle(2 * project.scale, 0xaa7f43, 0.9);
-  wall.beginFill(0xd8ad67);
-  drawPolygon(wall, project, points);
-  wall.endFill();
-  wall.lineStyle(1.4 * project.scale, 0xf3d58f, 0.65);
-  const [a, b, c, d] = points;
-  wall.moveTo(project.x((a[0] + d[0]) / 2), project.y((a[1] + d[1]) / 2));
-  wall.lineTo(project.x((b[0] + c[0]) / 2), project.y((b[1] + c[1]) / 2));
-  container.addChild(wall);
+function drawDashedLine(
+  graphics: PIXI.Graphics,
+  project: Projector,
+  from: SourcePoint,
+  to: SourcePoint,
+  segmentLength: number,
+  gap: number,
+  width: number,
+  color: number,
+  alpha: number,
+) {
+  const [x1, y1] = from;
+  const [x2, y2] = to;
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  const steps = Math.floor(length / (segmentLength + gap));
+  const dx = (x2 - x1) / length;
+  const dy = (y2 - y1) / length;
+  graphics.lineStyle(width * project.scale, color, alpha);
+  for (let i = 0; i <= steps; i++) {
+    const start = i * (segmentLength + gap);
+    const end = Math.min(start + segmentLength, length);
+    graphics.moveTo(project.x(x1 + dx * start), project.y(y1 + dy * start));
+    graphics.lineTo(project.x(x1 + dx * end), project.y(y1 + dy * end));
+  }
 }
 
 function addLabel(
   container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
+  project: Projector,
   text: string,
   x: number,
   y: number,
@@ -169,11 +108,11 @@ function addLabel(
   const label = new PIXI.Text(text, {
     fill: 0xffffff,
     fontFamily: 'sans-serif',
-    fontSize: 24 * project.scale,
+    fontSize: 22 * project.scale,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0,
     lineJoin: 'round',
-    stroke: 0x111111,
+    stroke: 0x211a12,
     strokeThickness: 2 * project.scale,
   });
   label.x = 9 * project.scale;
@@ -181,7 +120,8 @@ function addLabel(
   label.resolution = 2;
 
   const background = new PIXI.Graphics();
-  background.beginFill(0x1a1a1a, 0.82);
+  background.lineStyle(1.2 * project.scale, 0xe4c781, 0.55);
+  background.beginFill(0x1d1710, 0.82);
   background.drawRoundedRect(
     0,
     0,
@@ -194,8 +134,6 @@ function addLabel(
   wrapper.addChild(background);
   wrapper.addChild(label);
 
-  // Labels bound to a festival venue are clickable: open that venue's schedule in the
-  // sidebar. Stop propagation so the tap doesn't also drive the map's move-to navigation.
   if (venue) {
     wrapper.eventMode = 'static';
     wrapper.cursor = 'pointer';
@@ -227,7 +165,7 @@ const INSTALLATION_COLORS: Record<string, number> = {
 
 function addInstallationMarker(
   container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
+  project: Projector,
   installation: Installation,
 ) {
   const accent = INSTALLATION_COLORS[installation.id.slice(0, 1)] ?? 0x1da76e;
@@ -249,7 +187,7 @@ function addInstallationMarker(
     fontFamily: 'sans-serif',
     fontSize: 12 * project.scale,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0,
   });
   text.resolution = 2;
 
@@ -290,189 +228,509 @@ function addInstallationMarker(
   container.addChild(wrapper);
 }
 
-function addInstallationMarkers(
-  container: PIXI.Container,
-  project: ReturnType<typeof createProjector>,
-) {
+function addInstallationMarkers(container: PIXI.Container, project: Projector) {
   for (const installation of INSTALLATIONS) {
     addInstallationMarker(container, project, installation);
   }
 }
 
-// Shoreline taken from the user's hand-drawn marks on the aerial photo: a steep upper
-// segment, a bend at the tidal pond, then a flatter lower segment exiting the bottom
-// edge at ~4/5 width. The lower segment runs through the pond so sea and pond connect.
-const coastline: SourcePoint[] = [
-  [0, 176],
-  [268, 450],
-  [508, 690],
-  [690, 875],
-  [951, 1050],
-  [1245, 1230],
-  [1340, 1279],
+const planBlocks: PlanBlock[] = [
+  { x: 42, y: 124, width: 176, height: 170, fill: 0xe6c684, stroke: 0xb78b46, radius: 10 },
+  { x: 327, y: 122, width: 184, height: 168, fill: 0xd9b06c, stroke: 0xa87938, radius: 14 },
+  { x: 360, y: 520, width: 75, height: 75, fill: 0xe7dcc8, stroke: 0xb99d74, radius: 4 },
+  { x: 492, y: 828, width: 76, height: 38, fill: 0xf2e4ce, stroke: 0xb99d74, radius: 5 },
+  { x: 655, y: 560, width: 88, height: 90, fill: 0xe5c18a, stroke: 0xb28548, radius: 4 },
+  { x: 880, y: 260, width: 238, height: 62, fill: 0xe2d0b0, stroke: 0xae936d, radius: 4 },
+  { x: 1282, y: 596, width: 72, height: 78, fill: 0xf2eee6, stroke: 0xb8a27f, radius: 5 },
+  { x: 1418, y: 448, width: 140, height: 86, fill: 0xd8ad67, stroke: 0xaa7f43, radius: 5 },
+  { x: 1328, y: 783, width: 112, height: 132, fill: 0xf2e5cf, stroke: 0xb99d74, radius: 5 },
+  { x: 1452, y: 788, width: 86, height: 132, fill: 0xe0b86f, stroke: 0xaa7f43, radius: 5 },
 ];
 
-const seaPolygon: SourcePoint[] = [...coastline, [0, 1279]];
+const planSlats: PlanSlat[] = [
+  { x: 452, y: 320, height: 210 },
+  { x: 500, y: 450, height: 250 },
+  { x: 602, y: 350, height: 260 },
+  { x: 668, y: 292, height: 245 },
+  { x: 744, y: 318, height: 325 },
+  { x: 823, y: 280, height: 370 },
+  { x: 912, y: 355, height: 405 },
+  { x: 986, y: 330, height: 230 },
+  { x: 1078, y: 390, height: 300 },
+  { x: 1140, y: 445, height: 220 },
+  { x: 1188, y: 664, height: 215 },
+  { x: 1280, y: 690, height: 180 },
+];
 
-// Offset the shoreline perpendicularly into the sea (down-left) by `d` source-pixels.
-function offsetCoast(d: number): SourcePoint[] {
-  return coastline.map(([x, y], i) => {
-    const prev = coastline[Math.max(0, i - 1)];
-    const next = coastline[Math.min(coastline.length - 1, i + 1)];
-    const tx = next[0] - prev[0];
-    const ty = next[1] - prev[1];
-    const len = Math.hypot(tx, ty) || 1;
-    // right-hand normal (-ty, tx) points toward the sea (negative x / positive y)
-    return [x + (-ty / len) * d, y + (tx / len) * d] as SourcePoint;
-  });
-}
+function drawPlanBlock(container: PIXI.Container, project: Projector, block: PlanBlock) {
+  const rect = project.rect(block.x, block.y, block.width, block.height);
+  const shadow = new PIXI.Graphics();
+  shadow.beginFill(0x654622, 0.18);
+  shadow.drawRoundedRect(
+    rect.x + 8 * project.scale,
+    rect.y + 10 * project.scale,
+    rect.width,
+    rect.height,
+    (block.radius ?? 6) * project.scale,
+  );
+  shadow.endFill();
+  container.addChild(shadow);
 
-function drawFoamLine(
-  graphics: PIXI.Graphics,
-  project: ReturnType<typeof createProjector>,
-  pts: SourcePoint[],
-  width: number,
-  color: number,
-  alpha: number,
-) {
-  graphics.lineStyle(width * project.scale, color, alpha);
-  graphics.moveTo(...project.point(pts[0]));
-  for (const p of pts.slice(1)) {
-    graphics.lineTo(...project.point(p));
+  const graphics = new PIXI.Graphics();
+  graphics.lineStyle(2.4 * project.scale, block.stroke ?? 0xb99d74, 0.95);
+  graphics.beginFill(block.fill ?? 0xf2eadc, 0.96);
+  graphics.drawRoundedRect(
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+    (block.radius ?? 3) * project.scale,
+  );
+  graphics.endFill();
+  graphics.lineStyle(1.2 * project.scale, 0xffffff, 0.35);
+  graphics.moveTo(rect.x + 10 * project.scale, rect.y + 12 * project.scale);
+  graphics.lineTo(rect.x + rect.width - 12 * project.scale, rect.y + 7 * project.scale);
+  graphics.lineStyle(1 * project.scale, 0x8d6937, 0.22);
+  for (let i = 1; i < Math.max(2, Math.floor(block.width / 48)); i++) {
+    const x = rect.x + (rect.width / Math.max(2, Math.floor(block.width / 48))) * i;
+    graphics.moveTo(x, rect.y + 8 * project.scale);
+    graphics.lineTo(x + 3 * project.scale, rect.y + rect.height - 8 * project.scale);
   }
+  container.addChild(graphics);
 }
 
-const pondPolygon: SourcePoint[] = [
-  [860, 888],
-  [960, 884],
-  [1038, 918],
-  [1050, 978],
-  [1008, 1032],
-  [912, 1050],
-  [838, 1020],
-  [820, 948],
-];
+function drawPlanSlats(container: PIXI.Container, project: Projector) {
+  const graphics = new PIXI.Graphics();
+  for (const slat of planSlats) {
+    const rect = project.rect(slat.x, slat.y, slat.width ?? 7, slat.height);
+    graphics.lineStyle(1.2 * project.scale, 0x9c7742, 0.72);
+    graphics.beginFill(0xd4b071, 0.72);
+    graphics.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1 * project.scale);
+    graphics.endFill();
+    graphics.lineStyle(1 * project.scale, 0xf4d88f, 0.36);
+    graphics.moveTo(rect.x + rect.width * 0.35, rect.y + 5 * project.scale);
+    graphics.lineTo(rect.x + rect.width * 0.65, rect.y + rect.height - 5 * project.scale);
+  }
+  container.addChild(graphics);
+}
 
-const forestPolygon: SourcePoint[] = [
-  [560, 0],
-  [1515, 0],
-  [1510, 420],
-  [1390, 500],
-  [1210, 486],
-  [1040, 420],
-  [885, 392],
-  [744, 302],
-  [610, 218],
-];
+function drawDiamondWall(
+  container: PIXI.Container,
+  project: Projector,
+  x: number,
+  y: number,
+  count: number,
+  size: number,
+  step: number,
+) {
+  const graphics = new PIXI.Graphics();
+  graphics.lineStyle(1.5 * project.scale, 0x9a733c, 0.88);
+  for (let i = 0; i < count; i++) {
+    const cy = y + i * step;
+    const lean = i % 2 === 0 ? -6 : 5;
+    graphics.beginFill(i % 2 === 0 ? 0xd9ad64 : 0xc99650, 0.96);
+    drawPolygon(graphics, project, [
+      [x + lean, cy - size],
+      [x + size + lean, cy],
+      [x + lean, cy + size],
+      [x - size + lean, cy],
+    ]);
+    graphics.endFill();
+  }
+  container.addChild(graphics);
+}
 
-const hotelGreenPolygon: SourcePoint[] = [
-  [1265, 420],
-  [1703, 390],
-  [1703, 620],
-  [1430, 585],
-  [1250, 525],
-];
+function drawTextOnPlan(
+  container: PIXI.Container,
+  project: Projector,
+  text: string,
+  x: number,
+  y: number,
+  fontSize = 18,
+  align: 'left' | 'center' | 'right' = 'center',
+) {
+  const label = new PIXI.Text(text, {
+    align,
+    fill: 0x6d5638,
+    fontFamily: 'sans-serif',
+    fontSize: fontSize * project.scale,
+    fontWeight: '700',
+    letterSpacing: 0,
+  });
+  label.anchor.set(align === 'center' ? 0.5 : 0, 0.5);
+  label.resolution = 2;
+  label.x = project.x(x);
+  label.y = project.y(y);
+  container.addChild(label);
+}
 
-const sandWallPolygons: SourcePoint[][] = [
-  [
-    [292, 245],
-    [514, 209],
-    [525, 238],
-    [307, 278],
-  ],
-  [
-    [412, 295],
-    [655, 244],
-    [667, 273],
-    [425, 326],
-  ],
-  [
-    [546, 345],
-    [804, 294],
-    [816, 324],
-    [560, 378],
-  ],
-  [
-    [273, 358],
-    [436, 316],
-    [449, 345],
-    [286, 390],
-  ],
-  [
-    [398, 424],
-    [584, 365],
-    [599, 395],
-    [416, 455],
-  ],
-  [
-    [525, 486],
-    [717, 423],
-    [733, 455],
-    [544, 517],
-  ],
-  [
-    [675, 555],
-    [875, 486],
-    [892, 520],
-    [694, 588],
-  ],
-  [
-    [808, 628],
-    [956, 575],
-    [973, 607],
-    [825, 660],
-  ],
-  [
-    [494, 591],
-    [635, 530],
-    [654, 562],
-    [515, 624],
-  ],
-  [
-    [602, 662],
-    [765, 594],
-    [784, 628],
-    [622, 696],
-  ],
-  [
-    [1458, 792],
-    [1660, 778],
-    [1664, 812],
-    [1464, 827],
-  ],
-  [
-    [1510, 848],
-    [1663, 835],
-    [1666, 867],
-    [1514, 881],
-  ],
-];
+function drawVenueDetails(container: PIXI.Container, project: Projector) {
+  const details = new PIXI.Graphics();
+  details.lineStyle(1.2 * project.scale, 0x9e8054, 0.85);
 
-// Deterministic layout of the east-side glamping pods (shared with sandCity collision).
-function podField(): SourcePoint[] {
-  const pods: SourcePoint[] = [];
-  for (let r = 0; r < 6; r++) {
-    for (let c = 0; c < 6; c++) {
-      pods.push([1448 + c * 44 + r * 4, 726 + r * 80 + c * 6]);
+  for (let i = 0; i < 7; i++) {
+    const x = 1168 + i * 13;
+    const rect = project.rect(x, 324, 10, 12);
+    details.beginFill(0xc6aa78, 0.92);
+    details.drawRect(rect.x, rect.y, rect.width, rect.height);
+    details.endFill();
+  }
+
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 5; col++) {
+      details.beginFill(0xa58c62, 0.86);
+      details.drawCircle(
+        project.x(1255 + col * 15),
+        project.y(370 + row * 15),
+        2.8 * project.scale,
+      );
+      details.endFill();
     }
   }
-  return pods;
+
+  details.lineStyle(2 * project.scale, 0xb48d58, 0.78);
+  for (let i = 0; i < 5; i++) {
+    const x = 1258 + i * 17;
+    details.moveTo(project.x(x), project.y(505));
+    details.lineTo(project.x(x), project.y(600));
+  }
+
+  details.lineStyle(3 * project.scale, 0x9f8f75, 0.78);
+  details.drawCircle(project.x(70), project.y(360), 11 * project.scale);
+  details.drawCircle(project.x(112), project.y(360), 11 * project.scale);
+  details.drawCircle(project.x(70), project.y(408), 11 * project.scale);
+  details.drawCircle(project.x(111), project.y(408), 11 * project.scale);
+  details.drawCircle(project.x(90), project.y(515), 12 * project.scale);
+  details.moveTo(project.x(42), project.y(532));
+  details.lineTo(project.x(68), project.y(532));
+  details.moveTo(project.x(55), project.y(520));
+  details.lineTo(project.x(55), project.y(545));
+
+  container.addChild(details);
 }
 
-function drawRoad(
-  graphics: PIXI.Graphics,
-  project: ReturnType<typeof createProjector>,
-  width: number,
-  color: number,
-  alpha: number,
-  points: SourcePoint[],
-) {
-  graphics.lineStyle(width * project.scale, color, alpha);
-  const [first, ...rest] = points;
-  graphics.moveTo(...project.point(first));
-  for (const point of rest) {
-    graphics.lineTo(...project.point(point));
+function drawSandTexture(container: PIXI.Container, project: Projector) {
+  const texture = new PIXI.Graphics();
+  for (let i = 0; i < 180; i++) {
+    const x = 35 + ((i * 97) % 1620);
+    const y = 185 + ((i * 53) % 760);
+    const radius = 1.1 + (i % 4) * 0.45;
+    texture.beginFill(i % 3 === 0 ? 0xc8aa76 : 0xe5c993, 0.18);
+    texture.drawCircle(project.x(x), project.y(y), radius * project.scale);
+    texture.endFill();
   }
+  texture.lineStyle(1.2 * project.scale, 0xb9955b, 0.13);
+  for (let i = 0; i < 14; i++) {
+    const y = 240 + i * 52;
+    texture.moveTo(project.x(330 + i * 19), project.y(y));
+    texture.bezierCurveTo(
+      project.x(560 + i * 14),
+      project.y(y - 26),
+      project.x(790 + i * 8),
+      project.y(y + 24),
+      project.x(1130 + i * 20),
+      project.y(y - 8),
+    );
+  }
+  container.addChild(texture);
+}
+
+function drawCanvasTent(
+  container: PIXI.Container,
+  project: Projector,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const tent = new PIXI.Graphics();
+  tent.lineStyle(1.5 * project.scale, 0xb99d74, 0.95);
+  tent.beginFill(0xf3efe6, 0.96);
+  drawPolygon(tent, project, [
+    [x + width * 0.5, y],
+    [x + width, y + height * 0.72],
+    [x + width * 0.78, y + height],
+    [x + width * 0.22, y + height],
+    [x, y + height * 0.72],
+  ]);
+  tent.endFill();
+  tent.lineStyle(1 * project.scale, 0xffffff, 0.48);
+  tent.moveTo(project.x(x + width * 0.5), project.y(y + 4));
+  tent.lineTo(project.x(x + width * 0.34), project.y(y + height * 0.92));
+  tent.moveTo(project.x(x + width * 0.5), project.y(y + 4));
+  tent.lineTo(project.x(x + width * 0.66), project.y(y + height * 0.92));
+  container.addChild(tent);
+}
+
+function drawSketchCircle(
+  container: PIXI.Container,
+  project: Projector,
+  x: number,
+  y: number,
+  radius: number,
+  fill: number,
+) {
+  const circle = new PIXI.Graphics();
+  circle.beginFill(0x5f4225, 0.14);
+  circle.drawCircle(project.x(x + 5), project.y(y + 7), radius * project.scale);
+  circle.endFill();
+  circle.lineStyle(2 * project.scale, 0xb99d74, 0.9);
+  circle.beginFill(fill, 0.96);
+  circle.drawCircle(project.x(x), project.y(y), radius * project.scale);
+  circle.endFill();
+  circle.lineStyle(1 * project.scale, 0xffffff, 0.4);
+  circle.drawCircle(project.x(x - 4), project.y(y - 5), radius * 0.72 * project.scale);
+  container.addChild(circle);
+}
+
+function drawSandCityPlan(
+  container: PIXI.Container,
+  project: Projector,
+  worldWidth: number,
+  worldHeight: number,
+) {
+  const terrain = new PIXI.Graphics();
+  terrain.beginFill(0xd8c194);
+  terrain.drawRect(0, 0, worldWidth, worldHeight);
+  terrain.endFill();
+
+  terrain.beginFill(0xbeb59e, 0.78);
+  drawPolygon(terrain, project, [
+    [0, 40],
+    [112, 40],
+    [137, 126],
+    [1018, 126],
+    [1018, 46],
+    [1703, 46],
+    [1703, 160],
+    [0, 160],
+  ]);
+  terrain.endFill();
+
+  terrain.beginFill(0xe0d5be, 0.92);
+  drawPolygon(terrain, project, [
+    [585, 160],
+    [735, 160],
+    [735, 130],
+    [904, 130],
+    [904, 160],
+    [1703, 160],
+    [1703, 215],
+    [585, 195],
+  ]);
+  terrain.endFill();
+
+  terrain.beginFill(0xd5bd8d, 0.96);
+  drawPolygon(terrain, project, [
+    [0, 905],
+    [300, 900],
+    [580, 928],
+    [920, 932],
+    [1210, 955],
+    [1450, 985],
+    [1703, 1090],
+    [1703, 1279],
+    [0, 1279],
+  ]);
+  terrain.endFill();
+
+  terrain.beginFill(0x5c7f7a, 0.96);
+  drawPolygon(terrain, project, [
+    [0, 1038],
+    [410, 1038],
+    [620, 1072],
+    [875, 1060],
+    [1110, 1084],
+    [1370, 1118],
+    [1703, 1118],
+    [1703, 1279],
+    [0, 1279],
+  ]);
+  terrain.endFill();
+
+  terrain.beginFill(0x6f968c, 0.42);
+  drawPolygon(terrain, project, [
+    [0, 990],
+    [405, 994],
+    [610, 1028],
+    [860, 1018],
+    [1110, 1040],
+    [1390, 1088],
+    [1703, 1098],
+    [1703, 1135],
+    [1370, 1118],
+    [1110, 1084],
+    [875, 1060],
+    [620, 1072],
+    [410, 1038],
+    [0, 1038],
+  ]);
+  terrain.endFill();
+
+  terrain.lineStyle(2 * project.scale, 0xc1b393, 0.65);
+  terrain.moveTo(project.x(1020), project.y(38));
+  terrain.lineTo(project.x(1703), project.y(158));
+  terrain.lineStyle(4 * project.scale, 0xfbf8f0, 0.72);
+  terrain.moveTo(project.x(0), project.y(1025));
+  terrain.bezierCurveTo(
+    project.x(410),
+    project.y(1025),
+    project.x(570),
+    project.y(1070),
+    project.x(770),
+    project.y(1055),
+  );
+  terrain.bezierCurveTo(
+    project.x(990),
+    project.y(1042),
+    project.x(1270),
+    project.y(1104),
+    project.x(1703),
+    project.y(1118),
+  );
+  terrain.lineStyle(2 * project.scale, 0xffffff, 0.42);
+  terrain.moveTo(project.x(0), project.y(1058));
+  terrain.bezierCurveTo(
+    project.x(420),
+    project.y(1052),
+    project.x(610),
+    project.y(1094),
+    project.x(790),
+    project.y(1080),
+  );
+  terrain.bezierCurveTo(
+    project.x(1020),
+    project.y(1064),
+    project.x(1260),
+    project.y(1120),
+    project.x(1703),
+    project.y(1140),
+  );
+
+  terrain.beginFill(0xb19f86, 0.76);
+  drawPolygon(terrain, project, [
+    [432, 320],
+    [470, 352],
+    [496, 420],
+    [570, 468],
+    [650, 520],
+    [795, 515],
+    [930, 538],
+    [1044, 600],
+    [1160, 660],
+    [1265, 705],
+    [1314, 770],
+    [1295, 840],
+    [1242, 894],
+    [1192, 836],
+    [1078, 775],
+    [950, 705],
+    [825, 656],
+    [684, 657],
+    [575, 615],
+    [504, 560],
+    [430, 535],
+    [392, 470],
+    [386, 398],
+  ]);
+  terrain.endFill();
+
+  terrain.beginFill(0xcbb78f, 0.42);
+  drawPolygon(terrain, project, [
+    [446, 350],
+    [482, 397],
+    [535, 456],
+    [650, 536],
+    [825, 545],
+    [990, 574],
+    [1120, 660],
+    [1255, 740],
+    [1228, 785],
+    [1070, 696],
+    [940, 640],
+    [790, 596],
+    [630, 595],
+    [512, 515],
+    [430, 482],
+    [414, 420],
+  ]);
+  terrain.endFill();
+
+  drawPolyline(
+    terrain,
+    project,
+    [
+      [560, 880],
+      [620, 760],
+      [688, 650],
+      [760, 560],
+      [824, 484],
+      [892, 392],
+    ],
+    2,
+    0x9d7a4d,
+    0.85,
+  );
+  drawDashedLine(terrain, project, [840, 934], [890, 934], 18, 10, 4, 0xa17a48, 0.65);
+  drawDashedLine(terrain, project, [842, 662], [895, 662], 18, 10, 4, 0xa17a48, 0.65);
+  drawDashedLine(terrain, project, [834, 725], [885, 725], 18, 10, 4, 0xa17a48, 0.65);
+
+  container.addChild(terrain);
+  drawSandTexture(container, project);
+
+  drawDiamondWall(container, project, 254, 135, 9, 15, 34);
+  drawDiamondWall(container, project, 258, 498, 11, 15, 34);
+  drawDiamondWall(container, project, 1602, 342, 10, 16, 36);
+  drawDiamondWall(container, project, 1608, 720, 12, 16, 36);
+
+  drawPlanSlats(container, project);
+
+  for (const block of planBlocks) {
+    drawPlanBlock(container, project, block);
+  }
+
+  drawSketchCircle(container, project, 148, 395, 55, 0xe8ddc8);
+  drawSketchCircle(container, project, 1368, 886, 26, 0xe0d0b6);
+  drawCanvasTent(container, project, 886, 190, 62, 54);
+  drawCanvasTent(container, project, 985, 188, 58, 52);
+  drawCanvasTent(container, project, 1076, 190, 58, 52);
+  drawCanvasTent(container, project, 1380, 728, 58, 54);
+
+  drawVenueDetails(container, project);
+
+  drawTextOnPlan(container, project, '候鸟巡游花车停放处', 132, 258, 16);
+  drawTextOnPlan(container, project, '候鸟中心', 148, 395, 16);
+  drawTextOnPlan(container, project, '沙城一级城墙', 298, 372, 16);
+  drawTextOnPlan(container, project, '伏园', 420, 198, 17);
+  drawTextOnPlan(container, project, '婚姻登记处', 398, 558, 16);
+  drawTextOnPlan(container, project, '候鸟电影院', 528, 850, 14);
+  drawTextOnPlan(container, project, '候鸟工作坊', 700, 606, 15);
+  drawTextOnPlan(container, project, '候鸟黑客松', 1000, 286, 15);
+  drawTextOnPlan(container, project, '时间广场', 1010, 352, 15);
+  drawTextOnPlan(container, project, '候鸟交易所', 1284, 362, 15);
+  drawTextOnPlan(container, project, '鸟其林', 1244, 626, 16);
+  drawTextOnPlan(container, project, '冰JOYS\n灵感发酵局', 1392, 648, 15);
+  drawTextOnPlan(container, project, '公路复古艺术展区', 1488, 492, 15);
+  drawTextOnPlan(container, project, '300.梯威', 1496, 850, 15);
+  drawTextOnPlan(container, project, '沙城二级城墙', 1646, 612, 16);
+
+  addLabel(container, project, '巡游花车', 46, 86);
+  addLabel(container, project, '候鸟中心', 94, 438);
+  addLabel(container, project, '一级城墙', 282, 338, '一级城墙');
+  addLabel(container, project, '伏园', 350, 92, '伏园');
+  addLabel(container, project, '婚姻登记处', 360, 602);
+  addLabel(container, project, '候鸟电影院', 470, 878, '候鸟电影院');
+  addLabel(container, project, '候鸟工作坊', 640, 662, '候鸟工作坊');
+  addLabel(container, project, '候鸟黑客松', 895, 218, '候鸟黑客松');
+  addLabel(container, project, '时间广场', 965, 402, '时间广场');
+  addLabel(container, project, '候鸟交易所', 1240, 420);
+  addLabel(container, project, '鸟其林', 1208, 690);
+  addLabel(container, project, '候鸟俱乐部', 1268, 752, '候鸟俱乐部');
+  addLabel(container, project, '公路复古艺术展区', 1422, 552, '艺术作品展区');
+  addLabel(container, project, '300.梯威', 1458, 934, '300.梯威');
+  addLabel(container, project, '二级城墙', 1550, 688);
+
+  addInstallationMarkers(container, project);
 }
 
 export function drawSandCityModel(
@@ -481,189 +739,14 @@ export function drawSandCityModel(
   worldHeight: number,
 ) {
   const project = createProjector(worldWidth, worldHeight);
-  const terrain = new PIXI.Graphics();
+  drawSandCityPlan(container, project, worldWidth, worldHeight);
 
-  terrain.beginFill(0xd8c194);
-  terrain.drawRect(0, 0, worldWidth, worldHeight);
-  terrain.endFill();
-
-  terrain.beginFill(0x5c7f7a);
-  drawPolygon(terrain, project, seaPolygon);
-  terrain.endFill();
-
-  // Shallow-water tint hugging the shoreline.
-  terrain.beginFill(0x6f968c, 0.6);
-  drawPolygon(terrain, project, [...coastline, ...offsetCoast(120).reverse()]);
-  terrain.endFill();
-
-  // Muddy tidal pond in the centre of the site.
-  terrain.lineStyle(3 * project.scale, 0x8a7448, 0.6);
-  terrain.beginFill(0x6f5c3b);
-  drawPolygon(terrain, project, pondPolygon);
-  terrain.endFill();
-  terrain.lineStyle(0);
-  terrain.beginFill(0x83703f, 0.4);
-  drawPolygon(
-    terrain,
-    project,
-    pondPolygon.map(([x, y]) => [934 + (x - 934) * 0.6, 966 + (y - 966) * 0.6]),
-  );
-  terrain.endFill();
-
-  terrain.beginFill(0x4f7a47);
-  drawPolygon(terrain, project, forestPolygon);
-  terrain.endFill();
-
-  terrain.beginFill(0x679550);
-  drawPolygon(terrain, project, hotelGreenPolygon);
-  terrain.endFill();
-
-  terrain.beginFill(0xd3bf94, 0.72);
-  drawPolygon(terrain, project, [
-    [740, 362],
-    [1030, 418],
-    [1240, 520],
-    [1130, 605],
-    [900, 505],
-    [755, 452],
-  ]);
-  terrain.endFill();
-
-  drawRoad(terrain, project, 26, 0xb8b0a0, 0.95, [
-    [440, -20],
-    [585, 145],
-    [735, 225],
-    [950, 332],
-    [1220, 505],
-    [1545, 610],
-  ]);
-  drawRoad(terrain, project, 15, 0xd7d1c4, 0.9, [
-    [990, 372],
-    [1100, 490],
-    [1090, 720],
-    [1225, 1020],
-    [1350, 1279],
-  ]);
-
-  // White foam breaking along the shoreline (a few offset wavy lines inside the sea).
-  drawFoamLine(terrain, project, offsetCoast(8), 7, 0xfbf8f0, 0.9);
-  drawFoamLine(terrain, project, offsetCoast(34), 4, 0xffffff, 0.6);
-  drawFoamLine(terrain, project, offsetCoast(64), 3, 0xffffff, 0.4);
-
-  container.addChild(terrain);
-
-  const treeLayer = new PIXI.Graphics();
-  for (let i = 0; i < 190; i++) {
-    const sourceX = 660 + ((i * 73) % 720);
-    const sourceY = 18 + ((i * 47) % 420);
-    if (!pointInRoughForest(sourceX, sourceY)) continue;
-    treeLayer.beginFill(i % 3 === 0 ? 0x365f3f : i % 3 === 1 ? 0x4f7f52 : 0x2e5538, 0.92);
-    treeLayer.drawCircle(project.x(sourceX), project.y(sourceY), (10 + (i % 5)) * project.scale);
-    treeLayer.endFill();
-  }
-  container.addChild(treeLayer);
-
-  const tracks = new PIXI.Graphics();
-  tracks.lineStyle(1.8 * project.scale, 0x8f7651, 0.34);
-  for (let i = 0; i < 18; i++) {
-    const y = 500 + i * 32;
-    tracks.moveTo(project.x(430 + i * 16), project.y(y));
-    tracks.bezierCurveTo(
-      project.x(650 + i * 8),
-      project.y(y - 90),
-      project.x(900 + i * 4),
-      project.y(y - 20),
-      project.x(1130 + i * 6),
-      project.y(y + 75),
-    );
-  }
-  tracks.lineStyle(1.6 * project.scale, 0x7f6a4a, 0.28);
-  for (let i = 0; i < 9; i++) {
-    tracks.moveTo(project.x(905 + i * 54), project.y(710 + i * 18));
-    tracks.lineTo(project.x(1260 + i * 35), project.y(1030 + i * 20));
-  }
-  container.addChild(tracks);
-
-  drawBuilding(container, project, 105, 138, 118, 68, 0xf3eadc);
-  drawTent(container, project, 256, 74, 64, 44);
-  drawTent(container, project, 332, 70, 70, 50);
-  drawBuilding(container, project, 395, 92, 88, 58, 0xf1e2c8);
-  drawBuilding(container, project, 250, 160, 138, 58, 0xf0d09a);
-  drawBuilding(container, project, 490, 125, 96, 62, 0xf3e8d7);
-  drawBuilding(container, project, 176, 276, 135, 68, 0xf4eee2);
-  drawBuilding(container, project, 214, 400, 140, 72, 0xf1e7da);
-  drawBuilding(container, project, 406, 374, 154, 88, 0xf0dbb6);
-  drawBuilding(container, project, 702, 298, 192, 156, 0xf2eadc);
-  drawBuilding(container, project, 1118, 482, 154, 94, 0xf3eadb);
-  drawBuilding(container, project, 1288, 612, 255, 114, 0xe8ddc8);
-  drawBuilding(container, project, 1182, 858, 180, 128, 0xf1eee7);
-
-  const special = new PIXI.Graphics();
-  special.lineStyle(3 * project.scale, 0xb99d74, 0.95);
-  special.beginFill(0xf5efe4);
-  drawPolygon(special, project, [
-    [955, 548],
-    [1075, 556],
-    [1118, 624],
-    [1070, 698],
-    [958, 700],
-    [908, 628],
-  ]);
-  special.endFill();
-  container.addChild(special);
-
-  drawBuilding(container, project, 910, 712, 150, 70, 0xead4b0);
-  drawBuilding(container, project, 642, 625, 210, 112, 0xc8a16c);
-
-  for (const wall of sandWallPolygons) {
-    drawSandWall(container, project, wall);
-  }
-
-  // Glamping pod field on the east side; rows follow the diagonal coastline.
-  for (const [px, py] of podField()) {
-    drawPod(container, project, px, py);
-  }
-
-  const plazas = new PIXI.Graphics();
-  plazas.lineStyle(3 * project.scale, 0xf4e7c8, 0.75);
-  plazas.beginFill(0xd9c39b, 0.42);
-  plazas.drawEllipse(project.x(800), project.y(498), 96 * project.scale, 40 * project.scale);
-  plazas.drawEllipse(project.x(745), project.y(665), 112 * project.scale, 42 * project.scale);
-  plazas.endFill();
-  container.addChild(plazas);
-
-  addLabel(container, project, '候鸟巡游花车停放处', 214, 45);
-  addLabel(container, project, '候鸟中心', 102, 150);
-  addLabel(container, project, '一级城墙', 252, 178, '一级城墙');
-  addLabel(container, project, '伏园', 494, 137, '伏园');
-  addLabel(container, project, '婚姻登记处', 180, 282);
-  addLabel(container, project, '候鸟电影院', 212, 405, '候鸟电影院');
-  addLabel(container, project, '候鸟工作坊', 398, 380, '候鸟工作坊');
-  addLabel(container, project, '候鸟黑客松', 706, 312, '候鸟黑客松');
-  addLabel(container, project, '时间广场', 762, 470, '时间广场');
-  addLabel(container, project, '候鸟交易所', 1120, 494);
-  addLabel(container, project, '鸟其林', 990, 590);
-  addLabel(container, project, '候鸟俱乐部', 925, 718, '候鸟俱乐部');
-  addLabel(container, project, '候鸟沙城剧场', 670, 642);
-  addLabel(container, project, '公路复古艺术展区', 1305, 645, '艺术作品展区');
-  addLabel(container, project, '300.梯威', 1180, 880, '300.梯威');
-  addLabel(container, project, '二级城墙', 1480, 805);
-  addInstallationMarkers(container, project);
-
-  // Clip the whole model to the map rectangle: the sea / shallow water / foam are
-  // projected past the shoreline (negative x, y beyond the bottom) and would
-  // otherwise bleed outside the map container. The mask is a child so it tracks
-  // the container's own transform.
   const clip = new PIXI.Graphics();
   clip.beginFill(0xffffff);
   clip.drawRect(0, 0, worldWidth, worldHeight);
   clip.endFill();
   container.addChild(clip);
   container.mask = clip;
-}
-
-function pointInRoughForest(x: number, y: number) {
-  return x > 600 && y < 455 && !(x < 760 && y > 250) && !(x > 1375 && y > 330);
 }
 
 export const PixiStaticMap = PixiComponent('StaticMap', {
