@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from 'convex/react';
-import QRCode from 'qrcode';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../convex/_generated/api';
 import { Avatar } from '../lib/avatars';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -185,22 +185,11 @@ function ComicLightbox({
 // 扫码加入卡（固定角落）。
 // ============================================================
 function JoinQR() {
-  const [qr, setQr] = useState<string | null>(null);
-  useEffect(() => {
-    QRCode.toDataURL(SITE_ROOT, { margin: 1, width: 256, color: { dark: INK, light: SAND } })
-      .then(setQr)
-      .catch((e) => console.error('二维码生成失败', e));
-  }, []);
-
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-20 hidden sm:block">
       <div className="pointer-events-auto flex items-center gap-3 border-2 border-brown-700 bg-brown-900/95 p-3 shadow-2xl backdrop-blur">
         <div className="shrink-0 overflow-hidden rounded" style={{ background: SAND, padding: 5 }}>
-          {qr ? (
-            <img src={qr} alt="扫码加入" width={84} height={84} style={{ display: 'block' }} />
-          ) : (
-            <div style={{ width: 84, height: 84 }} />
-          )}
+          <QRCodeSVG value={SITE_ROOT} size={84} fgColor={INK} bgColor={SAND} level="M" />
         </div>
         <div className="max-w-[9rem]">
           <p className="font-display text-sm text-clay-100">扫码加入</p>

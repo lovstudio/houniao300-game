@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
+import { useRef, useState } from 'react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 
 export type PosterPanel = { imageUrl: string | null; narration: string };
 
@@ -61,20 +61,15 @@ export default function ComicPoster({
   onClose,
 }: PosterProps) {
   const [downloading, setDownloading] = useState(false);
-  const [qr, setQr] = useState<string | null>(null);
+  // 隐藏的离屏 QRCodeCanvas：下载海报时直接 drawImage 它，二维码清晰且无异步加载。
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const link = deepLink(activityKey);
   const dl = dateLine(activityKey);
-
-  useEffect(() => {
-    QRCode.toDataURL(link, { margin: 1, width: 256, color: { dark: INK, light: SAND } })
-      .then(setQr)
-      .catch((e) => console.error('二维码生成失败', e));
-  }, [link]);
 
   const download = async () => {
     setDownloading(true);
     try {
-      await composeAndDownload({ title, userName, venue, dl, badgeTitle, badgeSummary, reflection, panels, qr });
+      await composeAndDownload({ title, userName, venue, dl, badgeTitle, badgeSummary, reflection, panels, qrCanvas: qrCanvasRef.current });
     } catch (e) {
       console.error('长图导出失败', e);
       alert('长图导出失败，可直接截图保存（截图即海报）。');
@@ -85,6 +80,17 @@ export default function ComicPoster({
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black/85">
+      {/* 离屏高分二维码（仅供下载时 drawImage，不显示）。 */}
+      <QRCodeCanvas
+        ref={qrCanvasRef}
+        value={link}
+        size={256}
+        fgColor={INK}
+        bgColor={SAND}
+        level="M"
+        style={{ position: 'fixed', left: -9999, top: -9999, pointerEvents: 'none' }}
+        aria-hidden
+      />
       <div className="flex shrink-0 items-center justify-between gap-2 bg-brown-900 px-4 py-2">
         <span className="font-display text-brown-100">连环画海报</span>
         <div className="flex gap-2">
@@ -177,11 +183,7 @@ export default function ComicPoster({
             style={{ background: INK, borderTop: `2px dashed ${CLAY}` }}
           >
             <div className="shrink-0 overflow-hidden" style={{ background: SAND, borderRadius: 8, padding: 6 }}>
-              {qr ? (
-                <img src={qr} alt="扫码体验" width={76} height={76} style={{ display: 'block' }} />
-              ) : (
-                <div style={{ width: 76, height: 76 }} />
-              )}
+              <QRCodeSVG value={link} size={76} fgColor={INK} bgColor={SAND} level="M" />
             </div>
             <div className="min-w-0">
               <p className="font-display text-sm" style={{ color: SAND }}>
@@ -266,7 +268,7 @@ async function composeAndDownload({
   badgeSummary,
   reflection,
   panels,
-  qr,
+  qrCanvas,
 }: {
   title: string;
   userName: string;
@@ -276,7 +278,7 @@ async function composeAndDownload({
   badgeSummary?: string;
   reflection?: string;
   panels: PosterPanel[];
-  qr: string | null;
+  qrCanvas: HTMLCanvasElement | null;
 }) {
   const W = 1080;
   const pad = 56;
@@ -285,7 +287,6 @@ async function composeAndDownload({
   const headerH = 240;
 
   const imgs = await Promise.all(panels.map((p) => (p.imageUrl ? loadImage(p.imageUrl) : Promise.resolve(null))));
-  const qrImg = qr ? await loadImage(qr).catch(() => null) : null;
 
   const measure = document.createElement('canvas').getContext('2d')!;
   const narrFont = 30;
@@ -424,7 +425,7 @@ async function composeAndDownload({
   ctx.fillStyle = SAND;
   roundRect(ctx, pad, qy, qrSize, qrSize, 10);
   ctx.fill();
-  if (qrImg) ctx.drawImage(qrImg, pad + 8, qy + 8, qrSize - 16, qrSize - 16);
+  if (qrCanvas) ctx.drawImage(qrCanvas, pad + 8, qy + 8, qrSize - 16, qrSize - 16);
   ctx.textAlign = 'left';
   const tx = pad + qrSize + 36;
   ctx.fillStyle = SAND;

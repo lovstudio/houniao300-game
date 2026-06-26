@@ -272,6 +272,49 @@ export const awardBadge = internalMutation({
   },
 });
 
+// 一次性清理：删除冒烟/E2E 测试遗留的 events 及其 experiences/panels/badges。
+// 按 activityKey 前缀匹配（测试键都带这些前缀），真实节目单键形如 "20|11:00|场地|标题" 不会命中。
+export const cleanupTestData = internalMutation({
+  args: { prefixes: v.array(v.string()) },
+  handler: async (ctx, { prefixes }) => {
+    const events = await ctx.db.query('events').collect();
+    const targets = events.filter((e) => {
+      const key = e.activityKey;
+      return typeof key === 'string' && prefixes.some((p) => key.startsWith(p));
+    });
+    let removed = { events: 0, experiences: 0, panels: 0, badges: 0 };
+    for (const ev of targets) {
+      const exps = await ctx.db
+        .query('experiences')
+        .withIndex('eventId', (q) => q.eq('eventId', ev._id))
+        .collect();
+      for (const exp of exps) {
+        const panels = await ctx.db
+          .query('panels')
+          .withIndex('experienceId', (q) => q.eq('experienceId', exp._id))
+          .collect();
+        for (const p of panels) {
+          await ctx.db.delete(p._id);
+          removed.panels++;
+        }
+        await ctx.db.delete(exp._id);
+        removed.experiences++;
+      }
+      const badges = await ctx.db
+        .query('badges')
+        .withIndex('eventId', (q) => q.eq('eventId', ev._id))
+        .collect();
+      for (const b of badges) {
+        await ctx.db.delete(b._id);
+        removed.badges++;
+      }
+      await ctx.db.delete(ev._id);
+      removed.events++;
+    }
+    return { removedKeys: targets.map((t) => t.activityKey ?? ''), removed };
+  },
+});
+
 export const experienceState = internalQuery({
   args: { experienceId: v.id('experiences') },
   handler: async (ctx, { experienceId }) => {
