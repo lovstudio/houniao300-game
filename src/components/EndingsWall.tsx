@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { api } from '../../convex/_generated/api';
 import { Avatar } from '../lib/avatars';
 import type { Id } from '../../convex/_generated/dataModel';
+import ComicPoster from './ComicPoster';
 
 // 公测实时结局墙：投屏大屏，直播真实玩家的 AIGC 连环画结局。
 // 通过 ?wall=1 进入，useQuery 订阅，新结局自动上墙。无路由依赖。
@@ -42,6 +43,7 @@ function ComicLightbox({
   onClose: () => void;
 }) {
   const comic = useQuery(api.experience.experienceComic, { experienceId });
+  const [showPoster, setShowPoster] = useState(false);
 
   // Esc 关闭。
   useEffect(() => {
@@ -59,6 +61,7 @@ function ComicLightbox({
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/85 px-4 py-8 backdrop-blur-sm"
       onClick={onClose}
@@ -135,11 +138,21 @@ function ComicLightbox({
                 )}
               </div>
 
+              {/* 生成含二维码的分享海报（复用玩家自己的 ComicPoster） */}
+              {comic.activityKey && comic.panels.length > 0 && (
+                <button
+                  onClick={() => setShowPoster(true)}
+                  className="mt-4 w-full rounded border-2 border-clay-700 px-4 py-2.5 font-display text-base text-clay-100 hover:border-clay-500 hover:text-white"
+                >
+                  生成连环画海报（含二维码）
+                </button>
+              )}
+
               {/* 玩同款活动深链 */}
               {comic.activityKey && (
                 <button
                   onClick={playSame}
-                  className="mt-4 w-full rounded bg-clay-700 px-4 py-2.5 font-display text-base text-white hover:bg-clay-500"
+                  className="mt-3 w-full rounded bg-clay-700 px-4 py-2.5 font-display text-base text-white hover:bg-clay-500"
                 >
                   玩同款活动 →
                 </button>
@@ -149,6 +162,22 @@ function ComicLightbox({
         </div>
       </div>
     </div>
+
+      {/* 含二维码的分享海报（与玩家自己生成的完全一致） */}
+      {showPoster && comic && comic.activityKey && (
+        <ComicPoster
+          title={comic.eventTitle}
+          userName={comic.userName}
+          venue={comic.venue ?? undefined}
+          activityKey={comic.activityKey}
+          badgeTitle={comic.badgeTitle ?? undefined}
+          badgeSummary={comic.badgeSummary ?? undefined}
+          reflection={comic.reflection ?? undefined}
+          panels={comic.panels.map((p) => ({ imageUrl: p.imageUrl, narration: p.narration }))}
+          onClose={() => setShowPoster(false)}
+        />
+      )}
+    </>
   );
 }
 

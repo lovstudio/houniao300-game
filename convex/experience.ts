@@ -458,6 +458,7 @@ export const experienceComic = query({
       avatarPreset: profile?.avatarPreset ?? null,
       avatarUrl: profile?.avatarStorageId ? await ctx.storage.getUrl(profile.avatarStorageId) : null,
       eventTitle: event?.title ?? '',
+      venue: event?.hostName ?? null,
       activityKey: event?.activityKey ?? null,
       badgeTitle: badge?.title ?? null,
       badgeSummary: badge?.summary ?? null,
