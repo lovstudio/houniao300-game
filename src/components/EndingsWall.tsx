@@ -138,6 +138,27 @@ function ComicLightbox({
                 )}
               </div>
 
+              {/* 直接显示的扫码深链：看到这条连环画即可扫码玩同款，无需多点一步 */}
+              {comic.activityKey && (
+                <div className="mt-4 flex items-center gap-4 border-2 border-clay-700 bg-brown-900 px-5 py-4">
+                  <div className="shrink-0 rounded p-2" style={{ background: SAND }}>
+                    <QRCodeSVG
+                      value={`${window.location.origin}/?exp=${encodeURIComponent(comic.activityKey)}`}
+                      size={96}
+                      fgColor={INK}
+                      bgColor={SAND}
+                      level="M"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-display text-base text-clay-100">扫码玩同款连环画</p>
+                    <p className="mt-1 text-sm leading-relaxed text-brown-300">
+                      手机扫一扫，立刻开启这场活动属于你自己的结局
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* 生成含二维码的分享海报（复用玩家自己的 ComicPoster） */}
               {comic.activityKey && comic.panels.length > 0 && (
                 <button
