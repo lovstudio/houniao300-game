@@ -315,24 +315,33 @@ body {
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
 }
 
-/* 印章式 tab */
+/* 印章式 tab（浅纸卷签） */
 .sand-tab {
   position: relative;
   font-family: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
   letter-spacing: 2px;
   border-radius: 7px 7px 3px 3px;
   transition: 0.18s;
-  color: #cdb088;
-  background: linear-gradient(180deg, rgba(70, 48, 30, 0.7), rgba(44, 30, 18, 0.6));
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
+  color: #7c5f42;
+  background: linear-gradient(180deg, #e9d8b4, #dcc89f);
+  box-shadow: 0 0 0 1px #cbb287 inset, 0 2px 0 rgba(0, 0, 0, 0.06);
 }
 .sand-tab:hover {
-  color: #f0dcb6;
+  color: var(--sand-clay-deep);
+  transform: translateY(-1px);
 }
 .sand-tab-on {
   color: #fff1de;
   background: linear-gradient(180deg, var(--sand-seal), #8e3320);
-  box-shadow: 0 0 0 1px rgba(255, 210, 180, 0.3) inset, 0 3px 8px rgba(140, 40, 20, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 210, 180, 0.3) inset, 0 3px 8px rgba(140, 40, 20, 0.4);
+}
+.sand-tab-on::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(255, 220, 190, 0.4);
+  border-radius: 5px 5px 2px 2px;
+  pointer-events: none;
 }
 
 /* 描金内框（卷/札通用） */
