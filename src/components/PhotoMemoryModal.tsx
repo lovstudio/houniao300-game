@@ -102,6 +102,7 @@ export default function PhotoMemoryModal({
   const [submitting, setSubmitting] = useState(false); // 上传+建记录的短暂请求
   const [lastMemoryId, setLastMemoryId] = useState<Id<'photoMemories'> | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null); // 点击查看大图
 
   const generateUploadUrl = useMutation(api.photoMemories.generateUploadUrl);
   const createPhotoMemory = useMutation(api.photoMemories.createPhotoMemory);
@@ -161,11 +162,14 @@ export default function PhotoMemoryModal({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // 看大图时，Esc 先关大图，不关整个弹窗。
+      if (viewerUrl) setViewerUrl(null);
+      else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, open]);
+  }, [onClose, open, viewerUrl]);
 
   useEffect(() => {
     return () => {
@@ -280,7 +284,14 @@ export default function PhotoMemoryModal({
               <div className="overflow-hidden border-2 border-brown-700 bg-brown-800">
                 <div className="aspect-square bg-brown-900">
                   {generatedUrl ? (
-                    <img src={generatedUrl} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setViewerUrl(generatedUrl)}
+                      className="block h-full w-full"
+                      title="点击查看大图"
+                    >
+                      <img src={generatedUrl} alt="" className="h-full w-full object-cover" />
+                    </button>
                   ) : previewUrl ? (
                     <div className="relative h-full w-full">
                       <img
@@ -426,6 +437,7 @@ export default function PhotoMemoryModal({
               empty="还没有照片记忆。"
               canToggle
               onToggle={toggleShared}
+              onView={setViewerUrl}
             />
           )}
 
@@ -434,10 +446,33 @@ export default function PhotoMemoryModal({
               items={shared}
               loading={shared === undefined}
               empty="还没有公开的照片记忆。"
+              onView={setViewerUrl}
             />
           )}
         </div>
       </div>
+
+      {/* 点击查看大图：完整展示（object-contain，不裁切），点背景/✕/Esc 关闭 */}
+      {viewerUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setViewerUrl(null)}
+        >
+          <img
+            src={viewerUrl}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setViewerUrl(null)}
+            className="absolute right-4 top-4 rounded border-2 border-white/40 bg-black/40 px-3 py-1.5 text-sm text-white hover:border-white"
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -471,12 +506,14 @@ function MemoryGrid({
   empty,
   canToggle = false,
   onToggle,
+  onView,
 }: {
   items: PhotoMemoryItem[] | undefined;
   loading: boolean;
   empty: string;
   canToggle?: boolean;
   onToggle?: (item: PhotoMemoryItem) => Promise<void>;
+  onView?: (url: string) => void;
 }) {
   if (loading) return <div className="flex h-48 items-center justify-center text-brown-300">翻找相册中…</div>;
   if (!items || items.length === 0) {
@@ -488,7 +525,21 @@ function MemoryGrid({
         <article key={item._id} className="overflow-hidden border-2 border-brown-700 bg-brown-800">
           <div className="aspect-square bg-brown-900">
             {item.imageUrl ? (
-              <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => onView?.(item.imageUrl as string)}
+                className="group relative block h-full w-full"
+                title="点击查看大图"
+              >
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  className="h-full w-full object-cover transition group-hover:opacity-90"
+                />
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
+                  查看大图
+                </span>
+              </button>
             ) : (
               <div className="flex h-full items-center justify-center text-brown-400">图片读取中</div>
             )}
