@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Avatar, AVATAR_PRESETS, DEFAULT_PRESET } from '../lib/avatars';
 import { Gender } from '../lib/identity';
 import clsx from 'clsx';
+import SandText, { type SandTextHandle } from './SandText.tsx';
 
 type AvatarChoice =
   | { kind: 'preset'; preset: string }
@@ -27,6 +28,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const headingRef = useRef<SandTextHandle>(null);
   const canSave = !!name.trim() && !!gender && !saving;
 
   const generate = async () => {
@@ -42,6 +44,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
 
   const finish = async () => {
     if (!canSave || !gender) return;
+    headingRef.current?.scatter(); // 把名字写进沙里：标题散成沙作为提交反馈
     setSaving(true);
     try {
       await save({
@@ -62,18 +65,24 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
 
   const serif = '"Noto Serif SC","Songti SC",serif';
   const inputCls =
-    'w-full bg-transparent border-0 border-b border-[rgba(44,38,32,0.22)] py-2 text-[15px] text-[#2c2620] outline-none transition-colors placeholder:text-[#a89e8d] focus:border-[#b0563a]';
+    'sand-underline w-full bg-transparent border-0 text-[15px] text-[#2c2620] outline-none placeholder:text-[#a89e8d]';
 
   return (
     <div className="mx-auto w-full max-w-[400px] text-left" style={{ fontFamily: serif, color: '#2c2620' }}>
-      {/* 表头 */}
+      {/* 表头：沙粒「登记成为候鸟」，提交时散成沙 */}
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
         <Avatar url={previewUrl} preset={previewPreset} size="lg" />
-        <div>
-          <h2 className="text-[19px] font-medium tracking-[0.16em]" style={{ textIndent: '0.16em' }}>
-            登记成为候鸟
-          </h2>
-          <p className="mt-1 text-[12px] tracking-[0.04em] text-[#7a7063]">
+        <div className="flex flex-col items-center">
+          <h2 className="sr-only">登记成为候鸟</h2>
+          <SandText
+            ref={headingRef}
+            text="登记成为候鸟"
+            tracking={0.16}
+            fontScale={0.66}
+            settleMs={1600}
+            className="h-[34px] w-[248px]"
+          />
+          <p className="mt-2 text-[12px] tracking-[0.04em] text-[#7a7063]">
             先创建你的身份，整座候鸟沙城通用
           </p>
         </div>
