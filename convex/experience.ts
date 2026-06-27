@@ -588,7 +588,14 @@ async function genImageSafe(
 }
 
 // 生成首格（导演 + 文生图），供两个入口复用。
-async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'>, event: Doc<'events'>) {
+// referenceBlob 存在时（用户上传过该作品的风格化照片记忆），首格以其为参考做 image edit，
+// 让主角就是用户本人的沙雕化形象；该首格图再锁成 firstPanelStorageId，后续每格沿用，全程锁脸。
+async function generateFirstPanel(
+  ctx: ActionCtx,
+  experienceId: Id<'experiences'>,
+  event: Doc<'events'>,
+  referenceBlob?: Blob,
+) {
   const step = await director(event, [], {
     stepIndex: 0,
     minPanels: event.minPanels,
@@ -605,7 +612,7 @@ async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'
     allowCustom: step.allowCustom ?? true,
     isFinal: false,
   });
-  const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-0-${Date.now()}`);
+  const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-0-${Date.now()}`, referenceBlob);
   if (gen) {
     await ctx.runMutation(internal.experience.setPanelImage, {
       panelId,
@@ -661,7 +668,15 @@ export const startActivityExperience = action({
       userId,
       userName,
     });
-    await generateFirstPanel(ctx, experienceId, event);
+    // 若用户在该作品下上传过风格化照片记忆，取最新一张当首格主角参考（沙雕化的自己出演）。
+    const memoryStorageId = await ctx.runQuery(internal.photoMemory.latestMemoryStorageId, {
+      activityKey: activity.activityKey,
+      userId,
+    });
+    const referenceBlob = memoryStorageId
+      ? (await ctx.storage.get(memoryStorageId as Id<'_storage'>)) ?? undefined
+      : undefined;
+    await generateFirstPanel(ctx, experienceId, event, referenceBlob);
     return experienceId;
   },
 });

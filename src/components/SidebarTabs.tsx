@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAction, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import PlayerDetails from './PlayerDetails';
@@ -29,6 +29,7 @@ import {
 } from '../../data/installations';
 import { enterActivity, activityFromSchedule, activityFromInstallation } from '../lib/activityEnter';
 import { setPanelTabHandler } from '../lib/panelBus';
+import { getAnonUserId } from '../lib/identity';
 import { toast } from 'react-toastify';
 
 type Tab = 'state' | 'chat' | 'schedule' | 'works';
@@ -413,7 +414,119 @@ function InstallationDetail({
         >
           在地图上定位
         </button>
+
+        <PhotoMemorySection installation={installation} />
       </div>
+    </div>
+  );
+}
+
+// 把用户选的图片在浏览器端等比缩放到 max 边长，转成 PNG 字节，避免把整张大图传给 action。
+function fileToScaledPng(file: File, max = 1024): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('canvas 不可用'));
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('图片转换失败'));
+        blob.arrayBuffer().then(resolve).catch(reject);
+      }, 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('图片读取失败'));
+    };
+    img.src = url;
+  });
+}
+
+// 作品「照片记忆」：上传真实照片 → 风格化成沙雕风 → 持久化成公共照片墙，
+// 并在进入该作品专属体验时成为主角参考（沙雕化的自己出演连环画）。
+function PhotoMemorySection({ installation }: { installation: Installation }) {
+  const activityKey = useMemo(
+    () => activityFromInstallation(installation).activityKey,
+    [installation],
+  );
+  const userId = useMemo(getAnonUserId, []);
+  const profile = useQuery(api.profile.getProfile, { userId });
+  const memories = useQuery(api.photoMemory.listMemories, { activityKey });
+  const stylize = useAction(api.photoMemory.stylizePhotoMemory);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // 允许重选同一张
+    if (!file) return;
+    setBusy(true);
+    try {
+      const photo = await fileToScaledPng(file);
+      await stylize({ activityKey, userId, userName: profile?.name ?? '候鸟', photo });
+      toast.success('照片记忆已风格化，进入专属体验时它会成为你的主角');
+    } catch (err) {
+      console.error(err);
+      toast.error('照片记忆生成失败，请重试');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 border-t border-brown-700/40 pt-4">
+      <div className="flex items-baseline justify-between">
+        <h4 className="font-display text-lg text-brown-100">照片记忆</h4>
+        {memories && memories.length > 0 && (
+          <span className="text-xs text-brown-400">{memories.length} 张</span>
+        )}
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-brown-400">
+        上传一张照片，AI 会把你风格化成这件作品的沙雕风，留在它的照片墙上；进入专属体验时，沙雕化的你会成为连环画主角。
+      </p>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => void onPick(event)}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="mt-3 w-full rounded border-2 border-dashed border-brown-700 px-3 py-2.5 text-sm font-bold text-brown-100 hover:border-clay-500 disabled:opacity-50"
+      >
+        {busy ? '正在风格化…' : '上传照片记忆'}
+      </button>
+
+      {memories && memories.length > 0 && (
+        <div className="mt-3 grid grid-cols-3 gap-1.5">
+          {memories.map((m) => (
+            <div
+              key={m._id}
+              className="relative aspect-square overflow-hidden rounded border border-brown-700/50 bg-brown-900/40"
+              title={m.userName}
+            >
+              {m.url ? (
+                <img src={m.url} alt={m.userName} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-[10px] text-brown-500">
+                  绘制中
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
