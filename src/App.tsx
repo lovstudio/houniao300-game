@@ -145,7 +145,7 @@ export default function Home() {
         <div className="font-body">
           <h1 className="text-center text-6xl font-bold font-display game-title">帮助</h1>
           <p>
-            欢迎来到候鸟沙城。游戏同时支持匿名<i>旁观</i>和登录后的<i>互动</i>。
+            欢迎来到《沙之书》。游戏同时支持匿名<i>旁观</i>和登录后的<i>互动</i>。
           </p>
           <h2 className="text-4xl mt-4">旁观</h2>
           <p>
@@ -165,7 +165,7 @@ export default function Home() {
             想和智能体对话，先点击它，再点击"发起对话"，它就会朝你走来。等它走近，对话便会开始，你们就可以互相交谈。你随时可以关闭对话面板或走开来结束对话。对方也可能主动向你发起对话——这时你会在消息面板里看到一个接受按钮。
           </p>
           <p className="mt-4">
-            候鸟沙城同一时间最多只支持 {MAX_HUMAN_PLAYERS} 名真人玩家。如果你闲置超过五分钟，将会被自动移出模拟世界。
+            《沙之书》同一时间最多只支持 {MAX_HUMAN_PLAYERS} 名真人玩家。如果你闲置超过五分钟，将会被自动移出模拟世界。
           </p>
         </div>
       </ReactModal>

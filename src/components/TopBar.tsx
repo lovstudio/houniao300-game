@@ -48,12 +48,23 @@ export default function TopBar({
         {/* brand block */}
         <div className="masthead-in flex min-w-0 items-center gap-2.5">
           <FlockSeal />
-          <h1 className="game-title whitespace-nowrap font-display text-2xl leading-tight tracking-wide sm:text-[2.6rem]">
-            候鸟沙城
-          </h1>
-          <span className="hidden shrink-0 self-center rounded-full bg-brown-700/60 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide tabular-nums text-[#caa979] sm:inline">
-            v{__APP_VERSION__}
-          </span>
+          <div className="flex min-w-0 flex-col leading-none">
+            <div className="flex items-center gap-2">
+              <h1 className="game-title whitespace-nowrap font-display text-2xl leading-tight tracking-wide sm:text-[2.6rem]">
+                沙之书
+              </h1>
+              <span className="hidden shrink-0 self-center rounded-full bg-brown-700/60 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide tabular-nums text-[#caa979] sm:inline">
+                v{__APP_VERSION__}
+              </span>
+            </div>
+            {/* 博尔赫斯式标语：一本没有第一页、也没有最后一页的书 */}
+            <span
+              className="mt-0.5 hidden whitespace-nowrap text-[11px] italic tracking-[0.18em] text-brown-300/80 sm:inline"
+              style={{ fontFamily: '"Noto Serif SC", serif' }}
+            >
+              没有第一页，也没有最后一页
+            </span>
+          </div>
         </div>
 
         {/* control deck — primary action + settings menu */}
