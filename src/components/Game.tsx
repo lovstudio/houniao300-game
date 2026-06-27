@@ -7,8 +7,6 @@ import { useElementSize } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import SettingsMenu from './SettingsMenu';
-import DeckButton from './buttons/DeckButton';
-import { ChevronIcon } from './buttons/DeckIcons';
 import SidebarTabs from './SidebarTabs.tsx';
 import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
 import { api } from '../../convex/_generated/api';
@@ -121,21 +119,18 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 游戏内悬浮控制台：只留「手卷」开关；设置等都收进手卷里。
-              放右上角，与手卷从右侧展开的方向一致。 */}
+          {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
-            <div
-              className="deck-group absolute right-3 z-40 flex items-center gap-1"
-              style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
+            <button
+              className="sand-handle"
+              onClick={() => setPanelOpen(true)}
+              title="展开沙城手卷（状态 / 广播 / 节目单 / 作品 / 设置）"
+              aria-label="展开沙城手卷"
             >
-              <DeckButton
-                icon={<ChevronIcon />}
-                onClick={() => setPanelOpen(true)}
-                title="展开沙城手卷（状态 / 广播 / 节目单 / 作品 / 设置）"
-              >
-                手卷
-              </DeckButton>
-            </div>
+              <span className="seal">卷</span>
+              <span className="glyph">手卷</span>
+              <span className="chev">‹</span>
+            </button>
           )}
 
           {SHOW_DEV_TOOLS && showCollisionOverlay && (
