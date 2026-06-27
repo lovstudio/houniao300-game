@@ -12,6 +12,7 @@ import {
   FreeMoveIcon,
   GearIcon,
   HelpIcon,
+  LeaveIcon,
   LocateIcon,
   PersonIcon,
   PhotoIcon,
@@ -50,6 +51,13 @@ export default function SettingsMenu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // 调试：抹除本地身份与记忆，刷新后生成新 uid → profile 为 null → 强制回到 onboarding 重新登记。
+  const resetIdentity = () => {
+    if (!window.confirm('确认重置？将抹除本地身份，回到首页重新登记。')) return;
+    localStorage.clear();
+    window.location.reload();
+  };
 
   // close on outside click or Escape
   useEffect(() => {
@@ -155,6 +163,12 @@ export default function SettingsMenu({
               active={calibrating}
               onClick={onToggleCalibrating}
               title="采集 GPS↔地图锚点：站到地标点采集 GPS，再点地图对应位置，≥3 组后保存。"
+            />
+            <SettingRow
+              icon={<LeaveIcon />}
+              label="重置身份"
+              onClick={resetIdentity}
+              title="抹除本地身份与记忆，回到首页重新登记。"
             />
           </>
         )}
