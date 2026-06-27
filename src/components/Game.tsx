@@ -168,31 +168,39 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           />
         )}
 
-        {/* 右侧可折叠面板：所有断点统一为浮层抽屉，覆盖在满屏地图之上 */}
+        {/* 右侧可折叠手卷：浮木轴 + 毛笔卷头，统一为浮层抽屉覆盖在满屏地图之上 */}
         <div
           className={clsx(
-            'flex min-h-0 flex-col overflow-hidden bg-brown-800/95 text-brown-100',
+            'flex min-h-0 overflow-hidden bg-brown-800/95 text-brown-100',
             'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm lg:w-96 lg:max-w-none',
-            'border-l-8 border-brown-900 shadow-2xl transition-transform duration-300',
-            'pt-[env(safe-area-inset-top)] lg:pt-0',
+            'shadow-2xl transition-transform duration-300',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
           )}
         >
-          <button
-            onClick={() => setPanelOpen(false)}
-            className="flex shrink-0 items-center gap-1 border-b border-brown-700/50 px-3 py-2 text-sm text-brown-300 hover:text-brown-100"
-          >
-            收起面板
-          </button>
-          <SidebarTabs
-            worldId={worldId}
-            engineId={engineId}
-            game={game}
-            userId={userId}
-            playerId={selectedElement?.id}
-            setSelectedElement={setSelectedElement}
-            onActivate={() => setPanelOpen(true)}
-          />
+          {/* 浮木卷轴左缘 */}
+          <div className="sand-roller" />
+          <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] lg:pt-0">
+            {/* 毛笔卷头 */}
+            <div className="sand-masthead shrink-0">
+              <span className="t">沙城手卷</span>
+              <button
+                onClick={() => setPanelOpen(false)}
+                className="ml-auto text-sm text-brown-300 transition hover:text-brown-100"
+                title="收起手卷"
+              >
+                收起 ›
+              </button>
+            </div>
+            <SidebarTabs
+              worldId={worldId}
+              engineId={engineId}
+              game={game}
+              userId={userId}
+              playerId={selectedElement?.id}
+              setSelectedElement={setSelectedElement}
+              onActivate={() => setPanelOpen(true)}
+            />
+          </div>
         </div>
       </div>
     </>

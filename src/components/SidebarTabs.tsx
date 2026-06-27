@@ -118,20 +118,15 @@ export default function SidebarTabs({
 
   return (
     <div className="flex min-h-0 w-full flex-col">
-      {/* tab bar */}
-      <div className="flex shrink-0 gap-1 border-b-4 border-brown-900 bg-brown-800/95 px-2 pt-2">
+      {/* tab bar — 印章式卷签 */}
+      <div className="flex shrink-0 gap-1.5 border-b-2 border-[#7a5234]/60 bg-gradient-to-b from-[#3a2616]/50 to-transparent px-2.5 pt-2.5">
         {TABS.map((t) => {
           const on = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={
-                'relative -mb-1 rounded-t-md px-3 py-1.5 font-display text-lg leading-none tracking-wide transition ' +
-                (on
-                  ? 'bg-clay-700 text-white shadow-[inset_0_2px_0_rgba(255,255,255,0.18)]'
-                  : 'bg-brown-900/40 text-brown-200 hover:bg-brown-700/60')
-              }
+              className={'sand-tab relative -mb-0.5 px-3 py-1.5 text-lg ' + (on ? 'sand-tab-on' : '')}
             >
               {t.label}
               {t.id === 'chat' && <ChatDot worldId={worldId} />}
@@ -757,7 +752,7 @@ function StateTab({
             key={s.k}
             className="rounded-lg border border-brown-700/50 bg-brown-700/30 px-3 py-2.5"
           >
-            <div className="font-display text-3xl leading-none text-[#e4b58c]">{s.v}</div>
+            <div className="font-num text-4xl font-semibold leading-none text-[#e4b58c]">{s.v}</div>
             <div className="mt-1 text-xs text-brown-300">{s.k}</div>
           </div>
         ))}
