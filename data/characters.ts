@@ -117,5 +117,6 @@ export const characters = [
   },
 ];
 
-// Characters move at 4 tiles per second for a responsive local game feel.
-export const movementSpeed = 4;
+// 8 tiles/sec on the 128x96 / 16px grid == the prior 4 tiles/sec on 64x48 / 32px
+// (both 128 px/sec). Keep in sync with PixiGame LOCAL_PLAYER_SPEED_TILES_PER_SECOND.
+export const movementSpeed = 8;

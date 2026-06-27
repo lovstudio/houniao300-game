@@ -297,5 +297,5 @@ export function tilePositionBlockedBySolidGeometry(
 }
 
 export function sandCityGeometryControlsCollision(mapWidth: number, mapHeight: number) {
-  return mapWidth === 64 && mapHeight === 48;
+  return mapWidth === 128 && mapHeight === 96;
 }

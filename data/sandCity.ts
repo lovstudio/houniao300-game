@@ -13,13 +13,17 @@ import {
 } from './sandCityGeometry';
 
 export const tilesetpath = gentle.tilesetpath;
-export const tiledim = gentle.tiledim;
-export const screenxtiles = 64;
-export const screenytiles = 48;
+// 128x96 collision grid at 16px/tile keeps the world a constant 2048x1536px
+// (was 64x48 @ 32px), doubling collision precision so thin barriers ~1.5 tiles
+// apart no longer merge. World pixel size, viewport, and 32px sprites are
+// unchanged; only tile-denominated rates are rescaled (see movementSpeed etc.).
+export const tiledim = 16;
+export const screenxtiles = 128;
+export const screenytiles = 96;
 export const tilesetpxw = gentle.tilesetpxw;
 export const tilesetpxh = gentle.tilesetpxh;
-export const mapwidth = 64;
-export const mapheight = 48;
+export const mapwidth = 128;
+export const mapheight = 96;
 
 const emptyLayer = () =>
   Array.from({ length: mapwidth }, () => Array.from({ length: mapheight }, () => -1));

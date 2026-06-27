@@ -29,10 +29,11 @@ import { Location, playerLocation } from '../../convex/aiTown/location.ts';
 const MAP_SOURCE_WIDTH = 1703;
 const MAP_SOURCE_HEIGHT = 1279;
 const KEYBOARD_MOVE_REPEAT_MS = 180;
-const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 4;
+// Tile-denominated values doubled for the 128x96 / 16px grid (see data/sandCity.ts).
+const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 8;
 const MAX_OPTIMISTIC_PATH_LENGTH = 2;
-const SERVER_SNAP_DISTANCE_TILES = 0.75;
-const SERVER_SETTLE_DISTANCE_TILES = 0.05;
+const SERVER_SNAP_DISTANCE_TILES = 1.5;
+const SERVER_SETTLE_DISTANCE_TILES = 0.1;
 const SERVER_SETTLE_LERP = 0.08;
 const SERVER_CATCHUP_GRACE_MS = 2500;
 const MOVEMENT_KEYS = new Set([

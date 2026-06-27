@@ -22,7 +22,8 @@ import {
 import { INSTALLATIONS, type Installation } from '../../data/installations';
 import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
 
-const TILE = 32;
+// Must match data/sandCity.ts tiledim: 128 tiles * 16px = 2048px world width.
+const TILE = 16;
 const SOURCE_WIDTH = 1703;
 const SOURCE_HEIGHT = 1279;
 
