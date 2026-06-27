@@ -90,31 +90,29 @@ export default function Game({
         {/* Game area（移动端占满全屏） */}
         <div className="relative min-h-0 min-w-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <div className="absolute inset-0">
-            <div className="container">
-              <Stage width={width} height={height} options={{ backgroundColor: 0x7ab5ff }}>
-                {/* Re-propagate context because contexts are not shared between renderers.
+            <Stage width={width} height={height} options={{ backgroundColor: 0x181425 }}>
+              {/* Re-propagate context because contexts are not shared between renderers.
 https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-531549215 */}
-                <ConvexProvider client={convex}>
-                  <PixiGame
-                    userId={userId}
-                    game={game}
-                    worldId={worldId}
-                    engineId={engineId}
-                    width={width}
-                    height={height}
-                    controlMode={controlMode}
-                    cameraFollow={cameraFollow}
-                    onToggleControlMode={onToggleControlMode}
-                    onToggleCameraFollow={onToggleCameraFollow}
-                    onSetCameraFollow={onSetCameraFollow}
-                    onEnterVenueInterior={onEnterVenueInterior}
-                    showCollisionOverlay={showCollisionOverlay}
-                    historicalTime={historicalTime}
-                    setSelectedElement={setSelectedElement}
-                  />
-                </ConvexProvider>
-              </Stage>
-            </div>
+              <ConvexProvider client={convex}>
+                <PixiGame
+                  userId={userId}
+                  game={game}
+                  worldId={worldId}
+                  engineId={engineId}
+                  width={width}
+                  height={height}
+                  controlMode={controlMode}
+                  cameraFollow={cameraFollow}
+                  onToggleControlMode={onToggleControlMode}
+                  onToggleCameraFollow={onToggleCameraFollow}
+                  onSetCameraFollow={onSetCameraFollow}
+                  onEnterVenueInterior={onEnterVenueInterior}
+                  showCollisionOverlay={showCollisionOverlay}
+                  historicalTime={historicalTime}
+                  setSelectedElement={setSelectedElement}
+                />
+              </ConvexProvider>
+            </Stage>
           </div>
           {/* 游戏内悬浮控制台：加入世界 / 设置 / 照片记忆 / 帮助 —— 所有交互都在游戏内部 */}
           <div

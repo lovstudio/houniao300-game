@@ -24,7 +24,7 @@ export function viewportMinScale(
     props.screenWidth / props.worldWidth,
     props.screenHeight / props.worldHeight,
   );
-  return Math.min(3, Math.max(0.05, fitWorldScale * 0.96));
+  return Math.min(3, Math.max(0.05, fitWorldScale));
 }
 
 // https://davidfig.github.io/pixi-viewport/jsdoc/Viewport.html
