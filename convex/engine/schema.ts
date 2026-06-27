@@ -51,6 +51,9 @@ export const engine = v.object({
 export type Engine = Infer<typeof engine>;
 
 export const engineTables = {
-  inputs: defineTable(input).index('byInputNumber', ['engineId', 'number']),
+  inputs: defineTable(input)
+    .index('byInputNumber', ['engineId', 'number'])
+    // 按 handler 名查询，避免按引擎全表扫 inputs（该表会随运行时长无限增长）。
+    .index('byName', ['engineId', 'name']),
   engines: defineTable(engine),
 };
