@@ -13,6 +13,7 @@ import {
   GearIcon,
   HelpIcon,
   PersonIcon,
+  PhotoIcon,
   ShrinkIcon,
 } from './buttons/DeckIcons';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
@@ -26,6 +27,7 @@ export default function SettingsMenu({
   onToggleCameraFollow,
   onToggleFullscreen,
   onToggleCollisionOverlay,
+  onOpenPhotoMemory,
   onHelp,
 }: {
   controlMode: 'player' | 'camera';
@@ -36,6 +38,7 @@ export default function SettingsMenu({
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
   onToggleCollisionOverlay: () => void;
+  onOpenPhotoMemory: () => void;
   onHelp: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -67,6 +70,15 @@ export default function SettingsMenu({
       {/* panel stays mounted so MusicButton keeps its state + `m` shortcut */}
       <div className={clsx('settings-pop', open ? 'settings-pop-open' : 'settings-pop-closed')}>
         <div className="settings-section">世界</div>
+        <SettingRow
+          icon={<PhotoIcon />}
+          label="照片记忆"
+          onClick={() => {
+            setOpen(false);
+            onOpenPhotoMemory();
+          }}
+          title="上传照片并查看记忆相册"
+        />
         <FreezeButton />
         <MusicButton />
 

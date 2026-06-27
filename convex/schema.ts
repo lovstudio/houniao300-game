@@ -81,6 +81,28 @@ export default defineSchema({
     .index('userId', ['userId'])
     .index('experienceId', ['experienceId']),
 
+  // 玩家上传真实照片后生成的「沙之书」风格记忆。
+  // shared=true 时进入公共相册与实时通知流；原图与生成图都自动持久化。
+  photoMemories: defineTable({
+    userId: v.string(),
+    userName: v.string(),
+    title: v.string(),
+    sourceType: v.union(v.literal('photo'), v.literal('video')),
+    originalStorageId: v.string(),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.string()),
+    activityKey: v.optional(v.string()),
+    activityTitle: v.optional(v.string()),
+    venue: v.optional(v.string()),
+    contextLabel: v.optional(v.string()),
+    shared: v.boolean(),
+    sharedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('userId', ['userId', 'createdAt'])
+    .index('shared', ['shared', 'createdAt']),
+
   messages: defineTable({
     conversationId,
     messageUuid: v.string(),

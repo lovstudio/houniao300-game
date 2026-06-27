@@ -65,6 +65,14 @@ export const CameraIcon = () => (
   </svg>
 );
 
+export const PhotoIcon = () => (
+  <svg {...base} aria-hidden>
+    <path d="M4 5h16v14H4z" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="m4 16 4.5-4.5L13 16l2.5-2.5L20 18" />
+  </svg>
+);
+
 export const FollowIcon = () => (
   <svg {...base} aria-hidden>
     <circle cx="12" cy="12" r="3" />
