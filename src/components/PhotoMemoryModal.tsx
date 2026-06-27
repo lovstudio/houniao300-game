@@ -46,6 +46,7 @@ type PhotoMemoryItem = {
   userName: string;
   title: string;
   imageUrl: string | null;
+  images: string[]; // 这条记忆的每一张生成图（所有就绪轮），按 index 顺序
   originalUrl: string | null;
   shared: boolean;
   createdAt: number;
@@ -688,31 +689,52 @@ function MemoryGrid({
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
         <article key={item._id} className="overflow-hidden border-2 border-brown-700 bg-brown-800">
-          <div className="aspect-square bg-brown-900">
-            {item.imageUrl ? (
-              <button
-                type="button"
-                onClick={() => onView?.(item.imageUrl as string)}
-                className="group relative block h-full w-full"
-                title="点击查看大图"
+          <div className="bg-brown-900 p-1.5">
+            {item.images.length ? (
+              <div
+                className={clsx(
+                  'grid gap-1',
+                  item.images.length === 1 ? 'grid-cols-1' : 'grid-cols-3',
+                )}
               >
-                <img
-                  src={item.imageUrl}
-                  alt=""
-                  className="h-full w-full object-cover transition group-hover:opacity-90"
-                />
-                <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">
-                  查看大图
-                </span>
-              </button>
+                {item.images.map((url, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => onView?.(url)}
+                    className="group relative block aspect-square overflow-hidden rounded"
+                    title="点击查看大图"
+                  >
+                    <img
+                      src={url}
+                      alt=""
+                      className="h-full w-full object-cover transition group-hover:opacity-90"
+                    />
+                    {item.images.length > 1 && (
+                      <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/55 px-1 text-[10px] text-white">
+                        {i + 1}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-brown-400">图片读取中</div>
+              <div className="flex aspect-square items-center justify-center text-brown-400">
+                图片读取中
+              </div>
             )}
           </div>
           <div className="space-y-2 p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="truncate font-display text-lg text-brown-100">{item.title}</h3>
+                <h3 className="truncate font-display text-lg text-brown-100">
+                  {item.title}
+                  {item.images.length > 1 && (
+                    <span className="ml-1.5 align-middle text-xs text-brown-400">
+                      {item.images.length} 版
+                    </span>
+                  )}
+                </h3>
                 <p className="truncate text-xs text-brown-300">
                   {item.userName} · {formatDate(item.createdAt)}
                 </p>
