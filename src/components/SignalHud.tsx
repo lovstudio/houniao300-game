@@ -2,7 +2,8 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { useGeolocation, gpsSignalBars, type GeoStatus } from '../hooks/useGeolocation';
 import { useNetworkStatus, networkSignalBars } from '../hooks/useNetworkStatus';
-import { VENUE_CALIBRATION, isCalibrated } from '../lib/gps';
+import { useCalibration } from '../hooks/useCalibration';
+import { isCalibrated } from '../lib/gps';
 
 // 三格信号条。bars=0 全灰（无信号）。
 function SignalBars({ bars, muted }: { bars: 0 | 1 | 2 | 3; muted?: boolean }) {
@@ -52,11 +53,12 @@ export default function SignalHud() {
   const [expanded, setExpanded] = useState(false);
   const geo = useGeolocation(gpsEnabled);
   const net = useNetworkStatus();
+  const { calibration } = useCalibration();
 
   const gpsBars = geo.status === 'active' ? gpsSignalBars(geo.reading?.accuracy) : 0;
   const gpsActive = geo.status === 'active';
   const netBars = networkSignalBars(net);
-  const calibrated = isCalibrated(VENUE_CALIBRATION);
+  const calibrated = isCalibrated(calibration);
 
   return (
     <div className="pointer-events-auto absolute left-2 top-2 z-30 select-none text-brown-200">

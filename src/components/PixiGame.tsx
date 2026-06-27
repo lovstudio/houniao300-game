@@ -14,7 +14,12 @@ import { DebugPath } from './DebugPath.tsx';
 import { DebugCollisionOverlay } from './DebugCollisionOverlay.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
-import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
+import {
+  setMapFocusHandler,
+  setMapFocusTileHandler,
+  isMapTapCaptureActive,
+  captureMapTap,
+} from '../lib/mapFocus.ts';
 import {
   sandCityGeometryControlsCollision,
   tilePositionBlockedBySolidGeometry,
@@ -195,9 +200,6 @@ export const PixiGame = (props: {
         return;
       }
     }
-    if (!humanPlayerId) {
-      return;
-    }
     const viewport = viewportRef.current;
     if (!viewport) {
       return;
@@ -208,6 +210,17 @@ export const PixiGame = (props: {
       x: gameSpacePx.x / tileDim,
       y: gameSpacePx.y / tileDim,
     };
+    // 标定模式：把点击点换算成航拍源坐标交给标定面板，不移动角色。
+    if (isMapTapCaptureActive()) {
+      captureMapTap(
+        (gameSpaceTiles.x / props.game.worldMap.width) * MAP_SOURCE_WIDTH,
+        (gameSpaceTiles.y / props.game.worldMap.height) * MAP_SOURCE_HEIGHT,
+      );
+      return;
+    }
+    if (!humanPlayerId) {
+      return;
+    }
     const roundedTiles = {
       x: Math.floor(gameSpaceTiles.x),
       y: Math.floor(gameSpaceTiles.y),
