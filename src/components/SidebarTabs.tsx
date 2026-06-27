@@ -27,7 +27,7 @@ import {
   type Installation,
   type InstallationZone,
 } from '../../data/installations';
-import { enterActivity, activityFromSchedule } from '../lib/activityEnter';
+import { enterActivity, activityFromSchedule, activityFromInstallation } from '../lib/activityEnter';
 import { setPanelTabHandler } from '../lib/panelBus';
 import { toast } from 'react-toastify';
 
@@ -412,8 +412,14 @@ function InstallationDetail({
           </p>
         )}
         <button
-          onClick={onLocate}
+          onClick={() => enterActivity(activityFromInstallation(installation))}
           className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
+        >
+          进入这个作品的专属体验
+        </button>
+        <button
+          onClick={onLocate}
+          className="mt-2 w-full rounded border-2 border-brown-700 px-3 py-2.5 text-base font-bold text-brown-100 hover:border-clay-500"
         >
           在地图上定位
         </button>
