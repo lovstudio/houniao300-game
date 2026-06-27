@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAction, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -48,6 +48,22 @@ export default function Experience({
   );
 }
 
+// 勋章墙里一条勋章（activityBadges 返回的元素结构）。
+type ActivityBadge = {
+  _id: string;
+  experienceId: Id<'experiences'>;
+  userId: string;
+  userName: string;
+  title: string;
+  summary: string;
+  reflection?: string | null;
+  awardedAt: number;
+  avatarPreset?: string | null;
+  avatarUrl?: string | null;
+  endingImageUrl?: string | null;
+  endingNarration?: string;
+};
+
 // ---------- 活动介绍 + 开始 + 本活动勋章墙 ----------
 function ActivityIntro({
   activity,
@@ -71,6 +87,7 @@ function ActivityIntro({
   const badges = useQuery(api.experience.activityBadges, { activityKey: activity.activityKey });
   const start = useAction(api.experience.startActivityExperience);
   const [starting, setStarting] = useState(false);
+  const [openBadge, setOpenBadge] = useState<ActivityBadge | null>(null);
 
   const handleStart = async () => {
     setStarting(true);
@@ -83,57 +100,231 @@ function ActivityIntro({
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-brown-900 px-6 py-8 text-brown-100">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-4 flex items-center justify-between">
+    <div
+      className="exp-intro h-full overflow-y-auto bg-brown-900 text-brown-100"
+      style={{
+        backgroundImage:
+          'radial-gradient(120% 75% at 50% -12%, rgba(204,120,92,0.20), transparent 58%), radial-gradient(70% 55% at 110% 115%, rgba(204,120,92,0.10), transparent 55%)',
+      }}
+    >
+      <style>{`
+        @keyframes expRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        .exp-rise { animation: expRise .55s cubic-bezier(.2,.7,.2,1) both; }
+        @keyframes expFade { from { opacity: 0; } to { opacity: 1; } }
+        .exp-fade { animation: expFade .25s ease both; }
+        @keyframes expPop { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+        .exp-pop { animation: expPop .3s cubic-bezier(.2,.7,.2,1) both; }
+      `}</style>
+
+      <div className="mx-auto max-w-2xl px-6 py-8">
+        {/* 顶部：身份 + 照片记忆 + 返回 */}
+        <div className="exp-rise mb-8 flex items-center justify-between" style={{ animationDelay: '0ms' }}>
           <div className="flex items-center gap-2">
             <Avatar url={avatarUrl} preset={avatarPreset} size="sm" />
             <span className="text-sm text-brown-200">{userName}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="text-sm text-brown-300 underline" onClick={onOpenPhotoMemory}>
+          <div className="flex items-center gap-4">
+            <button
+              className="text-sm text-brown-300 underline-offset-4 transition-colors hover:text-clay-300 hover:underline"
+              onClick={onOpenPhotoMemory}
+            >
               照片记忆
             </button>
-            <button className="text-sm text-brown-300 underline" onClick={onExit}>
+            <button
+              className="text-sm text-brown-300 underline-offset-4 transition-colors hover:text-clay-300 hover:underline"
+              onClick={onExit}
+            >
               返回小镇
             </button>
           </div>
         </div>
 
-        <h1 className="font-display game-title mb-2 text-4xl">{activity.title}</h1>
-        <p className="mb-1 text-brown-200">{activity.theme}</p>
-        {activity.hostName && <p className="mb-4 text-sm text-brown-300">场地 · {activity.hostName}</p>}
-        <p className="mb-6 whitespace-pre-wrap rounded-lg bg-brown-800 p-3 text-sm leading-relaxed text-brown-200">
+        {/* 扉页标题区 */}
+        <div className="exp-rise mb-7" style={{ animationDelay: '70ms' }}>
+          <div className="mb-4 flex items-center gap-3 text-[0.7rem] uppercase tracking-[0.28em] text-clay-300">
+            <span>{activity.category}</span>
+            <span className="h-px flex-1 bg-brown-700" />
+            {activity.hostName && <span className="text-brown-300">场地 · {activity.hostName}</span>}
+          </div>
+          <h1 className="game-title font-display text-4xl leading-tight sm:text-5xl">{activity.title}</h1>
+          <p className="mt-3 border-l-2 border-clay-500 pl-3 text-lg italic text-brown-200">
+            {activity.theme}
+          </p>
+        </div>
+
+        {/* 背景设定：书页质感 */}
+        <p
+          className="exp-rise mb-7 whitespace-pre-wrap border-2 border-brown-700 bg-brown-800/80 p-4 text-sm leading-relaxed text-brown-200 shadow-solid"
+          style={{ animationDelay: '140ms' }}
+        >
           {activity.background}
         </p>
 
+        {/* 开始按钮 */}
         <button
-          className="rounded bg-clay-700 px-5 py-2.5 font-display text-white hover:bg-clay-500 disabled:opacity-50"
+          className="exp-rise group inline-flex items-center gap-2 border-2 border-clay-500 bg-clay-700 px-6 py-3 font-display text-white shadow-solid transition-transform hover:-translate-y-0.5 hover:bg-clay-500 disabled:translate-y-0 disabled:opacity-50"
+          style={{ animationDelay: '210ms' }}
           disabled={starting}
           onClick={() => void handleStart()}
         >
-          {starting ? '正在生成首幕…' : '开始体验'}
+          {starting ? (
+            <>
+              <Spinner /> 正在生成首幕…
+            </>
+          ) : (
+            <>
+              开始体验
+              {/* 纯 CSS chevron，避免引入图标依赖、也不用特殊符号 */}
+              <span className="h-2 w-2 rotate-45 border-r-2 border-t-2 border-current transition-transform group-hover:translate-x-1" />
+            </>
+          )}
         </button>
 
+        {/* 勋章墙 */}
         {badges && badges.length > 0 && (
-          <div className="mt-10">
-            <h2 className="font-display mb-3 text-2xl text-brown-100">
-              本活动勋章墙 · {badges.length} 人完成
-            </h2>
+          <div className="exp-rise mt-12" style={{ animationDelay: '280ms' }}>
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="font-display text-2xl text-brown-100">本活动勋章墙</h2>
+              <span className="h-px flex-1 bg-brown-700" />
+              <span className="text-sm text-brown-300">{badges.length} 人完成</span>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {badges.map((b) => (
-                <div key={b._id} className="flex items-center gap-3 border-2 border-brown-700 bg-brown-800 p-3">
-                  <Avatar url={b.avatarUrl} preset={b.avatarPreset} size="md" />
-                  <div className="min-w-0">
+              {badges.map((b, i) => (
+                <button
+                  key={b._id}
+                  onClick={() => setOpenBadge(b as ActivityBadge)}
+                  style={{ animationDelay: `${320 + i * 45}ms` }}
+                  className="exp-rise group flex items-center gap-3 border-2 border-brown-700 bg-brown-800 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-clay-500 hover:shadow-solid"
+                >
+                  {b.endingImageUrl ? (
+                    <img
+                      src={b.endingImageUrl}
+                      alt=""
+                      className="h-14 w-14 shrink-0 border-2 border-brown-700 object-cover transition-colors group-hover:border-clay-500"
+                    />
+                  ) : (
+                    <Avatar url={b.avatarUrl} preset={b.avatarPreset} size="md" />
+                  )}
+                  <div className="min-w-0 flex-1">
                     <p className="truncate font-display text-brown-100">{b.title}</p>
                     <p className="truncate text-xs text-brown-300">{b.userName}</p>
+                    {b.reflection && (
+                      <p className="mt-0.5 truncate text-xs italic text-brown-400">「{b.reflection}」</p>
+                    )}
                   </div>
-                </div>
+                  <span className="h-2 w-2 shrink-0 self-center rotate-45 border-r-2 border-t-2 border-brown-500 transition-all group-hover:translate-x-0.5 group-hover:border-clay-300" />
+                </button>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {openBadge && <BadgeComicModal badge={openBadge} onClose={() => setOpenBadge(null)} />}
+    </div>
+  );
+}
+
+// ---------- 点击勋章：回看那位玩家的整套连环画 ----------
+function BadgeComicModal({ badge, onClose }: { badge: ActivityBadge; onClose: () => void }) {
+  const data = useQuery(api.experience.experienceComic, { experienceId: badge.experienceId });
+  const panels = data?.panels ?? [];
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="exp-fade fixed inset-0 z-50 grid place-items-center bg-brown-900/90 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="exp-pop flex max-h-[88vh] w-full max-w-3xl flex-col border-4 border-clay-500 bg-brown-800 shadow-solid"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 头部 */}
+        <div className="flex items-start gap-3 border-b-2 border-brown-700 p-4">
+          <Avatar url={badge.avatarUrl} preset={badge.avatarPreset} size="md" />
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-xl leading-tight text-brown-100">{badge.title}</p>
+            <p className="truncate text-sm text-brown-300">{badge.userName}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 border-2 border-brown-700 px-3 py-1.5 text-sm text-brown-200 transition-colors hover:border-clay-500 hover:text-clay-300"
+          >
+            关闭
+          </button>
+        </div>
+
+        {/* 题词 + 总结 */}
+        <div className="border-b-2 border-brown-700 bg-brown-900/40 px-4 py-3">
+          {badge.reflection && (
+            <p className="font-display text-brown-100">「{badge.reflection}」</p>
+          )}
+          <p className="mt-1 text-sm leading-relaxed text-brown-300">{badge.summary}</p>
+        </div>
+
+        {/* 连环画 */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {data === undefined ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-brown-300">
+              <Spinner /> 正在翻开 ta 的连环画…
+            </div>
+          ) : panels.length === 0 ? (
+            <ComicFallback badge={badge} />
+          ) : (
+            <div className="space-y-5">
+              {panels.map((p, i) => (
+                <figure key={i} className="exp-fade" style={{ animationDelay: `${i * 40}ms` }}>
+                  <div className="relative overflow-hidden border-2 border-brown-700 bg-brown-900">
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt="" className="w-full object-cover" />
+                    ) : (
+                      <div className="flex aspect-square items-center justify-center text-brown-500">
+                        （此格无画面）
+                      </div>
+                    )}
+                    <span className="absolute left-0 top-0 bg-brown-900/80 px-1.5 py-0.5 text-xs text-brown-100">
+                      {i + 1}
+                    </span>
+                  </div>
+                  {p.narration && (
+                    <figcaption className="mt-2 text-center text-sm leading-relaxed text-brown-200">
+                      {p.narration}
+                    </figcaption>
+                  )}
+                </figure>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 连环画拉不到时，至少回退展示结局画面。
+function ComicFallback({ badge }: { badge: ActivityBadge }) {
+  return (
+    <div className="space-y-3">
+      {badge.endingImageUrl ? (
+        <img
+          src={badge.endingImageUrl}
+          alt=""
+          className="w-full border-2 border-brown-700 object-cover"
+        />
+      ) : (
+        <div className="flex aspect-square items-center justify-center border-2 border-brown-700 bg-brown-900 text-brown-500">
+          暂无画面
+        </div>
+      )}
+      {badge.endingNarration && (
+        <p className="text-center text-sm leading-relaxed text-brown-200">{badge.endingNarration}</p>
+      )}
     </div>
   );
 }
