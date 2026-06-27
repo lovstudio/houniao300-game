@@ -217,15 +217,19 @@ function tilePositionInSpaceBarrier(
   const point = gridPositionToSourcePoint(position, mapWidth, mapHeight);
   const tileWidth = SOURCE_WIDTH / mapWidth;
   for (const rect of SPACE_BARRIERS) {
-    if (!pointInRect(point, rect, BARRIER_COLLISION_PADDING)) continue;
+    // Gate the vertical span by the tile centre; the horizontal hit is decided
+    // separately so a thin slat is never silently skipped.
+    const withinY =
+      point.y >= rect.y - BARRIER_COLLISION_PADDING &&
+      point.y <= rect.y + rect.height + BARRIER_COLLISION_PADDING;
+    if (!withinY) continue;
 
-    const minColumn = Math.floor(((rect.x - BARRIER_COLLISION_PADDING) / SOURCE_WIDTH) * mapWidth);
-    const maxColumn = Math.floor(
-      ((rect.x + rect.width + BARRIER_COLLISION_PADDING) / SOURCE_WIDTH) * mapWidth,
-    );
-    if (rect.width <= THIN_BARRIER_MAX_WIDTH && maxColumn > minColumn) {
+    if (rect.width <= THIN_BARRIER_MAX_WIDTH) {
+      // Block the single column that contains the slat's centre. Using floor
+      // (not round) keeps it on the column the centre actually falls inside,
+      // otherwise the slat can round onto an empty column and block nothing.
       const centerColumn = clamp(
-        Math.round((rect.x + rect.width / 2) / tileWidth),
+        Math.floor((rect.x + rect.width / 2) / tileWidth),
         0,
         mapWidth - 1,
       );
@@ -233,7 +237,12 @@ function tilePositionInSpaceBarrier(
       continue;
     }
 
-    return true;
+    if (
+      point.x >= rect.x - BARRIER_COLLISION_PADDING &&
+      point.x <= rect.x + rect.width + BARRIER_COLLISION_PADDING
+    ) {
+      return true;
+    }
   }
   return false;
 }
