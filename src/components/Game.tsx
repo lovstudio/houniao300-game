@@ -97,9 +97,12 @@ export default function Game({
   return (
     <>
       {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
-      <div className="fullscreen-game-frame game-frame relative h-full min-h-0 w-full overflow-hidden">
-        {/* Game area：始终满屏，面板浮在其上 */}
-        <div className="absolute inset-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
+      <div className="fullscreen-game-frame game-frame relative h-full min-h-0 w-full overflow-hidden md:grid md:grid-rows-[1fr] md:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
+        {/* Game area：移动端满屏（面板浮在其上）；md+ 占栅格第一列，被面板压缩 */}
+        <div
+          className="absolute inset-0 overflow-hidden bg-brown-900 md:relative md:inset-auto md:min-h-0 md:min-w-0"
+          ref={gameWrapperRef}
+        >
           <SignalHud />
           {calibrating && <CalibrationPanel />}
           <div className="absolute inset-0">
@@ -130,7 +133,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
             <button
-              className="sand-handle"
+              className="sand-handle md:hidden"
               onClick={() => setPanelOpen(true)}
               title="展开沙城手卷（状态 / 广播 / 节目单 / 作品 / 设置）"
               aria-label="展开沙城手卷"
@@ -157,7 +160,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
         {/* 移动端抽屉遮罩（桌面端不遮挡地图，靠面板内的收起按钮关闭） */}
         {panelOpen && (
           <div
-            className="fixed inset-0 z-[55] bg-black/50 lg:hidden"
+            className="fixed inset-0 z-[55] bg-black/50 md:hidden"
             onClick={() => setPanelOpen(false)}
           />
         )}
@@ -166,14 +169,16 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
         <div
           className={clsx(
             'sand-paper-bg flex min-h-0 overflow-hidden text-[#2a1c14]',
-            'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm lg:w-96 lg:max-w-none',
-            'shadow-2xl transition-transform duration-300',
+            'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm',
+            'md:static md:inset-auto md:z-auto md:w-full md:max-w-none',
+            'shadow-2xl transition-transform duration-300 md:shadow-none md:transition-none',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
+            'md:translate-x-0',
           )}
         >
           {/* 浮木卷轴左缘 */}
           <div className="sand-roller" />
-          <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] lg:pt-0">
+          <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] md:pt-0">
             {/* 毛笔卷头：卷名居中 + 副题；设置/收起为右上角墨色小图标 */}
             <div className="sand-masthead shrink-0">
               <span className="t">沙城手卷</span>
@@ -196,7 +201,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                 />
                 <button
                   onClick={() => setPanelOpen(false)}
-                  className="sand-icon-btn"
+                  className="sand-icon-btn md:hidden"
                   title="收起手卷"
                   aria-label="收起手卷"
                 >
