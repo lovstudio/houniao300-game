@@ -148,21 +148,21 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             <SandText
               ref={lyricRef}
               text={LYRIC[lyric]}
-              weight={500}
-              fontScale={0.72}
-              tracking={0.2}
+              weight={600}
+              fontScale={0.82}
+              tracking={0.18}
               settleMs={1100}
-              color="#7a7163"
-              className="h-[28px] w-[230px]"
+              color="#574f43"
+              className="h-[40px] w-[320px]"
             />
             <div
-              className="mt-2"
+              className="mt-2.5"
               style={{
                 fontFamily: serif,
-                fontSize: '10px',
-                letterSpacing: '0.14em',
+                fontSize: '12px',
+                letterSpacing: '0.12em',
                 color: INK_SOFT,
-                opacity: 0.5,
+                opacity: 0.78,
                 textAlign: 'right',
               }}
             >
