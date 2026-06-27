@@ -95,15 +95,18 @@ export default function PhotoMemoryModal({
 }) {
   const [tab, setTab] = useState<Tab>('upload');
   const [title, setTitle] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [sharePublic, setSharePublic] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [lastMemoryId, setLastMemoryId] = useState<Id<'photoMemories'> | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
 
   const generateUploadUrl = useMutation(api.photoMemories.generateUploadUrl);
   const generatePhotoMemory = useAction(api.photoMemories.generatePhotoMemory);
+  const refinePhotoMemory = useAction(api.photoMemories.refinePhotoMemory);
   const setPhotoMemoryShared = useMutation(api.photoMemories.setPhotoMemoryShared);
   const mine = useQuery(api.photoMemories.listMyPhotoMemories, open ? { userId } : 'skip');
   const shared = useQuery(api.photoMemories.listSharedPhotoMemories, open ? {} : 'skip');
@@ -165,9 +168,21 @@ export default function PhotoMemoryModal({
   const chooseFile = (next: File | undefined) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setLastImageUrl(null);
+    setLastMemoryId(null);
     setFile(next ?? null);
     setPreviewUrl(next ? URL.createObjectURL(next) : null);
     if (next && !title.trim()) setTitle(next.name.replace(/\.[^.]+$/, '').slice(0, 24));
+  };
+
+  // 生成后重置，准备做下一张（已生成的那张已存进「我的相册」）。
+  const resetForNew = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(null);
+    setPreviewUrl(null);
+    setLastImageUrl(null);
+    setLastMemoryId(null);
+    setPrompt('');
+    setTitle('');
   };
 
   const submit = async () => {
@@ -197,13 +212,34 @@ export default function PhotoMemoryModal({
           venue: selectedContext?.venue,
           contextLabel: selectedContext?.contextLabel,
         },
+        userPrompt: prompt.trim() || undefined,
       });
       setLastImageUrl(result.imageUrl);
-      setTab('mine');
+      setLastMemoryId(result.memoryId);
       toast.success(`已生成「${title.trim() || selectedContext?.activityTitle || '沙城照片'}」`);
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : '照片生成失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 生成后按提示词在原图基础上重绘，覆盖同一条记忆。
+  const refine = async () => {
+    if (!lastMemoryId || !prompt.trim() || busy) return;
+    setBusy(true);
+    try {
+      const result = await refinePhotoMemory({
+        memoryId: lastMemoryId,
+        userId,
+        userPrompt: prompt.trim(),
+      });
+      setLastImageUrl(result.imageUrl);
+      toast.success('已按提示词重绘');
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : '重绘失败');
     } finally {
       setBusy(false);
     }
@@ -288,6 +324,20 @@ export default function PhotoMemoryModal({
                   />
                 </div>
                 <div>
+                  <label className="mb-1 block text-sm text-brown-300">
+                    提示词（可选）
+                    {lastMemoryId && <span className="ml-1 text-brown-400">· 改完点重绘即可</span>}
+                  </label>
+                  <textarea
+                    className="w-full resize-none rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-500"
+                    rows={2}
+                    maxLength={280}
+                    value={prompt}
+                    placeholder="想怎么风格化？比如：加上夕阳、戴草帽、更梦幻一些"
+                    onChange={(e) => setPrompt(e.target.value)}
+                  />
+                </div>
+                <div>
                   <label className="mb-1 block text-sm text-brown-300">位置</label>
                   <select
                     className="w-full rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-brown-100"
@@ -303,23 +353,50 @@ export default function PhotoMemoryModal({
                   </select>
                   <p className="mt-1 truncate text-xs text-brown-400">{contextLine}</p>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 rounded border border-brown-700 bg-brown-900/60 p-3 text-sm text-brown-200 hover:border-clay-500">
-                  <input
-                    type="checkbox"
-                    className="rounded border-brown-600 bg-brown-900 text-clay-600"
-                    checked={sharePublic}
-                    onChange={(e) => setSharePublic(e.target.checked)}
-                  />
-                  生成后共享给所有人可见
-                </label>
-                <button
-                  type="button"
-                  disabled={!file || busy}
-                  onClick={() => void submit()}
-                  className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busy ? '正在生成…' : '生成沙之书照片'}
-                </button>
+                {!lastMemoryId && (
+                  <label className="flex cursor-pointer items-center gap-2 rounded border border-brown-700 bg-brown-900/60 p-3 text-sm text-brown-200 hover:border-clay-500">
+                    <input
+                      type="checkbox"
+                      className="rounded border-brown-600 bg-brown-900 text-clay-600"
+                      checked={sharePublic}
+                      onChange={(e) => setSharePublic(e.target.checked)}
+                    />
+                    生成后共享给所有人可见
+                  </label>
+                )}
+
+                {!lastMemoryId ? (
+                  <button
+                    type="button"
+                    disabled={!file || busy}
+                    onClick={() => void submit()}
+                    className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busy ? '正在生成…' : '生成沙之书照片'}
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-brown-400">
+                      已生成并存入「我的相册」。改提示词后可在原图基础上重绘，覆盖这张。
+                    </p>
+                    <button
+                      type="button"
+                      disabled={!prompt.trim() || busy}
+                      onClick={() => void refine()}
+                      className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {busy ? '正在重绘…' : '按提示词重绘'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={resetForNew}
+                      className="w-full rounded border-2 border-brown-700 px-4 py-2.5 text-sm text-brown-100 hover:border-clay-500 disabled:opacity-50"
+                    >
+                      再做一张新的
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

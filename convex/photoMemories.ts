@@ -1,5 +1,13 @@
 import { v } from 'convex/values';
-import { action, internalMutation, internalQuery, mutation, query, QueryCtx } from './_generated/server';
+import {
+  action,
+  ActionCtx,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  QueryCtx,
+} from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { generateImage } from './util/image';
@@ -29,6 +37,7 @@ function buildPrompt(args: {
   activityTitle?: string;
   venue?: string;
   contextLabel?: string;
+  userPrompt?: string;
 }) {
   const context = [
     args.activityTitle ? `festival activity: ${args.activityTitle}` : null,
@@ -43,8 +52,14 @@ function buildPrompt(args: {
     'Preserve the main people, poses, facial direction, camera angle, and recognizable composition of the original photo.',
     'Rebuild the scene as a cinematic sand-sculpture diorama from the 沙之书 world: carved sand figures, granular texture, warm coastal dusk, sea wind, tent lights, miniature festival architecture, subtle magical realism.',
     context ? `Anchor the image to this context: ${context}.` : 'Anchor the image to 候鸟沙城, a temporary coastal festival city made of sand.',
+    // 访客的可选创作指令：在沙之书母题内做调整，但不得违背"保留真人主体/构图"与"无文字"等硬约束。
+    args.userPrompt
+      ? `Honor this creative direction from the visitor while keeping the sand-sculpture style and the people recognizable: ${args.userPrompt}.`
+      : null,
     'Use a refined storybook frame, tactile sand material, golden shadows, and no readable text, watermark, logo, UI, or caption.',
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 async function resolveImageUrl(
@@ -62,6 +77,20 @@ async function resolvePhotoMemory(ctx: QueryCtx, item: Doc<'photoMemories'>) {
     imageUrl: await resolveImageUrl(ctx, item),
     originalUrl: await ctx.storage.getUrl(item.originalStorageId),
   };
+}
+
+// 把生成图优先转存七牛 CDN（imageUrl），失败回退 Convex storage（imageStorageId），绝不漏图。
+async function storeGenerated(
+  ctx: ActionCtx,
+  blob: Blob,
+): Promise<{ imageUrl?: string; imageStorageId?: string }> {
+  try {
+    const unique = `photo-memories/${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    return { imageUrl: await uploadToQiniu(blob, unique) };
+  } catch (e) {
+    console.error('照片记忆七牛上传失败，回退 Convex storage', e);
+    return { imageStorageId: await ctx.storage.store(blob) };
+  }
 }
 
 export const generateUploadUrl = mutation({
@@ -101,6 +130,7 @@ export const generatePhotoMemory = action({
     originalStorageId: v.string(),
     sharePublic: v.boolean(),
     context: contextValidator,
+    userPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ memoryId: Id<'photoMemories'>; imageUrl: string | null }> => {
     const source = await ctx.storage.get(args.originalStorageId);
@@ -112,18 +142,11 @@ export const generatePhotoMemory = action({
       activityTitle: compact(args.context?.activityTitle, 80),
       venue: compact(args.context?.venue, 48),
       contextLabel: compact(args.context?.contextLabel, 80),
+      userPrompt: compact(args.userPrompt, 280),
     });
 
     const generated = await generateImage(prompt, source);
-    let imageUrl: string | undefined;
-    let imageStorageId: string | undefined;
-    try {
-      const unique = `photo-memories/${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      imageUrl = await uploadToQiniu(generated, unique);
-    } catch (e) {
-      console.error('照片记忆七牛上传失败，回退 Convex storage', e);
-      imageStorageId = await ctx.storage.store(generated);
-    }
+    const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
 
     const now = Date.now();
     const memoryId = await ctx.runMutation(internal.photoMemories.insertPhotoMemory, {
@@ -148,6 +171,58 @@ export const generatePhotoMemory = action({
       memoryId,
       imageUrl: imageUrl ?? (imageStorageId ? await ctx.storage.getUrl(imageStorageId) : null),
     };
+  },
+});
+
+export const getOwnedMemory = internalQuery({
+  args: { memoryId: v.id('photoMemories'), userId: v.string() },
+  handler: async (ctx, { memoryId, userId }): Promise<Doc<'photoMemories'> | null> => {
+    const m = await ctx.db.get(memoryId);
+    if (!m || m.userId !== userId) return null;
+    return m;
+  },
+});
+
+export const patchPhotoMemoryImage = internalMutation({
+  args: {
+    memoryId: v.id('photoMemories'),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.string()),
+  },
+  handler: async (ctx, { memoryId, imageUrl, imageStorageId }) => {
+    // imageUrl / imageStorageId 恰有一个有值（新图替换旧图），另一个置空避免取到旧定位。
+    await ctx.db.patch(memoryId, { imageUrl, imageStorageId, updatedAt: Date.now() });
+  },
+});
+
+// 生成后按访客提示词在原图基础上重绘，覆盖同一条记忆（不新增行），保真不漂移。
+export const refinePhotoMemory = action({
+  args: {
+    memoryId: v.id('photoMemories'),
+    userId: v.string(),
+    userPrompt: v.string(),
+  },
+  handler: async (ctx, { memoryId, userId, userPrompt }): Promise<{ imageUrl: string | null }> => {
+    const memory = await ctx.runQuery(internal.photoMemories.getOwnedMemory, { memoryId, userId });
+    if (!memory) throw new Error('照片记忆不存在或无权调整');
+    const source = await ctx.storage.get(memory.originalStorageId);
+    if (!source) throw new Error('原图已不可用，无法继续调整');
+
+    const prompt = buildPrompt({
+      title: memory.title,
+      activityTitle: compact(memory.activityTitle, 80),
+      venue: compact(memory.venue, 48),
+      contextLabel: compact(memory.contextLabel, 80),
+      userPrompt: compact(userPrompt, 280),
+    });
+    const generated = await generateImage(prompt, source);
+    const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
+    await ctx.runMutation(internal.photoMemories.patchPhotoMemoryImage, {
+      memoryId,
+      imageUrl,
+      imageStorageId,
+    });
+    return { imageUrl: imageUrl ?? (imageStorageId ? await ctx.storage.getUrl(imageStorageId) : null) };
   },
 });
 
