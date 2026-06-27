@@ -33,11 +33,11 @@ import { toast } from 'react-toastify';
 
 type Tab = 'state' | 'chat' | 'schedule' | 'works';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'state', label: '状态' },
-  { id: 'chat', label: '广播' },
-  { id: 'schedule', label: '节目单' },
-  { id: 'works', label: '作品' },
+const TABS: { id: Tab; label: string; short: string }[] = [
+  { id: 'state', label: '状态', short: '状' },
+  { id: 'chat', label: '广播', short: '广' },
+  { id: 'schedule', label: '节目单', short: '单' },
+  { id: 'works', label: '作品', short: '作' },
 ];
 
 const TODAY_DAY = (() => {
@@ -118,21 +118,33 @@ export default function SidebarTabs({
 
   return (
     <div className="flex min-h-0 w-full flex-col">
-      {/* tab bar — 印章式卷签（浅纸卷面） */}
-      <div className="flex shrink-0 gap-1.5 border-b border-[#cbb287] bg-gradient-to-b from-[#ecdcba] to-[#e3d2ad] px-2.5 pt-2.5">
+      {/* tab bar — 居中单字印章卷签 */}
+      <div className="flex shrink-0 justify-center gap-2.5 px-2.5 pt-1">
         {TABS.map((t) => {
           const on = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={'sand-tab relative -mb-0.5 px-3 py-1.5 text-lg ' + (on ? 'sand-tab-on' : '')}
+              title={t.label}
+              aria-label={t.label}
+              className={
+                'sand-tab relative grid h-11 w-11 place-items-center text-xl ' +
+                (on ? 'sand-tab-on' : '')
+              }
             >
-              {t.label}
+              {t.short}
               {t.id === 'chat' && <ChatDot worldId={worldId} />}
             </button>
           );
         })}
+      </div>
+
+      {/* 描金菱形分隔 */}
+      <div className="sand-divider shrink-0">
+        <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden>
+          <path d="M6 1 10 6 6 11 2 6Z" fill="currentColor" />
+        </svg>
       </div>
 
       {/* tab content */}

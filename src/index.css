@@ -305,29 +305,78 @@ body {
   background-blend-mode: multiply, normal;
 }
 
-/* 侧栏卷头：干净的深木条 + 描金底线（与浅纸卷身形成层次） */
+/* 侧栏卷头：浅纸、毛笔卷名居中 + 副题（贴合设计稿）。设置/收起为右上角墨色小图标。 */
 .sand-masthead {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 11px 14px;
-  background: linear-gradient(180deg, #4a3320, #382514);
-  border-bottom: 2px solid var(--sand-gold);
-  box-shadow: 0 1px 0 rgba(255, 220, 170, 0.12) inset, 0 3px 8px -2px rgba(0, 0, 0, 0.4);
+  padding: 14px 14px 8px;
 }
 .sand-masthead .t {
   font-family: 'Ma Shan Zheng', cursive;
-  font-size: 23px;
-  letter-spacing: 3px;
+  font-size: 26px;
+  letter-spacing: 4px;
   line-height: 1;
-  color: #f6e8c8;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  color: var(--sand-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 .sand-masthead .sub {
-  font-size: 10px;
-  letter-spacing: 0.26em;
-  color: #c9a86a;
-  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--sand-ink-faint, #9c7e5e);
+  margin-top: 6px;
+}
+.sand-masthead .corner {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 墨色小图标按钮（浅纸上用） */
+.sand-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  color: #6b5238;
+  background: rgba(120, 80, 40, 0.08);
+  box-shadow: 0 0 0 1px rgba(120, 80, 40, 0.18) inset;
+  transition: 0.16s;
+}
+.sand-icon-btn:hover {
+  color: var(--sand-clay-deep);
+  background: rgba(120, 80, 40, 0.16);
+}
+.sand-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* 描金菱形分隔（卷头/tab 之下） */
+.sand-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 18px 4px;
+  color: var(--sand-clay);
+}
+.sand-divider::before,
+.sand-divider::after {
+  content: '';
+  height: 1px;
+  width: 64px;
+  background: linear-gradient(90deg, transparent, #c2a878);
+}
+.sand-divider::after {
+  background: linear-gradient(90deg, #c2a878, transparent);
 }
 
 /* 数据砖：渐变纸砖 + 毛笔角落水印字 */

@@ -32,6 +32,7 @@ export default function SettingsMenu({
   onToggleCalibrating,
   onOpenPhotoMemory,
   onHelp,
+  tone = 'deck',
 }: {
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
@@ -45,6 +46,7 @@ export default function SettingsMenu({
   onToggleCalibrating: () => void;
   onOpenPhotoMemory: () => void;
   onHelp: () => void;
+  tone?: 'deck' | 'ink';
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -68,9 +70,21 @@ export default function SettingsMenu({
 
   return (
     <div ref={ref} className="relative">
-      <DeckButton onClick={() => setOpen((v) => !v)} active={open} title="设置" icon={<GearIcon />}>
-        设置
-      </DeckButton>
+      {tone === 'ink' ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-pressed={open}
+          title="设置"
+          className="sand-icon-btn"
+        >
+          <GearIcon />
+        </button>
+      ) : (
+        <DeckButton onClick={() => setOpen((v) => !v)} active={open} title="设置" icon={<GearIcon />}>
+          设置
+        </DeckButton>
+      )}
 
       {/* panel stays mounted so MusicButton keeps its state + `m` shortcut */}
       <div className={clsx('settings-pop', open ? 'settings-pop-open' : 'settings-pop-closed')}>

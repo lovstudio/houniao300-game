@@ -174,14 +174,13 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           {/* 浮木卷轴左缘 */}
           <div className="sand-roller" />
           <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] lg:pt-0">
-            {/* 毛笔卷头：卷名 + 设置 + 收起 */}
+            {/* 毛笔卷头：卷名居中 + 副题；设置/收起为右上角墨色小图标 */}
             <div className="sand-masthead shrink-0">
-              <div className="flex min-w-0 flex-col">
-                <span className="t">沙城手卷</span>
-                <span className="sub">奉 候 鸟 而 来</span>
-              </div>
-              <div className="ml-auto flex items-center gap-1.5">
+              <span className="t">沙城手卷</span>
+              <span className="sub">奉 候 鸟 而 来</span>
+              <div className="corner">
                 <SettingsMenu
+                  tone="ink"
                   controlMode={controlMode}
                   cameraFollow={cameraFollow}
                   isFullscreen={isFullscreen}
@@ -197,10 +196,13 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                 />
                 <button
                   onClick={() => setPanelOpen(false)}
-                  className="text-sm text-brown-300 transition hover:text-brown-100"
+                  className="sand-icon-btn"
                   title="收起手卷"
+                  aria-label="收起手卷"
                 >
-                  收起 ›
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 6 6 6-6 6" />
+                  </svg>
                 </button>
               </div>
             </div>
