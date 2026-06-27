@@ -81,19 +81,29 @@ export default defineSchema({
     .index('userId', ['userId'])
     .index('experienceId', ['experienceId']),
 
-  // 作品「照片记忆」：访客在某件作品下上传真实照片，风格化成沙雕风后持久化，
-  // 既是该作品的公共照片墙，也会喂给该作品的专属体验当主角参考。
-  // activityKey 复用 activityFromInstallation 生成的 `作品|id|title`。
+  // 玩家上传真实照片后生成的「沙之书」风格记忆。
+  // shared=true 时进入公共相册与实时通知流；原图与生成图都自动持久化。
+  // activityKey 记录拍摄上下文（作品 / 节目），也用于把记忆喂给该作品/活动的专属体验当主角参考。
   photoMemories: defineTable({
-    activityKey: v.string(),
     userId: v.string(),
     userName: v.string(),
-    stylizedStorageId: v.string(), // 风格化沙雕图（Convex storage，作为体验参考 blob 来源）
-    stylizedUrl: v.optional(v.string()), // 七牛 CDN 展示 url（失败回退 getUrl(stylizedStorageId)）
+    title: v.string(),
+    sourceType: v.union(v.literal('photo'), v.literal('video')),
+    originalStorageId: v.string(),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.string()),
+    activityKey: v.optional(v.string()),
+    activityTitle: v.optional(v.string()),
+    venue: v.optional(v.string()),
+    contextLabel: v.optional(v.string()),
+    shared: v.boolean(),
+    sharedAt: v.optional(v.number()),
     createdAt: v.number(),
+    updatedAt: v.number(),
   })
-    .index('activityKey', ['activityKey'])
-    .index('userId_activityKey', ['userId', 'activityKey']),
+    .index('userId', ['userId', 'createdAt'])
+    .index('shared', ['shared', 'createdAt'])
+    .index('activityKey', ['activityKey', 'createdAt']),
 
   messages: defineTable({
     conversationId,
@@ -104,6 +114,21 @@ export default defineSchema({
   })
     .index('conversationId', ['worldId', 'conversationId'])
     .index('messageUuid', ['conversationId', 'messageUuid']),
+
+  // GPS→地图 标定锚点（全场单例，最新一条为准）。由现场操作员用标定工具采集后写入，
+  // 所有玩家共享同一套坐标变换。
+  gpsCalibration: defineTable({
+    anchors: v.array(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+        sourceX: v.number(),
+        sourceY: v.number(),
+        label: v.optional(v.string()),
+      }),
+    ),
+    updatedAt: v.number(),
+  }),
 
   ...agentTables,
   ...aiTownTables,

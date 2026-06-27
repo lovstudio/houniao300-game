@@ -25,6 +25,14 @@
     'Segoe UI Emoji', 'Segoe UI Symbol';
 }
 
+/* 沙之书设计系统：毛笔题字 + 衬线数字 */
+.font-brush {
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
+}
+.font-num {
+  font-family: 'Cormorant Garamond', 'Noto Serif SC', serif;
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -114,8 +122,10 @@ body {
 .deck-group {
   padding: 4px;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(20, 12, 6, 0.5), rgba(20, 12, 6, 0.28));
-  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.08), inset 0 0 0 1px rgba(255, 220, 170, 0.06);
+  /* 作为游戏内浮层时背后没有招牌深色条，底衬需足够不透明，确保在浅色地图上也清晰可读 */
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.86), rgba(20, 12, 6, 0.74));
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.1), inset 0 0 0 1px rgba(255, 220, 170, 0.08),
+    0 2px 10px rgba(20, 12, 6, 0.4);
 }
 .deck-btn {
   display: inline-flex;
@@ -135,7 +145,12 @@ body {
 .deck-btn .deck-ico {
   display: grid;
   place-items: center;
-  opacity: 0.85;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: rgba(255, 240, 220, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 235, 205, 0.22) inset;
+  opacity: 0.95;
 }
 .deck-btn-off {
   background: rgba(255, 236, 200, 0.05);
@@ -169,6 +184,339 @@ body {
     width: 14px;
     height: 14px;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   沙之书 · 沙城手卷 设计系统
+   持久 UI（HUD/侧栏）= 暗色风蚀手卷；弹窗 = 浅羊皮纸手札。
+   共用：陶土火漆 --clay/--seal、毛笔题字、描金线、浮木轴。
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --sand-ink: #2a1c14;
+  --sand-ink-soft: #6b5238;
+  --sand-paper: #f1e3c4;
+  --sand-paper-hi: #faf3df;
+  --sand-clay: #c0654a;
+  --sand-clay-deep: #9c4b34;
+  --sand-gold: #c69a5a;
+  --sand-seal: #ad3f29;
+  --sand-noise: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* 浮木卷轴：贴在侧栏左缘 */
+.sand-roller {
+  width: 14px;
+  flex: none;
+  border-radius: 8px;
+  margin: 12px 0;
+  background: linear-gradient(90deg, #3f2a19, #7a5234 45%, #a9764a 55%, #4e3422);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 8px 18px -6px #000;
+}
+
+/* 收起态把手：贴右缘的浮木卷轴拉手（与手卷同源的世界道具，而非悬浮按钮） */
+.sand-handle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 34px;
+  padding: 14px 0 11px;
+  border: none;
+  cursor: pointer;
+  border-radius: 11px 0 0 11px;
+  background: linear-gradient(90deg, #3a2616, #6b4729 38%, #a9764a 56%, #5a3d27 80%, #3a2616);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 220, 170, 0.18),
+    -2px 0 0 rgba(255, 220, 170, 0.08), 0 10px 26px -8px rgba(0, 0, 0, 0.7);
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.32, 1), filter 0.16s;
+}
+.sand-handle::before,
+.sand-handle::after {
+  /* 卷轴上下端的木栓 */
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: -2px;
+  height: 9px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #2f1d10, #7a5234 55%, #2f1d10);
+}
+.sand-handle::before {
+  top: -4px;
+}
+.sand-handle::after {
+  bottom: -4px;
+}
+.sand-handle:hover {
+  filter: brightness(1.08);
+  transform: translateY(-50%) translateX(-4px);
+}
+.sand-handle:active {
+  transform: translateY(-50%) translateX(-1px);
+}
+.sand-handle .seal {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #ffe2d4;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 15px;
+  background: radial-gradient(circle at 38% 32%, #d98a6e, var(--sand-seal) 62%, #7a2616);
+  box-shadow: 0 0 0 1px rgba(255, 200, 170, 0.4) inset, 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+.sand-handle .glyph {
+  writing-mode: vertical-rl;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 16px;
+  letter-spacing: 4px;
+  color: #f3e3c4;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.sand-handle .chev {
+  font-size: 13px;
+  line-height: 1;
+  color: #e7d3b3;
+  animation: handleHint 2.4s ease-in-out infinite;
+}
+@keyframes handleHint {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateX(-2px);
+    opacity: 1;
+  }
+}
+
+/* 纸面：暖色渐变 + 烘焙进背景的纤维噪点（无 ::after，内容正常压在上面） */
+.sand-paper-bg {
+  background-image: var(--sand-noise),
+    radial-gradient(125% 80% at 28% 8%, #f6ead0, #efe1c2 52%, #e7d6b1 100%);
+  background-size: 170px, cover;
+  background-blend-mode: multiply, normal;
+}
+
+/* 侧栏卷头：浅纸、毛笔卷名居中 + 副题（贴合设计稿）。设置/收起为右上角墨色小图标。 */
+.sand-masthead {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 14px 8px;
+}
+.sand-masthead .t {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 26px;
+  letter-spacing: 4px;
+  line-height: 1;
+  color: var(--sand-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.sand-masthead .sub {
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--sand-ink-faint, #9c7e5e);
+  margin-top: 6px;
+}
+.sand-masthead .corner {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 墨色小图标按钮（浅纸上用） */
+.sand-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  color: #6b5238;
+  background: rgba(120, 80, 40, 0.08);
+  box-shadow: 0 0 0 1px rgba(120, 80, 40, 0.18) inset;
+  transition: 0.16s;
+}
+.sand-icon-btn:hover {
+  color: var(--sand-clay-deep);
+  background: rgba(120, 80, 40, 0.16);
+}
+.sand-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* 描金菱形分隔（卷头/tab 之下） */
+.sand-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 18px 4px;
+  color: var(--sand-clay);
+}
+.sand-divider::before,
+.sand-divider::after {
+  content: '';
+  height: 1px;
+  width: 64px;
+  background: linear-gradient(90deg, transparent, #c2a878);
+}
+.sand-divider::after {
+  background: linear-gradient(90deg, #c2a878, transparent);
+}
+
+/* 数据砖：渐变纸砖 + 毛笔角落水印字 */
+.sand-stat {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  padding: 13px 14px 11px;
+  background: linear-gradient(158deg, #f5e9ca, #e7d4ad);
+  border: 1px solid #d3bd92;
+  box-shadow: 0 6px 14px -10px rgba(38, 24, 12, 0.55), 0 1px 0 rgba(255, 255, 255, 0.45) inset;
+}
+.sand-stat .corner {
+  position: absolute;
+  right: -4px;
+  top: -12px;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 48px;
+  line-height: 1;
+  color: rgba(192, 101, 74, 0.13);
+  pointer-events: none;
+}
+
+/* 印章式 tab（浅纸卷签） */
+.sand-tab {
+  position: relative;
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
+  letter-spacing: 2px;
+  border-radius: 7px 7px 3px 3px;
+  transition: 0.18s;
+  color: #7c5f42;
+  background: linear-gradient(180deg, #e9d8b4, #dcc89f);
+  box-shadow: 0 0 0 1px #cbb287 inset, 0 2px 0 rgba(0, 0, 0, 0.06);
+}
+.sand-tab:hover {
+  color: var(--sand-clay-deep);
+  transform: translateY(-1px);
+}
+.sand-tab-on {
+  color: #fff1de;
+  background: linear-gradient(180deg, var(--sand-seal), #8e3320);
+  box-shadow: 0 0 0 1px rgba(255, 210, 180, 0.3) inset, 0 3px 8px rgba(140, 40, 20, 0.4);
+}
+.sand-tab-on::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(255, 220, 190, 0.4);
+  border-radius: 5px 5px 2px 2px;
+  pointer-events: none;
+}
+
+/* 描金内框（卷/札通用） */
+.sand-gilt {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(198, 154, 90, 0.5);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.sand-gilt::before,
+.sand-gilt::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 0 solid var(--sand-gold);
+}
+.sand-gilt::before {
+  left: -1px;
+  top: -1px;
+  border-left-width: 2px;
+  border-top-width: 2px;
+  border-top-left-radius: 10px;
+}
+.sand-gilt::after {
+  right: -1px;
+  bottom: -1px;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-bottom-right-radius: 10px;
+}
+
+/* 浅羊皮纸手札（弹窗） */
+.sand-letter {
+  position: relative;
+  font-family: 'Noto Serif SC', serif;
+  color: var(--sand-ink);
+  background: linear-gradient(180deg, var(--sand-paper-hi), var(--sand-paper) 42%, #ecdcbb 100%);
+  border: 1px solid #ddc79c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 0 0 1px rgba(255, 255, 255, 0.35) inset,
+    0 26px 60px -18px rgba(20, 12, 6, 0.75);
+}
+.sand-letter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: var(--sand-noise);
+  background-size: 180px;
+  opacity: 0.45;
+  mix-blend-mode: multiply;
+}
+.sand-letter .body {
+  position: relative;
+  z-index: 1;
+}
+.sand-letter h1,
+.sand-letter h2,
+.sand-letter h3 {
+  font-family: 'Ma Shan Zheng', cursive;
+  color: var(--sand-ink);
+}
+.sand-letter p {
+  color: var(--sand-ink-soft);
+}
+
+/* 火漆封印（关闭键） */
+.sand-wax {
+  position: absolute;
+  right: -12px;
+  top: -12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  color: #ffe2d4;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 20px;
+  background: radial-gradient(circle at 38% 32%, #d98a6e, var(--sand-seal) 60%, #7a2616);
+  box-shadow: 0 0 0 1px rgba(255, 200, 170, 0.35) inset, 0 6px 14px -4px rgba(0, 0, 0, 0.6);
+  transition: transform 0.2s;
+}
+.sand-wax:hover {
+  transform: rotate(8deg) scale(1.06);
 }
 
 /* ── Settings popover ───────────────────────────────────── */
@@ -562,3 +910,45 @@ body {
   .splash-fade,
   .splash-rule { animation-duration: 0.4s; }
 }
+
+/* 候鸟300 现场瞬间轮播淡入 */
+@keyframes landingMoment {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.landing-moment {
+  animation: landingMoment 0.9s ease both;
+}
+
+/* 沙粒点阵下划线：呼应「沙之书」的颗粒质感，聚焦时变密、转陶土 */
+.sand-underline {
+  padding-bottom: 9px;
+  background-image: radial-gradient(circle, rgba(44, 38, 32, 0.42) 0.7px, transparent 0.8px);
+  background-size: 6px 2px;
+  background-position: 0 100%;
+  background-repeat: repeat-x;
+  transition: background-image 0.3s ease, background-size 0.3s ease;
+}
+.sand-underline:focus {
+  background-image: radial-gradient(circle, rgba(176, 86, 58, 0.85) 0.9px, transparent 1px);
+  background-size: 4px 2px;
+}
+
+/* ── 《沙之书》标题屏：瑰伟 · 3A 感 ───────────────────────── */
+@keyframes landingBloom {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.92; transform: scale(1.06); }
+}
+.landing-bloom { animation: landingBloom 9s ease-in-out infinite; }
+
+@keyframes ctaPulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.landing-cta { animation: ctaPulse 2.8s ease-in-out infinite; }
+
+@keyframes landingRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.landing-rise { animation: landingRise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }

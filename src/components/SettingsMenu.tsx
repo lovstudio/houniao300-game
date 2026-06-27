@@ -12,7 +12,9 @@ import {
   FreeMoveIcon,
   GearIcon,
   HelpIcon,
+  LocateIcon,
   PersonIcon,
+  PhotoIcon,
   ShrinkIcon,
 } from './buttons/DeckIcons';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
@@ -22,21 +24,29 @@ export default function SettingsMenu({
   cameraFollow,
   isFullscreen,
   showCollisionOverlay,
+  calibrating,
   onToggleControlMode,
   onToggleCameraFollow,
   onToggleFullscreen,
   onToggleCollisionOverlay,
+  onToggleCalibrating,
+  onOpenPhotoMemory,
   onHelp,
+  tone = 'deck',
 }: {
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
   isFullscreen: boolean;
   showCollisionOverlay: boolean;
+  calibrating: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
   onToggleCollisionOverlay: () => void;
+  onToggleCalibrating: () => void;
+  onOpenPhotoMemory: () => void;
   onHelp: () => void;
+  tone?: 'deck' | 'ink';
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -60,13 +70,34 @@ export default function SettingsMenu({
 
   return (
     <div ref={ref} className="relative">
-      <DeckButton onClick={() => setOpen((v) => !v)} active={open} title="设置" icon={<GearIcon />}>
-        设置
-      </DeckButton>
+      {tone === 'ink' ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-pressed={open}
+          title="设置"
+          className="sand-icon-btn"
+        >
+          <GearIcon />
+        </button>
+      ) : (
+        <DeckButton onClick={() => setOpen((v) => !v)} active={open} title="设置" icon={<GearIcon />}>
+          设置
+        </DeckButton>
+      )}
 
       {/* panel stays mounted so MusicButton keeps its state + `m` shortcut */}
       <div className={clsx('settings-pop', open ? 'settings-pop-open' : 'settings-pop-closed')}>
         <div className="settings-section">世界</div>
+        <SettingRow
+          icon={<PhotoIcon />}
+          label="照片记忆"
+          onClick={() => {
+            setOpen(false);
+            onOpenPhotoMemory();
+          }}
+          title="上传照片并查看记忆相册"
+        />
         <FreezeButton />
         <MusicButton />
 
@@ -116,6 +147,14 @@ export default function SettingsMenu({
               active={showCollisionOverlay}
               onClick={onToggleCollisionOverlay}
               title="显示当前路径规划实际不可走区域。"
+            />
+            <SettingRow
+              icon={<LocateIcon />}
+              label="GPS 标定"
+              value={calibrating ? '开' : '关'}
+              active={calibrating}
+              onClick={onToggleCalibrating}
+              title="采集 GPS↔地图锚点：站到地标点采集 GPS，再点地图对应位置，≥3 组后保存。"
             />
           </>
         )}

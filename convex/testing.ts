@@ -12,6 +12,7 @@ import schema from './schema';
 import { DELETE_BATCH_SIZE } from './constants';
 import { kickEngine, startEngine, stopEngine } from './aiTown/main';
 import { insertInput } from './aiTown/insertInput';
+import { Descriptions } from '../data/characters';
 import { fetchEmbedding } from './util/llm';
 import { chatCompletion } from './util/llm';
 import { startConversationMessage } from './agent/conversation';
@@ -56,6 +57,68 @@ export const kick = internalMutation({
   handler: async (ctx) => {
     const { worldStatus } = await getDefaultWorld(ctx.db);
     await kickEngine(ctx, worldStatus.worldId);
+  },
+});
+
+// 按当前 Descriptions 播种 AI agent。直接提交 createAgent 输入，
+// 绕开 init 里会全表扫 inputs 的 shouldCreateAgents（inputs 表已超读取上限）。
+// 前提：agent 已清空（见 wipeAgents），引擎处于 running。
+export const seedAgents = internalMutation({
+  handler: async (ctx) => {
+    const { worldStatus } = await getDefaultWorld(ctx.db);
+    for (let i = 0; i < Descriptions.length; i++) {
+      await insertInput(ctx, worldStatus.worldId, 'createAgent', { descriptionIndex: i });
+    }
+    console.log(`已提交 ${Descriptions.length} 个 createAgent 输入。`);
+  },
+});
+
+// 只清掉 AI agent（保留人类玩家、地图、连环画、照片记忆等）。
+// 配合后续 `init` 按新的 Descriptions 重新播种。
+// 注意：执行前必须先停引擎（testing:stop），否则并发的 saveDiff 会把 agent 写回。
+export const wipeAgents = internalMutation({
+  handler: async (ctx) => {
+    const { worldStatus, engine } = await getDefaultWorld(ctx.db);
+    if (engine.running) {
+      throw new Error(`Engine ${engine._id} 还在运行，请先 \`npx convex run testing:stop\``);
+    }
+    const world = await ctx.db.get(worldStatus.worldId);
+    if (!world) {
+      throw new Error(`World ${worldStatus.worldId} 不存在`);
+    }
+    const agentPlayerIds = new Set(world.agents.map((a) => a.playerId));
+
+    // 删除 agent 自身、其玩家、以及涉及 agent 的对话；人类玩家原样保留。
+    const remainingPlayers = world.players.filter((p) => !agentPlayerIds.has(p.id));
+    const remainingConversations = world.conversations.filter(
+      (c) => !c.participants.some((m) => agentPlayerIds.has(m.playerId)),
+    );
+    await ctx.db.patch(world._id, {
+      agents: [],
+      players: remainingPlayers,
+      conversations: remainingConversations,
+    });
+
+    // 清描述表：所有 agentDescriptions + 被删玩家的 playerDescriptions。
+    const agentDescs = await ctx.db
+      .query('agentDescriptions')
+      .withIndex('worldId', (q) => q.eq('worldId', world._id))
+      .collect();
+    for (const d of agentDescs) {
+      await ctx.db.delete(d._id);
+    }
+    const playerDescs = await ctx.db
+      .query('playerDescriptions')
+      .withIndex('worldId', (q) => q.eq('worldId', world._id))
+      .collect();
+    for (const d of playerDescs) {
+      if (agentPlayerIds.has(d.playerId)) {
+        await ctx.db.delete(d._id);
+      }
+    }
+    console.log(
+      `已清除 ${agentPlayerIds.size} 个 AI；保留 ${remainingPlayers.length} 个玩家、${remainingConversations.length} 段对话。下一步运行 init 重新播种。`,
+    );
   },
 });
 

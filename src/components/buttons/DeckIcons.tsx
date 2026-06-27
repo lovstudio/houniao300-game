@@ -65,6 +65,14 @@ export const CameraIcon = () => (
   </svg>
 );
 
+export const PhotoIcon = () => (
+  <svg {...base} aria-hidden>
+    <path d="M4 5h16v14H4z" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="m4 16 4.5-4.5L13 16l2.5-2.5L20 18" />
+  </svg>
+);
+
 export const FollowIcon = () => (
   <svg {...base} aria-hidden>
     <circle cx="12" cy="12" r="3" />
@@ -101,6 +109,13 @@ export const CollisionIcon = () => (
   <svg {...base} aria-hidden>
     <path d="M4 4h16v16H4zM4 12h16M12 4v16" />
     <path d="m7 17 10-10" />
+  </svg>
+);
+
+export const LocateIcon = () => (
+  <svg {...base} aria-hidden>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+    <circle cx="12" cy="10" r="2.5" />
   </svg>
 );
 

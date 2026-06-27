@@ -13,6 +13,7 @@ export function Messages({
   conversation,
   inConversationWithMe,
   humanPlayer,
+  userId,
   scrollViewRef,
 }: {
   worldId: Id<'worlds'>;
@@ -22,6 +23,7 @@ export function Messages({
     | { kind: 'archived'; doc: Doc<'archivedConversations'> };
   inConversationWithMe: boolean;
   humanPlayer?: Player;
+  userId: string;
   scrollViewRef: React.RefObject<HTMLDivElement>;
 }) {
   const humanPlayerId = humanPlayer?.id;
@@ -159,6 +161,7 @@ export function Messages({
             engineId={engineId}
             conversation={conversation.doc}
             humanPlayer={humanPlayer}
+            userId={userId}
           />
         )}
       </div>

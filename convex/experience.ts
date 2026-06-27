@@ -668,14 +668,22 @@ export const startActivityExperience = action({
       userId,
       userName,
     });
-    // 若用户在该作品下上传过风格化照片记忆，取最新一张当首格主角参考（沙雕化的自己出演）。
-    const memoryStorageId = await ctx.runQuery(internal.photoMemory.latestMemoryStorageId, {
+    // 若用户在该作品/活动下上传过照片记忆，取最新一张生成图当首格主角参考（沙雕化的自己出演）。
+    const memory = await ctx.runQuery(internal.photoMemories.latestMemoryForActivity, {
       activityKey: activity.activityKey,
       userId,
     });
-    const referenceBlob = memoryStorageId
-      ? (await ctx.storage.get(memoryStorageId as Id<'_storage'>)) ?? undefined
-      : undefined;
+    let referenceBlob: Blob | undefined;
+    if (memory?.imageStorageId) {
+      referenceBlob = (await ctx.storage.get(memory.imageStorageId as Id<'_storage'>)) ?? undefined;
+    } else if (memory?.imageUrl) {
+      try {
+        const res = await fetch(memory.imageUrl);
+        if (res.ok) referenceBlob = await res.blob();
+      } catch (e) {
+        console.error('拉取照片记忆生成图失败，跳过主角参考', e);
+      }
+    }
     await generateFirstPanel(ctx, experienceId, event, referenceBlob);
     return experienceId;
   },
