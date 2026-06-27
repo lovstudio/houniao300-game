@@ -62,6 +62,7 @@ export default function SidebarTabs({
   worldId,
   engineId,
   game,
+  userId,
   playerId,
   setSelectedElement,
   onActivate,
@@ -69,6 +70,7 @@ export default function SidebarTabs({
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
+  userId: string;
   playerId?: GameId<'players'>;
   setSelectedElement: SelectElement;
   onActivate?: () => void;
@@ -145,6 +147,7 @@ export default function SidebarTabs({
             worldId={worldId}
             engineId={engineId}
             game={game}
+            userId={userId}
             playerId={playerId}
             setSelectedElement={setSelectedElement}
           />
@@ -700,12 +703,14 @@ function StateTab({
   worldId,
   engineId,
   game,
+  userId,
   playerId,
   setSelectedElement,
 }: {
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
+  userId: string;
   playerId?: GameId<'players'>;
   setSelectedElement: SelectElement;
 }) {
@@ -719,6 +724,7 @@ function StateTab({
           worldId={worldId}
           engineId={engineId}
           game={game}
+          userId={userId}
           playerId={playerId}
           setSelectedElement={setSelectedElement}
           scrollViewRef={detailScrollRef}

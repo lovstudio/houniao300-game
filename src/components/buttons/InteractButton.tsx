@@ -10,12 +10,19 @@ import { useCallback } from 'react';
 import { waitForInput } from '../../hooks/sendInput';
 import { useServerGame } from '../../hooks/serverGame';
 
-export default function InteractButton() {
+export default function InteractButton({
+  userId,
+  worldId,
+}: {
+  userId: string;
+  worldId?: Id<'worlds'>;
+}) {
   // const { isAuthenticated } = useConvexAuth();
-  const worldStatus = useQuery(api.world.defaultWorldStatus);
-  const worldId = worldStatus?.worldId;
   const game = useServerGame(worldId);
-  const humanTokenIdentifier = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
+  const humanTokenIdentifier = useQuery(
+    api.world.userStatus,
+    worldId ? { worldId, userId } : 'skip',
+  );
   const userPlayerId =
     game && [...game.world.players.values()].find((p) => p.human === humanTokenIdentifier)?.id;
   const join = useMutation(api.world.joinWorld);
@@ -27,7 +34,7 @@ export default function InteractButton() {
     async (worldId: Id<'worlds'>) => {
       let inputId;
       try {
-        inputId = await join({ worldId });
+        inputId = await join({ worldId, userId });
       } catch (e: any) {
         if (e instanceof ConvexError) {
           toast.error(e.data);
@@ -41,20 +48,16 @@ export default function InteractButton() {
         toast.error(e.message);
       }
     },
-    [convex],
+    [convex, join, userId],
   );
 
   const joinOrLeaveGame = () => {
-    if (
-      !worldId ||
-      // || !isAuthenticated
-      game === undefined
-    ) {
+    if (!worldId) {
       return;
     }
     if (isPlaying) {
       console.log(`Leaving game for player ${userPlayerId}`);
-      void leave({ worldId });
+      void leave({ worldId, userId });
     } else {
       console.log(`Joining game`);
       void joinInput(worldId);

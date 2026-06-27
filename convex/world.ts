@@ -97,6 +97,7 @@ export const restartDeadWorlds = internalMutation({
 export const userStatus = query({
   args: {
     worldId: v.id('worlds'),
+    userId: v.string(),
   },
   handler: async (ctx, args) => {
     // const identity = await ctx.auth.getUserIdentity();
@@ -104,13 +105,18 @@ export const userStatus = query({
     //   return null;
     // }
     // return identity.tokenIdentifier;
-    return DEFAULT_NAME;
+    const world = await ctx.db.get(args.worldId);
+    if (!world) {
+      throw new ConvexError(`Invalid world ID: ${args.worldId}`);
+    }
+    return args.userId;
   },
 });
 
 export const joinWorld = mutation({
   args: {
     worldId: v.id('worlds'),
+    userId: v.string(),
   },
   handler: async (ctx, args) => {
     // const identity = await ctx.auth.getUserIdentity();
@@ -119,7 +125,11 @@ export const joinWorld = mutation({
     // }
     // const name =
     //   identity.givenName || identity.nickname || (identity.email && identity.email.split('@')[0]);
-    const name = DEFAULT_NAME;
+    const profile = await ctx.db
+      .query('profiles')
+      .withIndex('userId', (q) => q.eq('userId', args.userId))
+      .first();
+    const name = profile?.name?.trim() || DEFAULT_NAME;
 
     // if (!name) {
     //   throw new ConvexError(`Missing name on ${JSON.stringify(identity)}`);
@@ -132,9 +142,9 @@ export const joinWorld = mutation({
     return await insertInput(ctx, world._id, 'join', {
       name,
       character: characters[Math.floor(Math.random() * characters.length)].name,
-      description: `${DEFAULT_NAME}是一名真人玩家`,
+      description: `${name} 是一名真人玩家`,
       // description: `${identity.givenName} is a human player`,
-      tokenIdentifier: DEFAULT_NAME,
+      tokenIdentifier: args.userId,
     });
   },
 });
@@ -142,6 +152,7 @@ export const joinWorld = mutation({
 export const leaveWorld = mutation({
   args: {
     worldId: v.id('worlds'),
+    userId: v.string(),
   },
   handler: async (ctx, args) => {
     // const identity = await ctx.auth.getUserIdentity();
@@ -154,7 +165,7 @@ export const leaveWorld = mutation({
       throw new Error(`Invalid world ID: ${args.worldId}`);
     }
     // const existingPlayer = world.players.find((p) => p.human === tokenIdentifier);
-    const existingPlayer = world.players.find((p) => p.human === DEFAULT_NAME);
+    const existingPlayer = world.players.find((p) => p.human === args.userId);
     if (!existingPlayer) {
       return;
     }
