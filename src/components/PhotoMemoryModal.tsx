@@ -12,6 +12,12 @@ export type PhotoMemoryContext = {
   venue?: string;
 };
 
+export type PhotoMemoryLocationOption = PhotoMemoryContext & {
+  id: string;
+  label: string;
+  detail?: string;
+};
+
 type PhotoMemoryItem = {
   _id: Id<'photoMemories'>;
   userId: string;
@@ -78,12 +84,14 @@ export default function PhotoMemoryModal({
   userId,
   userName,
   context,
+  locationOptions,
 }: {
   open: boolean;
   onClose: () => void;
   userId: string;
   userName: string;
   context: PhotoMemoryContext;
+  locationOptions?: PhotoMemoryLocationOption[];
 }) {
   const [tab, setTab] = useState<Tab>('upload');
   const [title, setTitle] = useState('');
@@ -92,6 +100,7 @@ export default function PhotoMemoryModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
 
   const generateUploadUrl = useMutation(api.photoMemories.generateUploadUrl);
   const generatePhotoMemory = useAction(api.photoMemories.generatePhotoMemory);
@@ -99,10 +108,42 @@ export default function PhotoMemoryModal({
   const mine = useQuery(api.photoMemories.listMyPhotoMemories, open ? { userId } : 'skip');
   const shared = useQuery(api.photoMemories.listSharedPhotoMemories, open ? {} : 'skip');
 
+  const normalizedLocationOptions = useMemo<PhotoMemoryLocationOption[]>(() => {
+    const fallback: PhotoMemoryLocationOption = {
+      id: 'fallback-location',
+      label: context.contextLabel || context.venue || context.activityTitle || '候鸟沙城',
+      detail: [context.venue, context.activityTitle].filter(Boolean).join(' · ') || undefined,
+      ...context,
+    };
+    const deduped = new Map<string, PhotoMemoryLocationOption>();
+    for (const option of locationOptions && locationOptions.length > 0 ? locationOptions : [fallback]) {
+      deduped.set(option.id, option);
+    }
+    if (deduped.size === 0) deduped.set(fallback.id, fallback);
+    return [...deduped.values()];
+  }, [context, locationOptions]);
+
+  const selectedContext =
+    normalizedLocationOptions.find((option) => option.id === selectedLocationId) ??
+    normalizedLocationOptions[0];
+
   const contextLine = useMemo(() => {
-    const bits = [context.venue, context.activityTitle ?? context.contextLabel].filter(Boolean);
+    const bits = [
+      selectedContext?.venue,
+      selectedContext?.activityTitle ?? selectedContext?.contextLabel,
+    ].filter(Boolean);
     return bits.length > 0 ? bits.join(' · ') : '候鸟沙城';
-  }, [context]);
+  }, [selectedContext]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedLocationId((current) => {
+      if (current && normalizedLocationOptions.some((option) => option.id === current)) {
+        return current;
+      }
+      return normalizedLocationOptions[0]?.id ?? null;
+    });
+  }, [normalizedLocationOptions, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -151,15 +192,15 @@ export default function PhotoMemoryModal({
         originalStorageId: storageId,
         sharePublic,
         context: {
-          activityKey: context.activityKey,
-          activityTitle: context.activityTitle,
-          venue: context.venue,
-          contextLabel: context.contextLabel,
+          activityKey: selectedContext?.activityKey,
+          activityTitle: selectedContext?.activityTitle,
+          venue: selectedContext?.venue,
+          contextLabel: selectedContext?.contextLabel,
         },
       });
       setLastImageUrl(result.imageUrl);
       setTab('mine');
-      toast.success(`已生成「${title.trim() || context.activityTitle || '沙城照片'}」`);
+      toast.success(`已生成「${title.trim() || selectedContext?.activityTitle || '沙城照片'}」`);
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : '照片生成失败');
@@ -246,10 +287,21 @@ export default function PhotoMemoryModal({
                     onChange={(e) => setTitle(e.target.value)}
                   />
                 </div>
-                <div className="rounded border border-brown-700 bg-brown-900/60 p-3 text-sm text-brown-300">
-                  <span className="text-brown-100">当前位置</span>
-                  <br />
-                  {contextLine}
+                <div>
+                  <label className="mb-1 block text-sm text-brown-300">位置</label>
+                  <select
+                    className="w-full rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-brown-100"
+                    value={selectedContext?.id ?? ''}
+                    onChange={(e) => setSelectedLocationId(e.target.value)}
+                  >
+                    {normalizedLocationOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                        {option.detail ? ` · ${option.detail}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 truncate text-xs text-brown-400">{contextLine}</p>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 rounded border border-brown-700 bg-brown-900/60 p-3 text-sm text-brown-200 hover:border-clay-500">
                   <input
