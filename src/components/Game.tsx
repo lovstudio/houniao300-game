@@ -157,7 +157,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
         {/* 右侧可折叠手卷：浮木轴 + 毛笔卷头，统一为浮层抽屉覆盖在满屏地图之上 */}
         <div
           className={clsx(
-            'flex min-h-0 overflow-hidden bg-brown-800/95 text-brown-100',
+            'flex min-h-0 overflow-hidden bg-[#efe1c2] text-[#2a1c14]',
             'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm lg:w-96 lg:max-w-none',
             'shadow-2xl transition-transform duration-300',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
@@ -200,6 +200,10 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               setSelectedElement={setSelectedElement}
               onActivate={() => setPanelOpen(true)}
             />
+            {/* 卷尾题词（博尔赫斯） */}
+            <div className="shrink-0 border-t border-[#cbb287] px-4 py-2 text-center font-num text-[12px] italic text-[#9c7e5e]">
+              没有第一页，也没有最后一页
+            </div>
           </div>
         </div>
       </div>
