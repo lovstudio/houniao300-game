@@ -2,23 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { sound } from '@pixi/sound';
 import SettingRow from './SettingRow';
 import { MusicIcon } from './DeckIcons';
-import { useQuery } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
+
+// base-aware path: `/ai-town/assets/bgm.mp3` in dev, `/assets/bgm.mp3` on the dedicated domain.
+const BGM_URL = `${import.meta.env.BASE_URL}assets/bgm.mp3`;
 
 export default function MusicButton() {
-  const musicUrl = useQuery(api.music.getBackgroundMusic);
   const [isPlaying, setPlaying] = useState(false);
-
-  useEffect(() => {
-    if (musicUrl) {
-      sound.add('background', musicUrl).loop = true;
-    }
-  }, [musicUrl]);
 
   const flipSwitch = async () => {
     if (isPlaying) {
       sound.stop('background');
     } else {
+      // lazy add so the 13MB file is only fetched once the user opts in
+      if (!sound.exists('background')) {
+        sound.add('background', BGM_URL).loop = true;
+      }
       await sound.play('background');
     }
     setPlaying(!isPlaying);
@@ -45,7 +43,7 @@ export default function MusicButton() {
       value={isPlaying ? '播放中' : '关'}
       active={isPlaying}
       onClick={() => void flipSwitch()}
-      title="播放 AI 生成的音乐（按 m 播放/静音）"
+      title="播放背景音乐（按 m 播放/静音）"
     />
   );
 }
