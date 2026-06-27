@@ -23,6 +23,7 @@ export default function Game({
   onToggleControlMode,
   onToggleCameraFollow,
   onSetCameraFollow,
+  onEnterVenueInterior,
   showCollisionOverlay,
 }: {
   controlMode: ControlMode;
@@ -30,6 +31,7 @@ export default function Game({
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
+  onEnterVenueInterior?: (interiorId: string) => void;
   showCollisionOverlay: boolean;
 }) {
   const convex = useConvex();
@@ -90,6 +92,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     onToggleControlMode={onToggleControlMode}
                     onToggleCameraFollow={onToggleCameraFollow}
                     onSetCameraFollow={onSetCameraFollow}
+                    onEnterVenueInterior={onEnterVenueInterior}
                     showCollisionOverlay={showCollisionOverlay}
                     historicalTime={historicalTime}
                     setSelectedElement={setSelectedElement}

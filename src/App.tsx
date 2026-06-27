@@ -3,7 +3,16 @@ import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
 import EndingsWall from './components/EndingsWall.tsx';
 import Onboarding from './components/Onboarding.tsx';
-import { setActivityEnterHandler, activityFromSchedule, type ActivityDescriptor } from './lib/activityEnter.ts';
+import VenueInteriorMap from './components/VenueInteriorMap.tsx';
+import {
+  setActivityEnterHandler,
+  activityFromSchedule,
+  type ActivityDescriptor,
+} from './lib/activityEnter.ts';
+import {
+  getVenueInterior,
+  type VenueInteriorMap as VenueInteriorMapData,
+} from '../data/birdRestaurantInterior.ts';
 import { SCHEDULE } from '../data/schedule.ts';
 import { getAnonUserId } from './lib/identity.ts';
 
@@ -27,18 +36,13 @@ export default function Home() {
   const [showCollisionOverlay, setShowCollisionOverlay] = useState(false);
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
+  const [activeInterior, setActiveInterior] = useState<VenueInteriorMapData | null>(null);
 
   // 公测实时结局墙：?wall=1 进入，跳过身份门，纯公共投屏大屏视图。
-  const isWall = useMemo(
-    () => new URLSearchParams(window.location.search).get('wall') === '1',
-    [],
-  );
+  const isWall = useMemo(() => new URLSearchParams(window.location.search).get('wall') === '1', []);
 
   // 连环画永久链接：?comic=<experienceId> 落地，跳过身份门，直接打开该篇灯箱（公共只读）。
-  const comicId = useMemo(
-    () => new URLSearchParams(window.location.search).get('comic'),
-    [],
-  );
+  const comicId = useMemo(() => new URLSearchParams(window.location.search).get('comic'), []);
 
   // 扫码深链意图：?exp=<activityKey>。在首帧（onboarding 之前）就把它从 URL 里取出并固化下来，
   // 这样即便新用户要先完成 onboarding（期间 URL 可能被清/被 WeChat 改写），意图也不会丢。
@@ -117,7 +121,11 @@ export default function Home() {
 
   // 身份门：加载中显示占位，未录入则强制 onboarding。
   if (profile === undefined) {
-    return <main className="flex screen-h items-center justify-center bg-brown-900 text-brown-300">加载中…</main>;
+    return (
+      <main className="flex screen-h items-center justify-center bg-brown-900 text-brown-300">
+        加载中…
+      </main>
+    );
   }
   if (profile === null) {
     return (
@@ -158,14 +166,15 @@ export default function Home() {
           <p className="text-2xl mt-2">操作：</p>
           <p className="mt-4">点击即可移动。</p>
           <p className="mt-4">
-            在"角色"模式下，用 WASD 或方向键移动你的角色；在"镜头"模式下，同样的按键用来平移镜头。按 C
-            切换模式，按 V 切换跟随角色，按 + 和 - 缩放，按 0 显示完整地图，按 F 切换全屏。
+            在"角色"模式下，用 WASD 或方向键移动你的角色；在"镜头"模式下，同样的按键用来平移镜头。按
+            C 切换模式，按 V 切换跟随角色，按 + 和 - 缩放，按 0 显示完整地图，按 F 切换全屏。
           </p>
           <p className="mt-4">
             想和智能体对话，先点击它，再点击"发起对话"，它就会朝你走来。等它走近，对话便会开始，你们就可以互相交谈。你随时可以关闭对话面板或走开来结束对话。对方也可能主动向你发起对话——这时你会在消息面板里看到一个接受按钮。
           </p>
           <p className="mt-4">
-            《沙之书》同一时间最多只支持 {MAX_HUMAN_PLAYERS} 名真人玩家。如果你闲置超过五分钟，将会被自动移出模拟世界。
+            《沙之书》同一时间最多只支持 {MAX_HUMAN_PLAYERS}{' '}
+            名真人玩家。如果你闲置超过五分钟，将会被自动移出模拟世界。
           </p>
         </div>
       </ReactModal>
@@ -199,6 +208,10 @@ export default function Home() {
           onToggleControlMode={toggleControlMode}
           onToggleCameraFollow={toggleCameraFollow}
           onSetCameraFollow={setCameraFollow}
+          onEnterVenueInterior={(interiorId) => {
+            const interior = getVenueInterior(interiorId);
+            if (interior) setActiveInterior(interior);
+          }}
           showCollisionOverlay={showCollisionOverlay}
         />
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
@@ -220,6 +233,10 @@ export default function Home() {
             onExit={() => setActiveActivity(null)}
           />
         </div>
+      )}
+
+      {activeInterior && (
+        <VenueInteriorMap interior={activeInterior} onExit={() => setActiveInterior(null)} />
       )}
     </main>
   );

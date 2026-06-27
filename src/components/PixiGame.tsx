@@ -19,6 +19,7 @@ import {
   sandCityGeometryControlsCollision,
   tilePositionBlockedBySolidGeometry,
 } from '../../data/sandCityGeometry.ts';
+import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior.ts';
 import type { ControlMode } from './Game.tsx';
 import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
@@ -71,9 +72,7 @@ function isMapDestinationBlocked(destination: { x: number; y: number }, state: R
   ) {
     return true;
   }
-  if (
-    sandCityGeometryControlsCollision(state.game.worldMap.width, state.game.worldMap.height)
-  ) {
+  if (sandCityGeometryControlsCollision(state.game.worldMap.width, state.game.worldMap.height)) {
     if (
       tilePositionBlockedBySolidGeometry(
         destination,
@@ -140,6 +139,7 @@ export const PixiGame = (props: {
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
+  onEnterVenueInterior?: (interiorId: string) => void;
   showCollisionOverlay: boolean;
   setSelectedElement: SelectElement;
 }) => {
@@ -166,6 +166,7 @@ export const PixiGame = (props: {
   const lastOptimisticFrameAtRef = useRef<number>();
   const lastSentDestinationRef = useRef<SentDestination | null>(null);
   const latestGameStateRef = useRef<RuntimeGameState>();
+  const nearInteriorEntranceRef = useRef<string | null>(null);
 
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
@@ -241,6 +242,48 @@ export const PixiGame = (props: {
     worldHeightPx,
     worldWidthPx,
   };
+
+  useEffect(() => {
+    if (!props.onEnterVenueInterior || !humanPlayerId) {
+      nearInteriorEntranceRef.current = null;
+      return;
+    }
+
+    const humanPlayer = props.game.world.players.get(humanPlayerId);
+    if (!humanPlayer) {
+      nearInteriorEntranceRef.current = null;
+      return;
+    }
+
+    const location = optimisticHumanLocation ?? playerLocation(humanPlayer);
+    let nearestInteriorId: string | null = null;
+    let nearestDistance = Infinity;
+
+    for (const interior of VENUE_INTERIOR_MAPS) {
+      const [sourceX, sourceY] = interior.entrance.exteriorSource;
+      const entryTile = {
+        x: (sourceX / MAP_SOURCE_WIDTH) * props.game.worldMap.width,
+        y: (sourceY / MAP_SOURCE_HEIGHT) * props.game.worldMap.height,
+      };
+      const distance = Math.hypot(location.x - entryTile.x, location.y - entryTile.y);
+      if (distance <= interior.entrance.radiusTiles && distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestInteriorId = interior.id;
+      }
+    }
+
+    if (nearestInteriorId && nearInteriorEntranceRef.current !== nearestInteriorId) {
+      props.onEnterVenueInterior(nearestInteriorId);
+    }
+    nearInteriorEntranceRef.current = nearestInteriorId;
+  }, [
+    humanPlayerId,
+    optimisticHumanLocation,
+    props.game,
+    props.game.worldMap.height,
+    props.game.worldMap.width,
+    props.onEnterVenueInterior,
+  ]);
 
   useEffect(() => {
     const currentState = () => latestGameStateRef.current;

@@ -15,6 +15,10 @@ import {
   SPACE_BARRIERS,
   WORKSHOP_BUILDING_RECT,
 } from '../../data/sandCityGeometry';
+import {
+  BIRD_RESTAURANT_INTERIOR,
+  I3_BRIDGE_FIELD_INTERIOR,
+} from '../../data/birdRestaurantInterior';
 import { INSTALLATIONS, type Installation } from '../../data/installations';
 import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
 
@@ -493,9 +497,42 @@ function drawBirdRestaurant(container: PIXI.Container, project: Projector) {
     }
   }
 
-  drawPolyline(building, project, [[1290, 535], [1312, 625], [1284, 700]], 1, 0x8f806d, 0.5);
-  drawPolyline(building, project, [[1366, 530], [1390, 620], [1370, 716]], 1, 0x8f806d, 0.5);
-  drawPolyline(building, project, [[1306, 760], [1340, 780], [1390, 728]], 1, 0x8f806d, 0.5);
+  drawPolyline(
+    building,
+    project,
+    [
+      [1290, 535],
+      [1312, 625],
+      [1284, 700],
+    ],
+    1,
+    0x8f806d,
+    0.5,
+  );
+  drawPolyline(
+    building,
+    project,
+    [
+      [1366, 530],
+      [1390, 620],
+      [1370, 716],
+    ],
+    1,
+    0x8f806d,
+    0.5,
+  );
+  drawPolyline(
+    building,
+    project,
+    [
+      [1306, 760],
+      [1340, 780],
+      [1390, 728],
+    ],
+    1,
+    0x8f806d,
+    0.5,
+  );
 
   building.beginFill(0xa58c62, 0.72);
   for (let row = 0; row < 6; row++) {
@@ -510,6 +547,178 @@ function drawBirdRestaurant(container: PIXI.Container, project: Projector) {
   building.endFill();
 
   container.addChild(building);
+}
+
+function drawBirdRestaurantPhotoDetails(container: PIXI.Container, project: Projector) {
+  const details = new PIXI.Graphics();
+
+  details.beginFill(0x2c2924, 0.16);
+  drawPolygon(details, project, [
+    [1280, 512],
+    [1368, 492],
+    [1400, 535],
+    [1394, 722],
+    [1342, 780],
+    [1296, 744],
+  ]);
+  details.endFill();
+
+  details.lineStyle(1 * project.scale, 0xf2e2bd, 0.72);
+  details.moveTo(project.x(1288), project.y(526));
+  details.lineTo(project.x(1390), project.y(524));
+  details.moveTo(project.x(1290), project.y(560));
+  details.lineTo(project.x(1392), project.y(556));
+
+  const leftStall = project.rect(1284, 520, 50, 48);
+  details.lineStyle(1.2 * project.scale, 0xf4c9a0, 0.9);
+  details.beginFill(0xb33f32, 0.92);
+  details.drawRoundedRect(
+    leftStall.x,
+    leftStall.y,
+    leftStall.width,
+    leftStall.height,
+    3 * project.scale,
+  );
+  details.endFill();
+  details.lineStyle(1 * project.scale, 0xf7e2b8, 0.78);
+  for (let i = 0; i < 4; i++) {
+    details.moveTo(leftStall.x + 6 * project.scale, leftStall.y + (12 + i * 8) * project.scale);
+    details.lineTo(
+      leftStall.x + leftStall.width - 6 * project.scale,
+      leftStall.y + (12 + i * 8) * project.scale,
+    );
+  }
+
+  const counter = project.rect(1320, 546, 50, 24);
+  details.lineStyle(1.2 * project.scale, 0xd78a42, 0.9);
+  details.beginFill(0xe7aa55, 0.92);
+  details.drawRoundedRect(counter.x, counter.y, counter.width, counter.height, 2 * project.scale);
+  details.endFill();
+
+  const stage = project.rect(1364, 516, 30, 78);
+  details.lineStyle(1.1 * project.scale, 0x5f5650, 0.9);
+  details.beginFill(0x55473f, 0.86);
+  details.drawRoundedRect(stage.x, stage.y, stage.width, stage.height, 3 * project.scale);
+  details.endFill();
+  details.beginFill(0x1f1e1d, 0.9);
+  details.drawRect(project.x(1355), project.y(532), 7 * project.scale, 24 * project.scale);
+  details.drawRect(project.x(1396), project.y(532), 7 * project.scale, 24 * project.scale);
+  details.endFill();
+
+  const tables: SourcePoint[] = [
+    [1310, 604],
+    [1350, 610],
+    [1298, 660],
+    [1340, 675],
+    [1376, 662],
+    [1324, 724],
+  ];
+  for (const [index, [x, y]] of tables.entries()) {
+    details.lineStyle(1 * project.scale, 0x9e8054, 0.82);
+    details.beginFill(index % 2 === 0 ? 0xf0debd : 0xe1c58f, 0.94);
+    details.drawCircle(project.x(x), project.y(y), 8.5 * project.scale);
+    details.endFill();
+    details.beginFill(0x4d4036, 0.76);
+    details.drawCircle(project.x(x - 13), project.y(y - 4), 3.2 * project.scale);
+    details.drawCircle(project.x(x + 12), project.y(y + 5), 3.2 * project.scale);
+    details.drawCircle(project.x(x - 4), project.y(y + 13), 3.2 * project.scale);
+    details.endFill();
+  }
+
+  const [entryX, entryY] = BIRD_RESTAURANT_INTERIOR.entrance.exteriorSource;
+  details.lineStyle(2.2 * project.scale, 0xf5c15f, 0.95);
+  details.beginFill(0xf5c15f, 0.2);
+  details.drawCircle(project.x(entryX), project.y(entryY), 18 * project.scale);
+  details.endFill();
+  details.lineStyle(1 * project.scale, 0xffffff, 0.55);
+  details.moveTo(project.x(entryX - 16), project.y(entryY));
+  details.lineTo(project.x(entryX + 16), project.y(entryY));
+
+  container.addChild(details);
+  drawTextOnPlan(container, project, '入口', entryX, entryY + 28, 11);
+}
+
+function drawI3BridgeInstallation(container: PIXI.Container, project: Projector) {
+  const bridge = new PIXI.Graphics();
+  const [entryX, entryY] = I3_BRIDGE_FIELD_INTERIOR.entrance.exteriorSource;
+
+  bridge.lineStyle(1.2 * project.scale, 0xf6d18c, 0.38);
+  bridge.beginFill(0xd69e5b, 0.1);
+  bridge.drawEllipse(project.x(1300), project.y(972), 150 * project.scale, 78 * project.scale);
+  bridge.endFill();
+
+  bridge.beginFill(0xb77849, 0.28);
+  drawPolygon(bridge, project, [
+    [1260, 954],
+    [1330, 954],
+    [1372, 1020],
+    [1230, 1020],
+  ]);
+  bridge.endFill();
+
+  const drawMound = (x: number, y: number, width: number, height: number, flip = false) => {
+    const rect = project.rect(x, y, width, height);
+    bridge.beginFill(0x6e4428, 0.16);
+    bridge.drawEllipse(
+      rect.x + rect.width / 2 + 5 * project.scale,
+      rect.y + rect.height / 2 + 7 * project.scale,
+      rect.width / 2,
+      rect.height / 2,
+    );
+    bridge.endFill();
+
+    bridge.lineStyle(1.4 * project.scale, 0xd8bd8e, 0.72);
+    bridge.beginFill(0xd8bc8e, 0.92);
+    bridge.drawEllipse(rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width / 2, rect.height / 2);
+    bridge.endFill();
+
+    bridge.lineStyle(0.9 * project.scale, 0x9d7148, 0.34);
+    for (let i = 0; i < 5; i++) {
+      const t = 0.22 + i * 0.12;
+      const sx = x + width * (flip ? 1 - t : t);
+      const sy = y + height * 0.24;
+      bridge.moveTo(project.x(sx), project.y(sy));
+      bridge.bezierCurveTo(
+        project.x(x + width * (flip ? 0.38 : 0.62)),
+        project.y(y + height * (0.34 + i * 0.08)),
+        project.x(x + width * (flip ? 0.28 : 0.72)),
+        project.y(y + height * 0.78),
+        project.x(x + width * (flip ? 0.16 : 0.84)),
+        project.y(y + height * 0.94),
+      );
+    }
+  };
+
+  drawMound(1198, 922, 132, 90);
+  drawMound(1338, 922, 132, 90, true);
+
+  const shadow = project.rect(1210, 928, 268, 22);
+  bridge.beginFill(0x1f1a17, 0.48);
+  bridge.drawRoundedRect(shadow.x, shadow.y, shadow.width, shadow.height, 3 * project.scale);
+  bridge.endFill();
+
+  const beam = project.rect(1210, 906, 268, 20);
+  bridge.lineStyle(1.2 * project.scale, 0x5c4638, 0.92);
+  bridge.beginFill(0x2d241f, 0.96);
+  bridge.drawRoundedRect(beam.x, beam.y, beam.width, beam.height, 2 * project.scale);
+  bridge.endFill();
+  bridge.lineStyle(1 * project.scale, 0x90735a, 0.45);
+  bridge.moveTo(beam.x + 5 * project.scale, beam.y + 4 * project.scale);
+  bridge.lineTo(beam.x + beam.width - 5 * project.scale, beam.y + 4 * project.scale);
+
+  bridge.lineStyle(1.1 * project.scale, 0xf2e2bd, 0.44);
+  bridge.moveTo(project.x(1270), project.y(950));
+  bridge.bezierCurveTo(project.x(1284), project.y(938), project.x(1320), project.y(938), project.x(1334), project.y(950));
+  bridge.moveTo(project.x(1268), project.y(1008));
+  bridge.bezierCurveTo(project.x(1286), project.y(988), project.x(1320), project.y(988), project.x(1338), project.y(1008));
+
+  bridge.lineStyle(2.2 * project.scale, 0xf5c15f, 0.92);
+  bridge.beginFill(0xf5c15f, 0.18);
+  bridge.drawCircle(project.x(entryX), project.y(entryY), 23 * project.scale);
+  bridge.endFill();
+
+  container.addChild(bridge);
+  drawTextOnPlan(container, project, '桥下场域', entryX, entryY - 54, 11);
 }
 
 function drawSecondaryWallStructures(container: PIXI.Container, project: Projector) {
@@ -890,8 +1099,10 @@ function drawSandCityPlan(
 
   drawExchangeBuilding(container, project);
   drawBirdRestaurant(container, project);
+  drawBirdRestaurantPhotoDetails(container, project);
   drawIceJoysBuilding(container, project);
   drawClubDetails(container, project);
+  drawI3BridgeInstallation(container, project);
   drawSketchCircle(container, project, 148, 395, 55, 0xe8ddc8);
   drawSketchCircle(
     container,
