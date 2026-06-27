@@ -12,6 +12,7 @@ import {
   FreeMoveIcon,
   GearIcon,
   HelpIcon,
+  LocateIcon,
   PersonIcon,
   PhotoIcon,
   ShrinkIcon,
@@ -23,10 +24,12 @@ export default function SettingsMenu({
   cameraFollow,
   isFullscreen,
   showCollisionOverlay,
+  calibrating,
   onToggleControlMode,
   onToggleCameraFollow,
   onToggleFullscreen,
   onToggleCollisionOverlay,
+  onToggleCalibrating,
   onOpenPhotoMemory,
   onHelp,
 }: {
@@ -34,10 +37,12 @@ export default function SettingsMenu({
   cameraFollow: boolean;
   isFullscreen: boolean;
   showCollisionOverlay: boolean;
+  calibrating: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
   onToggleCollisionOverlay: () => void;
+  onToggleCalibrating: () => void;
   onOpenPhotoMemory: () => void;
   onHelp: () => void;
 }) {
@@ -128,6 +133,14 @@ export default function SettingsMenu({
               active={showCollisionOverlay}
               onClick={onToggleCollisionOverlay}
               title="显示当前路径规划实际不可走区域。"
+            />
+            <SettingRow
+              icon={<LocateIcon />}
+              label="GPS 标定"
+              value={calibrating ? '开' : '关'}
+              active={calibrating}
+              onClick={onToggleCalibrating}
+              title="采集 GPS↔地图锚点：站到地标点采集 GPS，再点地图对应位置，≥3 组后保存。"
             />
           </>
         )}

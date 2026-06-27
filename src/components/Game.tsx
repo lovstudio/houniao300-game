@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import PixiGame from './PixiGame.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
@@ -27,11 +27,13 @@ export default function Game({
   cameraFollow,
   isFullscreen,
   showCollisionOverlay,
+  calibrating,
   onToggleControlMode,
   onToggleCameraFollow,
   onSetCameraFollow,
   onToggleFullscreen,
   onToggleCollisionOverlay,
+  onToggleCalibrating,
   onOpenPhotoMemory,
   onHelp,
   onEnterVenueInterior,
@@ -41,11 +43,13 @@ export default function Game({
   cameraFollow: boolean;
   isFullscreen: boolean;
   showCollisionOverlay: boolean;
+  calibrating: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
   onToggleFullscreen: () => void;
   onToggleCollisionOverlay: () => void;
+  onToggleCalibrating: () => void;
   onOpenPhotoMemory: () => void;
   onHelp: () => void;
   onEnterVenueInterior?: (interiorId: string) => void;
@@ -56,11 +60,6 @@ export default function Game({
     id: GameId<'players'>;
   }>();
   const [gameWrapperRef, { width, height }] = useElementSize();
-  // 操作员标定工具：?calibrate=1 开启（采集 GPS↔地图锚点）。
-  const calibrating = useMemo(
-    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calibrate') === '1',
-    [],
-  );
   // 侧边栏统一为可折叠的浮层抽屉（覆盖在满屏地图上）。桌面端默认展开，移动端默认收起。
   const [panelOpen, setPanelOpen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 1024,
@@ -184,10 +183,12 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                   cameraFollow={cameraFollow}
                   isFullscreen={isFullscreen}
                   showCollisionOverlay={showCollisionOverlay}
+                  calibrating={calibrating}
                   onToggleControlMode={onToggleControlMode}
                   onToggleCameraFollow={onToggleCameraFollow}
                   onToggleFullscreen={onToggleFullscreen}
                   onToggleCollisionOverlay={onToggleCollisionOverlay}
+                  onToggleCalibrating={onToggleCalibrating}
                   onOpenPhotoMemory={onOpenPhotoMemory}
                   onHelp={onHelp}
                 />
