@@ -14,7 +14,12 @@ import { DebugPath } from './DebugPath.tsx';
 import { DebugCollisionOverlay } from './DebugCollisionOverlay.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
-import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
+import {
+  setMapFocusHandler,
+  setMapFocusTileHandler,
+  isMapTapCaptureActive,
+  captureMapTap,
+} from '../lib/mapFocus.ts';
 import {
   sandCityGeometryControlsCollision,
   tilePositionBlockedBySolidGeometry,
@@ -128,6 +133,7 @@ function movementVector(key: string) {
 }
 
 export const PixiGame = (props: {
+  userId: string;
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
@@ -148,7 +154,8 @@ export const PixiGame = (props: {
   const convex = useConvex();
   const viewportRef = useRef<Viewport | undefined>();
 
-  const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
+  const humanTokenIdentifier =
+    useQuery(api.world.userStatus, { worldId: props.worldId, userId: props.userId }) ?? null;
   const humanPlayerId = [...props.game.world.players.values()].find(
     (p) => p.human === humanTokenIdentifier,
   )?.id;
@@ -193,9 +200,6 @@ export const PixiGame = (props: {
         return;
       }
     }
-    if (!humanPlayerId) {
-      return;
-    }
     const viewport = viewportRef.current;
     if (!viewport) {
       return;
@@ -206,6 +210,17 @@ export const PixiGame = (props: {
       x: gameSpacePx.x / tileDim,
       y: gameSpacePx.y / tileDim,
     };
+    // 标定模式：把点击点换算成航拍源坐标交给标定面板，不移动角色。
+    if (isMapTapCaptureActive()) {
+      captureMapTap(
+        (gameSpaceTiles.x / props.game.worldMap.width) * MAP_SOURCE_WIDTH,
+        (gameSpaceTiles.y / props.game.worldMap.height) * MAP_SOURCE_HEIGHT,
+      );
+      return;
+    }
+    if (!humanPlayerId) {
+      return;
+    }
     const roundedTiles = {
       x: Math.floor(gameSpaceTiles.x),
       y: Math.floor(gameSpaceTiles.y),

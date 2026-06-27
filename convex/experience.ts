@@ -588,7 +588,14 @@ async function genImageSafe(
 }
 
 // 生成首格（导演 + 文生图），供两个入口复用。
-async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'>, event: Doc<'events'>) {
+// referenceBlob 存在时（用户上传过该作品的风格化照片记忆），首格以其为参考做 image edit，
+// 让主角就是用户本人的沙雕化形象；该首格图再锁成 firstPanelStorageId，后续每格沿用，全程锁脸。
+async function generateFirstPanel(
+  ctx: ActionCtx,
+  experienceId: Id<'experiences'>,
+  event: Doc<'events'>,
+  referenceBlob?: Blob,
+) {
   const step = await director(event, [], {
     stepIndex: 0,
     minPanels: event.minPanels,
@@ -605,7 +612,7 @@ async function generateFirstPanel(ctx: ActionCtx, experienceId: Id<'experiences'
     allowCustom: step.allowCustom ?? true,
     isFinal: false,
   });
-  const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-0-${Date.now()}`);
+  const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-0-${Date.now()}`, referenceBlob);
   if (gen) {
     await ctx.runMutation(internal.experience.setPanelImage, {
       panelId,
@@ -661,7 +668,23 @@ export const startActivityExperience = action({
       userId,
       userName,
     });
-    await generateFirstPanel(ctx, experienceId, event);
+    // 若用户在该作品/活动下上传过照片记忆，取最新一张生成图当首格主角参考（沙雕化的自己出演）。
+    const memory = await ctx.runQuery(internal.photoMemories.latestMemoryForActivity, {
+      activityKey: activity.activityKey,
+      userId,
+    });
+    let referenceBlob: Blob | undefined;
+    if (memory?.imageStorageId) {
+      referenceBlob = (await ctx.storage.get(memory.imageStorageId as Id<'_storage'>)) ?? undefined;
+    } else if (memory?.imageUrl) {
+      try {
+        const res = await fetch(memory.imageUrl);
+        if (res.ok) referenceBlob = await res.blob();
+      } catch (e) {
+        console.error('拉取照片记忆生成图失败，跳过主角参考', e);
+      }
+    }
+    await generateFirstPanel(ctx, experienceId, event, referenceBlob);
     return experienceId;
   },
 });

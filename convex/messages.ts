@@ -71,12 +71,22 @@ export const listRecentMessages = query({
 export const writeMessage = mutation({
   args: {
     worldId: v.id('worlds'),
+    userId: v.string(),
     conversationId,
     messageUuid: v.string(),
     playerId,
     text: v.string(),
   },
   handler: async (ctx, args) => {
+    const world = await ctx.db.get(args.worldId);
+    const player = world?.players.find((p) => p.id === args.playerId);
+    if (!player || player.human !== args.userId) {
+      throw new Error('Cannot write a message for another player.');
+    }
+    const conversation = world?.conversations.find((c) => c.id === args.conversationId);
+    if (!conversation?.participants.some((p) => p.playerId === args.playerId)) {
+      throw new Error('Player is not in this conversation.');
+    }
     await ctx.db.insert('messages', {
       conversationId: args.conversationId,
       author: args.playerId,

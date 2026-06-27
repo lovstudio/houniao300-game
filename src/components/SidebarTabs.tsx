@@ -27,17 +27,18 @@ import {
   type Installation,
   type InstallationZone,
 } from '../../data/installations';
-import { enterActivity, activityFromSchedule } from '../lib/activityEnter';
+import { enterActivity, activityFromSchedule, activityFromInstallation } from '../lib/activityEnter';
 import { setPanelTabHandler } from '../lib/panelBus';
+import { openPhotoMemory } from '../lib/photoMemoryBus';
 import { toast } from 'react-toastify';
 
 type Tab = 'state' | 'chat' | 'schedule' | 'works';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'state', label: '状态' },
-  { id: 'chat', label: '广播' },
-  { id: 'schedule', label: '节目单' },
-  { id: 'works', label: '作品' },
+const TABS: { id: Tab; label: string; short: string }[] = [
+  { id: 'state', label: '状态', short: '状' },
+  { id: 'chat', label: '广播', short: '广' },
+  { id: 'schedule', label: '节目单', short: '单' },
+  { id: 'works', label: '作品', short: '作' },
 ];
 
 const TODAY_DAY = (() => {
@@ -62,6 +63,7 @@ export default function SidebarTabs({
   worldId,
   engineId,
   game,
+  userId,
   playerId,
   setSelectedElement,
   onActivate,
@@ -69,6 +71,7 @@ export default function SidebarTabs({
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
+  userId: string;
   playerId?: GameId<'players'>;
   setSelectedElement: SelectElement;
   onActivate?: () => void;
@@ -116,26 +119,33 @@ export default function SidebarTabs({
 
   return (
     <div className="flex min-h-0 w-full flex-col">
-      {/* tab bar */}
-      <div className="flex shrink-0 gap-1 border-b-4 border-brown-900 bg-brown-800/95 px-2 pt-2">
+      {/* tab bar — 居中单字印章卷签 */}
+      <div className="flex shrink-0 justify-center gap-2.5 px-2.5 pt-1">
         {TABS.map((t) => {
           const on = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
+              title={t.label}
+              aria-label={t.label}
               className={
-                'relative -mb-1 rounded-t-md px-3 py-1.5 font-display text-lg leading-none tracking-wide transition ' +
-                (on
-                  ? 'bg-clay-700 text-white shadow-[inset_0_2px_0_rgba(255,255,255,0.18)]'
-                  : 'bg-brown-900/40 text-brown-200 hover:bg-brown-700/60')
+                'sand-tab relative grid h-11 w-11 place-items-center text-xl ' +
+                (on ? 'sand-tab-on' : '')
               }
             >
-              {t.label}
+              {t.short}
               {t.id === 'chat' && <ChatDot worldId={worldId} />}
             </button>
           );
         })}
+      </div>
+
+      {/* 描金菱形分隔 */}
+      <div className="sand-divider shrink-0">
+        <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden>
+          <path d="M6 1 10 6 6 11 2 6Z" fill="currentColor" />
+        </svg>
       </div>
 
       {/* tab content */}
@@ -145,6 +155,7 @@ export default function SidebarTabs({
             worldId={worldId}
             engineId={engineId}
             game={game}
+            userId={userId}
             playerId={playerId}
             setSelectedElement={setSelectedElement}
           />
@@ -167,7 +178,7 @@ function ChatDot({ worldId }: { worldId: Id<'worlds'> }) {
   const fresh = msgs?.[0] && Date.now() - msgs[0].t < 60_000;
   if (!fresh) return null;
   return (
-    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[#e4b58c]" />
+    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[#c0654a]" />
   );
 }
 
@@ -191,7 +202,7 @@ function GlobalChat({
 
   return (
     <div className="flex h-full flex-col">
-      <p className="shrink-0 px-4 pb-2 pt-4 text-xs text-brown-300">
+      <p className="shrink-0 px-4 pb-2 pt-4 text-xs text-[#6b5238]">
         全城广播 · 记录每位 AI 居民的公开发言（最近 {msgs.length} 条）
       </p>
       <div ref={ref} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
@@ -211,14 +222,14 @@ function GlobalChat({
                 <div className="flex items-baseline gap-2">
                   <button
                     onClick={() => onSelectAgent(m.author as GameId<'players'>)}
-                    className="truncate text-sm font-semibold text-brown-100 hover:underline"
-                    style={{ color: `hsl(${hue} 55% 72%)` }}
+                    className="truncate text-sm font-semibold text-[#2a1c14] hover:underline"
+                    style={{ color: `hsl(${hue} 60% 36%)` }}
                   >
                     {m.authorName}
                   </button>
-                  <span className="shrink-0 text-[10px] text-brown-400">{timeAgo(m.t)}</span>
+                  <span className="shrink-0 text-[10px] text-[#9c7e5e]">{timeAgo(m.t)}</span>
                 </div>
-                <div className="mt-0.5 break-words rounded-lg rounded-tl-sm bg-brown-700/55 px-2.5 py-1.5 text-sm leading-snug text-brown-100">
+                <div className="mt-0.5 break-words rounded-lg rounded-tl-sm bg-[#e3d2ad] px-2.5 py-1.5 text-sm leading-snug text-[#2a1c14]">
                   {m.text}
                 </div>
               </div>
@@ -278,16 +289,16 @@ function WorksTab({ installationFocus }: { installationFocus: { id: string; n: n
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-brown-700/40 px-3 py-3">
+      <div className="shrink-0 border-b border-[#cbb287] px-3 py-3">
         <div className="flex items-baseline gap-2">
-          <h3 className="font-display text-xl leading-none text-brown-100">作品点位</h3>
-          <span className="text-xs text-brown-400">{INSTALLATIONS.length} 件</span>
+          <h3 className="font-display text-xl leading-none text-[#2a1c14]">作品点位</h3>
+          <span className="text-xs text-[#9c7e5e]">{INSTALLATIONS.length} 件</span>
         </div>
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜索编号、艺术家、作品名"
-          className="mt-3 w-full rounded border border-brown-700/70 bg-brown-900/45 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-400 focus:border-clay-500 focus:outline-none"
+          className="mt-3 w-full rounded border border-[#c2a878] bg-[#f6ecd3] px-3 py-2 text-sm text-[#2a1c14] placeholder:text-[#a8906c] focus:border-clay-500 focus:outline-none"
         />
       </div>
 
@@ -299,7 +310,7 @@ function WorksTab({ installationFocus }: { installationFocus: { id: string; n: n
               'shrink-0 rounded px-2.5 py-1 text-xs font-semibold transition ' +
               (zone === 'all'
                 ? 'bg-clay-700 text-white'
-                : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+                : 'bg-[#dcc89f] text-[#6b5238] hover:bg-[#e3d2ad]')
             }
           >
             全部
@@ -312,7 +323,7 @@ function WorksTab({ installationFocus }: { installationFocus: { id: string; n: n
                 'shrink-0 rounded px-2.5 py-1 text-xs font-semibold transition ' +
                 (zone === name
                   ? 'bg-clay-700 text-white'
-                  : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+                  : 'bg-[#dcc89f] text-[#6b5238] hover:bg-[#e3d2ad]')
               }
             >
               {name}
@@ -340,17 +351,17 @@ function InstallationRow({ item, onClick }: { item: Installation; onClick: () =>
   return (
     <button
       onClick={onClick}
-      className="group flex w-full gap-2.5 rounded border border-brown-700/40 bg-brown-900/18 px-2.5 py-2 text-left transition hover:border-clay-600/70 hover:bg-brown-700/38"
+      className="group flex w-full gap-2.5 rounded border border-[#cbb287] bg-[#efe1c2] px-2.5 py-2 text-left transition hover:border-clay-600/70 hover:bg-[#e8d6b0]"
     >
       <span className="grid h-7 w-9 shrink-0 place-items-center rounded bg-[#1da76e] text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]">
         {item.id}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-brown-100 group-hover:underline">
+        <span className="block truncate text-sm font-semibold text-[#2a1c14] group-hover:underline">
           {item.title}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-brown-300">{item.artist}</span>
-        <span className="mt-1 inline-flex rounded bg-brown-700/55 px-1.5 py-0.5 text-[10px] text-brown-300">
+        <span className="mt-0.5 block truncate text-xs text-[#6b5238]">{item.artist}</span>
+        <span className="mt-1 inline-flex rounded bg-[#e3d2ad] px-1.5 py-0.5 text-[10px] text-[#6b5238]">
           {item.zone}
         </span>
       </span>
@@ -372,7 +383,7 @@ function InstallationDetail({
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
         <button
           onClick={onBack}
-          className="shrink-0 rounded bg-brown-700/50 px-2 py-1 text-xs text-brown-200 hover:bg-brown-700"
+          className="shrink-0 rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#dcc89f]"
         >
           ← 返回
         </button>
@@ -381,29 +392,61 @@ function InstallationDetail({
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <h3 className="font-display text-2xl leading-tight text-brown-100">{installation.title}</h3>
-        <div className="mt-3 space-y-2 text-sm text-brown-200">
+        <img
+          src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/installations/${installation.id}.jpg`}
+          alt={installation.title}
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+          className="mb-3 w-full rounded-lg border border-[#dcc89f] bg-[#e8d6b0] object-cover"
+        />
+        <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{installation.title}</h3>
+        <div className="mt-3 space-y-2 text-sm text-[#5b4632]">
+
           <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-brown-400">艺术家</span>
+            <span className="w-12 shrink-0 text-[#9c7e5e]">艺术家</span>
             <span className="min-w-0 flex-1">{installation.artist}</span>
           </div>
           <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-brown-400">区域</span>
+            <span className="w-12 shrink-0 text-[#9c7e5e]">区域</span>
             <span>{installation.zone}</span>
           </div>
           <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-brown-400">来源</span>
+            <span className="w-12 shrink-0 text-[#9c7e5e]">来源</span>
             <span>{INSTALLATION_SOURCE}</span>
           </div>
         </div>
         {installation.note && (
-          <p className="mt-4 rounded-lg bg-brown-700/35 p-3 text-sm leading-relaxed text-brown-200">
+          <p className="mt-4 rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#5b4632]">
             {installation.note}
           </p>
         )}
         <button
-          onClick={onLocate}
+          onClick={() => enterActivity(activityFromInstallation(installation))}
           className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
+        >
+          进入这个作品的专属体验
+        </button>
+        <button
+          onClick={() =>
+            openPhotoMemory({
+              id: `installation:${installation.id}`,
+              label: installation.title,
+              detail: `${installation.artist} · ${installation.zone}`,
+              contextLabel: installation.title,
+              activityKey: activityFromInstallation(installation).activityKey,
+              activityTitle: installation.title,
+              venue: installation.zone,
+            })
+          }
+          className="mt-2 w-full rounded border-2 border-brown-700 px-3 py-2.5 text-base font-bold text-brown-100 hover:border-clay-500"
+        >
+          在这件作品下拍张照片记忆
+        </button>
+        <button
+          onClick={onLocate}
+          className="mt-2 w-full rounded border-2 border-brown-700 px-3 py-2.5 text-base font-bold text-brown-100 hover:border-clay-500"
         >
           在地图上定位
         </button>
@@ -453,11 +496,11 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
         <div className="flex shrink-0 items-center gap-2 px-3 py-2">
           <button
             onClick={() => setVenue(null)}
-            className="shrink-0 rounded bg-brown-700/50 px-2 py-1 text-xs text-brown-200 hover:bg-brown-700"
+            className="shrink-0 rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#dcc89f]"
           >
             ← 场地
           </button>
-          <span className="min-w-0 flex-1 truncate font-display text-lg text-brown-100">
+          <span className="min-w-0 flex-1 truncate font-display text-lg text-[#2a1c14]">
             {venue}
           </span>
           {onmap && (
@@ -492,14 +535,14 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
               <button
                 key={v}
                 onClick={() => setVenue(v)}
-                className="flex w-full items-center gap-2 border-b border-brown-700/40 py-2 text-left"
+                className="flex w-full items-center gap-2 border-b border-[#cbb287] py-2 text-left"
               >
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
                 />
-                <span className="min-w-0 flex-1 truncate text-sm text-brown-100">{v}</span>
-                <span className="shrink-0 text-[11px] text-brown-400">{counts[v] ?? 0} 场</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-[#2a1c14]">{v}</span>
+                <span className="shrink-0 text-[11px] text-[#9c7e5e]">{counts[v] ?? 0} 场</span>
               </button>
             );
           })}
@@ -522,7 +565,7 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
               'shrink-0 rounded px-2.5 py-1 text-sm font-bold tabular-nums transition ' +
               (d === date
                 ? 'bg-clay-700 text-white'
-                : 'bg-brown-700/50 text-brown-200 hover:bg-brown-700')
+                : 'bg-[#dcc89f] text-[#5b4632] hover:bg-[#dcc89f]')
             }
           >
             6/{d}
@@ -558,8 +601,8 @@ function ViewToggle({
           className={
             'rounded px-2.5 py-1 text-xs font-semibold transition ' +
             (view === o.id
-              ? 'bg-brown-700 text-white'
-              : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
+              ? 'bg-[#e3d2ad] text-white'
+              : 'bg-[#dcc89f] text-[#6b5238] hover:bg-[#e3d2ad]')
           }
         >
           {o.label}
@@ -582,19 +625,19 @@ function ScheduleRow({
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-stretch gap-2.5 border-b border-brown-700/40 py-2 text-left"
+      className="group flex w-full items-stretch gap-2.5 border-b border-[#cbb287] py-2 text-left"
     >
       <div className="w-12 shrink-0 pt-0.5 text-right">
-        {showDate && <div className="text-[10px] text-brown-400">6/{s.date}</div>}
-        <div className="text-sm font-bold tabular-nums text-brown-100">{s.time}</div>
-        {s.dur ? <div className="text-[10px] text-brown-400">{s.dur}min</div> : null}
+        {showDate && <div className="text-[10px] text-[#9c7e5e]">6/{s.date}</div>}
+        <div className="text-sm font-bold tabular-nums text-[#2a1c14]">{s.time}</div>
+        {s.dur ? <div className="text-[10px] text-[#9c7e5e]">{s.dur}min</div> : null}
       </div>
       <div className="w-1 shrink-0 rounded-full" style={{ background: CATEGORY_COLORS[s.cat] }} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-brown-100 group-hover:underline">
+        <div className="truncate text-sm font-medium text-[#2a1c14] group-hover:underline">
           {s.title}
         </div>
-        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-brown-300">
+        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#6b5238]">
           <span
             className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
@@ -627,7 +670,7 @@ function ScheduleDetail({
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
         <button
           onClick={onBack}
-          className="shrink-0 rounded bg-brown-700/50 px-2 py-1 text-xs text-brown-200 hover:bg-brown-700"
+          className="shrink-0 rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#dcc89f]"
         >
           ← 返回
         </button>
@@ -639,20 +682,20 @@ function ScheduleDetail({
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <h3 className="font-display text-2xl leading-tight text-brown-100">{item.title}</h3>
-        <div className="mt-3 space-y-1.5 text-sm text-brown-200">
+        <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{item.title}</h3>
+        <div className="mt-3 space-y-1.5 text-sm text-[#5b4632]">
           <div className="flex gap-2">
-            <span className="w-10 shrink-0 text-brown-400">时间</span>
+            <span className="w-10 shrink-0 text-[#9c7e5e]">时间</span>
             <span className="tabular-nums">
               6/{item.date} {item.time}
               {item.dur ? ` · ${item.dur} 分钟` : ''}
             </span>
           </div>
           <div className="group flex items-center gap-2">
-            <span className="w-10 shrink-0 text-brown-400">场地</span>
+            <span className="w-10 shrink-0 text-[#9c7e5e]">场地</span>
             <button
               onClick={() => onVenue(item.venue)}
-              className="min-w-0 text-left text-[#e4b58c] hover:underline"
+              className="min-w-0 text-left text-[#9c4b34] hover:underline"
             >
               {item.venue}
               {onmap ? '' : '（场外剧场）'}
@@ -662,7 +705,7 @@ function ScheduleDetail({
                 onClick={() => focusVenueOnMap(item.venue)}
                 title="在地图上定位"
                 aria-label="在地图上定位"
-                className="shrink-0 text-brown-400 opacity-40 transition hover:text-clay-300 group-hover:opacity-100"
+                className="shrink-0 text-[#9c7e5e] opacity-40 transition hover:text-[#9c4b34] group-hover:opacity-100"
               >
                 <svg
                   width="14"
@@ -682,7 +725,7 @@ function ScheduleDetail({
             )}
           </div>
         </div>
-        <p className="mt-4 whitespace-pre-wrap rounded-lg bg-brown-700/40 p-3 text-sm leading-relaxed text-brown-100">
+        <p className="mt-4 whitespace-pre-wrap rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#2a1c14]">
           {item.desc}
         </p>
         <button
@@ -700,12 +743,14 @@ function StateTab({
   worldId,
   engineId,
   game,
+  userId,
   playerId,
   setSelectedElement,
 }: {
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
+  userId: string;
   playerId?: GameId<'players'>;
   setSelectedElement: SelectElement;
 }) {
@@ -719,6 +764,7 @@ function StateTab({
           worldId={worldId}
           engineId={engineId}
           game={game}
+          userId={userId}
           playerId={playerId}
           setSelectedElement={setSelectedElement}
           scrollViewRef={detailScrollRef}
@@ -735,32 +781,31 @@ function StateTab({
   conversations.forEach((c) => c.participants.forEach((_v, k) => inConvo.add(k as string)));
 
   const stats = [
-    { k: 'AI 居民', v: agents.length },
-    { k: '真人玩家', v: humans },
-    { k: '进行中对话', v: conversations.length },
-    { k: '正在交谈', v: inConvo.size },
+    { k: 'AI 居民', v: agents.length, g: '居' },
+    { k: '真人玩家', v: humans, g: '客' },
+    { k: '进行中对话', v: conversations.length, g: '语' },
+    { k: '正在交谈', v: inConvo.size, g: '叙' },
   ];
 
   const nameOf = (pid: string) => game.playerDescriptions.get(pid as never)?.name ?? '居民';
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {stats.map((s) => (
-          <div
-            key={s.k}
-            className="rounded-lg border border-brown-700/50 bg-brown-700/30 px-3 py-2.5"
-          >
-            <div className="font-display text-3xl leading-none text-[#e4b58c]">{s.v}</div>
-            <div className="mt-1 text-xs text-brown-300">{s.k}</div>
+          <div key={s.k} className="sand-stat">
+            <span className="corner">{s.g}</span>
+            <div className="font-num text-4xl font-semibold leading-none text-[#9c4b34]">{s.v}</div>
+            <div className="mt-1.5 text-xs tracking-wide text-[#6b5238]">{s.k}</div>
           </div>
         ))}
       </div>
 
-      <h3 className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wider text-brown-300">
-        居民动态
-      </h3>
-      <div className="space-y-1">
+      <div className="mb-1.5 mt-5 flex items-center gap-2">
+        <h3 className="text-[13px] font-bold tracking-[0.18em] text-[#2a1c14]">居 民 动 态</h3>
+        <span className="h-px flex-1 bg-gradient-to-r from-[#cbb287] to-transparent" />
+      </div>
+      <div>
         {players
           .filter((p) => !p.human)
           .map((p) => {
@@ -772,15 +817,25 @@ function StateTab({
                   setSelectedElement({ kind: 'player', id: p.id });
                   focusMapTile(p.position.x, p.position.y);
                 }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-brown-700/40"
+                className="flex w-full items-center gap-2.5 border-b border-dashed border-[#cdb79a]/70 px-1 py-2.5 text-left transition hover:bg-[#e8d6b0]/60"
               >
                 <span
                   className={
-                    'h-2 w-2 shrink-0 rounded-full ' + (talking ? 'bg-[#c0654a]' : 'bg-brown-500')
+                    'h-2 w-2 shrink-0 rounded-full ' + (talking ? 'bg-[#c0654a]' : 'bg-[#b3a489]')
                   }
+                  style={talking ? { boxShadow: '0 0 0 3px rgba(192,101,74,0.14)' } : undefined}
                 />
-                <span className="truncate text-sm text-brown-100">{nameOf(p.id as string)}</span>
-                <span className="ml-auto shrink-0 text-[11px] text-brown-400">
+                <span className="truncate text-[15px] font-medium text-[#2a1c14]">
+                  {nameOf(p.id as string)}
+                </span>
+                <span
+                  className={
+                    'ml-auto shrink-0 text-xs ' +
+                    (talking
+                      ? 'font-semibold text-[#9c4b34]'
+                      : 'italic text-[#9c7e5e]')
+                  }
+                >
                   {talking ? '交谈中' : '漫步'}
                 </span>
               </button>
@@ -793,7 +848,7 @@ function StateTab({
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-full items-center justify-center px-8 text-center text-sm leading-relaxed text-brown-300">
+    <div className="flex h-full items-center justify-center px-8 text-center text-sm leading-relaxed text-[#6b5238]">
       {children}
     </div>
   );

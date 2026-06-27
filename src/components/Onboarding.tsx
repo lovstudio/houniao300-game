@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Avatar, AVATAR_PRESETS, DEFAULT_PRESET } from '../lib/avatars';
 import { Gender } from '../lib/identity';
 import clsx from 'clsx';
+import SandText, { type SandTextHandle } from './SandText.tsx';
 
 type AvatarChoice =
   | { kind: 'preset'; preset: string }
@@ -27,6 +28,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const headingRef = useRef<SandTextHandle>(null);
   const canSave = !!name.trim() && !!gender && !saving;
 
   const generate = async () => {
@@ -42,6 +44,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
 
   const finish = async () => {
     if (!canSave || !gender) return;
+    headingRef.current?.scatter(); // 把名字写进沙里：标题散成沙作为提交反馈
     setSaving(true);
     try {
       await save({
@@ -60,102 +63,117 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
   const previewUrl = avatar.kind === 'generated' ? avatar.url : null;
   const previewPreset = avatar.kind === 'preset' ? avatar.preset : null;
 
+  const serif = '"Noto Serif SC","Songti SC",serif';
+  const inputCls =
+    'sand-underline w-full bg-transparent border-0 text-[15px] text-[#2c2620] outline-none placeholder:text-[#a89e8d]';
+
   return (
-    <div className="flex h-full items-center justify-center overflow-y-auto bg-brown-900 p-6 text-brown-100">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-4">
-          <Avatar url={previewUrl} preset={previewPreset} size="lg" />
-          <div>
-            <h1 className="font-display game-title text-3xl">欢迎来到候鸟沙城</h1>
-            <p className="text-sm text-brown-300">先创建你的身份，整个沙城通用。</p>
-          </div>
+    <div className="mx-auto w-full max-w-[400px] text-left" style={{ fontFamily: serif, color: '#2c2620' }}>
+      {/* 表头：沙粒「登记成为候鸟」，提交时散成沙 */}
+      <div className="mb-8 flex flex-col items-center gap-3 text-center">
+        <Avatar url={previewUrl} preset={previewPreset} size="lg" />
+        <div className="flex flex-col items-center">
+          <h2 className="sr-only">登记成为候鸟</h2>
+          <SandText
+            ref={headingRef}
+            text="登记成为候鸟"
+            tracking={0.16}
+            fontScale={0.66}
+            settleMs={1600}
+            className="h-[34px] w-[248px]"
+          />
+          <p className="mt-2 text-[12px] tracking-[0.04em] text-[#7a7063]">
+            先创建你的身份，整座候鸟沙城通用
+          </p>
         </div>
-
-        {/* 名字 */}
-        <label className="mb-1 block text-sm text-brown-300">名字</label>
-        <input
-          className="mb-4 w-full rounded border-2 border-brown-700 bg-brown-800 px-3 py-2 text-brown-100 placeholder:text-brown-500"
-          placeholder="你在沙城里的名字"
-          value={name}
-          maxLength={20}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        {/* 性别 */}
-        <label className="mb-1 block text-sm text-brown-300">性别</label>
-        <div className="mb-4 flex gap-2">
-          {GENDERS.map((g) => (
-            <button
-              key={g.value}
-              onClick={() => setGender(g.value)}
-              className={clsx(
-                'flex-1 rounded border-2 px-3 py-2',
-                gender === g.value
-                  ? 'border-clay-500 bg-clay-700 text-white'
-                  : 'border-brown-700 bg-brown-800 text-brown-200 hover:border-clay-500',
-              )}
-            >
-              {g.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 头像：预置 */}
-        <label className="mb-1 block text-sm text-brown-300">头像</label>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {AVATAR_PRESETS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setAvatar({ kind: 'preset', preset: p.id })}
-              className={clsx(
-                'rounded-full',
-                avatar.kind === 'preset' && avatar.preset === p.id ? 'ring-2 ring-clay-300' : '',
-              )}
-            >
-              <Avatar preset={p.id} size="md" />
-            </button>
-          ))}
-        </div>
-
-        {/* 头像：自定义 -> AI 生成 */}
-        <div className="mb-6 rounded border-2 border-dashed border-brown-700 p-3">
-          <p className="mb-2 text-xs text-brown-400">或描述你想要的样子，AI 为你生成专属头像</p>
-          <div className="flex gap-2">
-            <input
-              className="min-w-0 flex-1 rounded border-2 border-brown-700 bg-brown-800 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-500"
-              placeholder="如：戴草帽的旅人、橙羽信使…"
-              value={desc}
-              disabled={generating}
-              onChange={(e) => setDesc(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void generate()}
-            />
-            <button
-              className="shrink-0 rounded bg-clay-700 px-3 text-sm font-bold text-white hover:bg-clay-500 disabled:opacity-50"
-              disabled={generating || !desc.trim() || !name.trim() || !gender}
-              onClick={() => void generate()}
-            >
-              {generating ? '生成中…' : '生成'}
-            </button>
-          </div>
-          {!name.trim() || !gender ? (
-            <p className="mt-2 text-xs text-brown-500">填好名字和性别后即可生成</p>
-          ) : null}
-          {avatar.kind === 'generated' && (
-            <div className="mt-3 flex items-center gap-2">
-              <Avatar url={avatar.url} size="md" className="ring-2 ring-clay-300" />
-              <span className="text-xs text-brown-300">已选用 AI 生成头像</span>
-            </div>
-          )}
-        </div>
-
-        <button
-          className="w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500 disabled:opacity-50"
-          disabled={!canSave}
-          onClick={() => void finish()}
-        >
-          {saving ? '保存中…' : '进入沙城'}
-        </button>
       </div>
+
+      {/* 名字 */}
+      <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">名 字</label>
+      <input
+        className={clsx(inputCls, 'mb-7')}
+        placeholder="你在沙城里的名字"
+        value={name}
+        maxLength={20}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      {/* 性别 —— 文字态切换 */}
+      <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">性 别</label>
+      <div className="mb-7 flex gap-8">
+        {GENDERS.map((g) => (
+          <button
+            key={g.value}
+            onClick={() => setGender(g.value)}
+            className="border-b pb-1 text-[15px] tracking-[0.1em] transition-colors"
+            style={{
+              color: gender === g.value ? '#2c2620' : '#a89e8d',
+              borderColor: gender === g.value ? '#b0563a' : 'transparent',
+            }}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 头像：预置 */}
+      <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">头 像</label>
+      <div className="mb-4 flex flex-wrap gap-2.5">
+        {AVATAR_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setAvatar({ kind: 'preset', preset: p.id })}
+            className={clsx(
+              'rounded-full transition-all',
+              avatar.kind === 'preset' && avatar.preset === p.id
+                ? 'ring-2 ring-[#b0563a]'
+                : 'opacity-70 ring-1 ring-[rgba(44,38,32,0.14)] hover:opacity-100',
+            )}
+          >
+            <Avatar preset={p.id} size="md" />
+          </button>
+        ))}
+      </div>
+
+      {/* 头像：自定义 -> AI 生成 */}
+      <div className="mb-9 border-t border-[rgba(44,38,32,0.12)] pt-4">
+        <p className="mb-2 text-[12px] text-[#7a7063]">或描述你想要的样子，AI 为你生成专属头像</p>
+        <div className="flex items-end gap-3">
+          <input
+            className={clsx(inputCls, 'flex-1 text-[14px]')}
+            placeholder="如：戴草帽的旅人、橙羽信使…"
+            value={desc}
+            disabled={generating}
+            onChange={(e) => setDesc(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void generate()}
+          />
+          <button
+            className="shrink-0 pb-2 text-[13px] tracking-[0.1em] text-[#b0563a] transition-opacity hover:opacity-70 disabled:opacity-30"
+            disabled={generating || !desc.trim() || !name.trim() || !gender}
+            onClick={() => void generate()}
+          >
+            {generating ? '生成中…' : '生成 →'}
+          </button>
+        </div>
+        {!name.trim() || !gender ? (
+          <p className="mt-2 text-[11px] text-[#a89e8d]">填好名字和性别后即可生成</p>
+        ) : null}
+        {avatar.kind === 'generated' && (
+          <div className="mt-3 flex items-center gap-2">
+            <Avatar url={avatar.url} size="md" className="ring-2 ring-[#b0563a]" />
+            <span className="text-[12px] text-[#7a7063]">已选用 AI 生成头像</span>
+          </div>
+        )}
+      </div>
+
+      <button
+        className="w-full border border-[#2c2620] py-3 text-[14px] tracking-[0.34em] text-[#2c2620] transition-colors hover:border-[#2c2620] hover:bg-[#2c2620] hover:text-[#f3efe6] disabled:cursor-not-allowed disabled:opacity-30"
+        style={{ textIndent: '0.34em' }}
+        disabled={!canSave}
+        onClick={() => void finish()}
+      >
+        {saving ? '保存中…' : '进入候鸟沙城 →'}
+      </button>
     </div>
   );
 }

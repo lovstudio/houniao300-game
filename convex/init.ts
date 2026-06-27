@@ -126,11 +126,12 @@ async function shouldCreateAgents(
   if (world.agents.length > 0) {
     return false;
   }
+  // 用 byName 索引只取该引擎的 createAgent 输入（寥寥数条），再在内存里挑出
+  // 尚未处理（returnValue 为空）的。旧实现用 byInputNumber 全表扫，inputs 累积
+  // 过 3.2 万条后会触发 Convex 单次读取上限而报错。
   const unactionedJoinInputs = await db
     .query('inputs')
-    .withIndex('byInputNumber', (q) => q.eq('engineId', engineId))
-    .order('asc')
-    .filter((q) => q.eq(q.field('name'), 'createAgent'))
+    .withIndex('byName', (q) => q.eq('engineId', engineId).eq('name', 'createAgent'))
     .filter((q) => q.eq(q.field('returnValue'), undefined))
     .first();
   if (unactionedJoinInputs) {
