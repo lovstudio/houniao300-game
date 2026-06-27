@@ -137,38 +137,14 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             text="沙之书"
             tracking={0.16}
             settleMs={2600}
-            className="mt-4 mb-5 h-[clamp(160px,36vh,380px)] w-[min(92vw,760px)]"
+            className="my-6 h-[clamp(180px,40vh,420px)] w-[min(92vw,760px)]"
           />
 
+          {/* 题词：沙中逐行缓现缓隐，安放右下角，不抢「开始」CTA */}
           <div
-            className="splash-fade"
-            style={{
-              fontFamily: serif,
-              fontSize: 'clamp(11px,1.5vw,14px)',
-              letterSpacing: '0.34em',
-              textIndent: '0.34em',
-              color: INK,
-              opacity: 0.9,
-              animationDelay: '1.6s',
-            }}
+            className="splash-fade absolute bottom-[max(5vh,22px)] right-[max(4vw,18px)] flex flex-col items-end"
+            style={{ animationDelay: '2.4s' }}
           >
-            候鸟沙城 · 候鸟300
-          </div>
-          <div
-            className="splash-fade mt-2"
-            style={{
-              fontFamily: serif,
-              fontSize: 'clamp(10px,1.2vw,12px)',
-              letterSpacing: '0.26em',
-              color: INK_SOFT,
-              animationDelay: '1.75s',
-            }}
-          >
-            孤独图书馆向北 200 米
-          </div>
-
-          {/* 题词：沙中逐行缓现缓隐 */}
-          <div className="splash-fade mt-8 flex flex-col items-center" style={{ animationDelay: '2.2s' }}>
             <SandText
               ref={lyricRef}
               text={LYRIC[lyric]}
@@ -176,17 +152,18 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
               fontScale={0.72}
               tracking={0.2}
               settleMs={1100}
-              color="#6a6052"
-              className="h-[30px] w-[260px]"
+              color="#7a7163"
+              className="h-[28px] w-[230px]"
             />
             <div
-              className="mt-2.5"
+              className="mt-2"
               style={{
                 fontFamily: serif,
                 fontSize: '10px',
-                letterSpacing: '0.16em',
+                letterSpacing: '0.14em',
                 color: INK_SOFT,
-                opacity: 0.62,
+                opacity: 0.5,
+                textAlign: 'right',
               }}
             >
               —— 刺猬《火车驶向云外，梦安魂于九霄》
