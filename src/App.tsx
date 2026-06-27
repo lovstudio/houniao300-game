@@ -1,8 +1,7 @@
 import Game, { type ControlMode } from './components/Game.tsx';
-import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
 import EndingsWall from './components/EndingsWall.tsx';
-import Onboarding from './components/Onboarding.tsx';
+import Landing from './components/Landing.tsx';
 import VenueInteriorMap from './components/VenueInteriorMap.tsx';
 import {
   setActivityEnterHandler,
@@ -13,7 +12,7 @@ import {
   getVenueInterior,
   type VenueInteriorMap as VenueInteriorMapData,
 } from '../data/birdRestaurantInterior.ts';
-import { SCHEDULE } from '../data/schedule.ts';
+import { SCHEDULE, VENUE_COORDS, VENUES } from '../data/schedule.ts';
 import { getAnonUserId } from './lib/identity.ts';
 
 import { ToastContainer } from 'react-toastify';
@@ -25,8 +24,32 @@ import { useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import ReactModal from 'react-modal';
-import TopBar from './components/TopBar.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
+import PhotoMemoryModal, {
+  type PhotoMemoryLocationOption,
+} from './components/PhotoMemoryModal.tsx';
+import PhotoMemoryNotifications from './components/PhotoMemoryNotifications.tsx';
+import { useServerGame } from './hooks/serverGame.ts';
+
+const MAP_SOURCE_WIDTH = 1703;
+const MAP_SOURCE_HEIGHT = 1279;
+
+function nearestVenueForTile(
+  x: number,
+  y: number,
+  mapWidth: number,
+  mapHeight: number,
+): string | undefined {
+  let best: { venue: string; distance: number } | null = null;
+  for (const [venue, source] of Object.entries(VENUE_COORDS)) {
+    if (!source) continue;
+    const venueX = (source[0] / MAP_SOURCE_WIDTH) * mapWidth;
+    const venueY = (source[1] / MAP_SOURCE_HEIGHT) * mapHeight;
+    const distance = Math.hypot(x - venueX, y - venueY);
+    if (!best || distance < best.distance) best = { venue, distance };
+  }
+  return best?.venue;
+}
 
 export default function Home() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
@@ -37,6 +60,7 @@ export default function Home() {
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
   const [activeInterior, setActiveInterior] = useState<VenueInteriorMapData | null>(null);
+  const [photoMemoryOpen, setPhotoMemoryOpen] = useState(false);
 
   // 公测实时结局墙：?wall=1 进入，跳过身份门，纯公共投屏大屏视图。
   const isWall = useMemo(() => new URLSearchParams(window.location.search).get('wall') === '1', []);
@@ -53,6 +77,13 @@ export default function Home() {
   // 全局玩家身份：未完成 onboarding 前，强制停在录入页。
   const userId = useMemo(getAnonUserId, []);
   const profile = useQuery(api.profile.getProfile, { userId });
+  const worldStatus = useQuery(api.world.defaultWorldStatus);
+  const worldId = worldStatus?.worldId;
+  const game = useServerGame(worldId);
+  const humanTokenIdentifier = useQuery(
+    api.world.userStatus,
+    worldId ? { worldId, userId } : 'skip',
+  ) ?? null;
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -109,6 +140,95 @@ export default function Home() {
       return nextFollow;
     });
 
+  const currentPlayerLocationOption = useMemo<PhotoMemoryLocationOption | null>(() => {
+    if (!game || !humanTokenIdentifier) return null;
+    const humanPlayer = [...game.world.players.values()].find(
+      (p) => p.human === humanTokenIdentifier,
+    );
+    if (!humanPlayer) return null;
+    const x = Math.round(humanPlayer.position.x);
+    const y = Math.round(humanPlayer.position.y);
+    const nearestVenue = nearestVenueForTile(
+      humanPlayer.position.x,
+      humanPlayer.position.y,
+      game.worldMap.width,
+      game.worldMap.height,
+    );
+    return {
+      id: 'current-player-location',
+      label: '我的当前位置',
+      detail: nearestVenue ? `靠近 ${nearestVenue}` : `地图坐标 ${x}, ${y}`,
+      venue: nearestVenue,
+      contextLabel: nearestVenue
+        ? `玩家当前位置，靠近${nearestVenue}，地图坐标 ${x}, ${y}`
+        : `玩家当前位置，地图坐标 ${x}, ${y}`,
+    };
+  }, [game, humanTokenIdentifier]);
+
+  const photoMemoryLocationOptions = useMemo<PhotoMemoryLocationOption[]>(() => {
+    const options: PhotoMemoryLocationOption[] = [];
+    if (currentPlayerLocationOption) options.push(currentPlayerLocationOption);
+    if (activeActivity) {
+      options.push({
+        id: `activity:${activeActivity.activityKey}`,
+        label: '当前活动',
+        detail: activeActivity.title,
+        contextLabel: activeActivity.title,
+        activityKey: activeActivity.activityKey,
+        activityTitle: activeActivity.title,
+        venue: activeActivity.hostName,
+      });
+    }
+    if (activeInterior) {
+      options.push({
+        id: `interior:${activeInterior.id}`,
+        label: '当前内场',
+        detail: activeInterior.venue,
+        contextLabel: activeInterior.venue,
+        venue: activeInterior.venue,
+      });
+    }
+    if (options.length === 0) {
+      options.push({
+        id: 'world:sand-city',
+        label: '候鸟沙城',
+        contextLabel: '候鸟沙城',
+      });
+    }
+    for (const venue of VENUES) {
+      options.push({
+        id: `venue:${venue}`,
+        label: venue,
+        contextLabel: venue,
+        venue,
+      });
+    }
+    const deduped = new Map<string, PhotoMemoryLocationOption>();
+    for (const option of options) deduped.set(option.id, option);
+    return [...deduped.values()];
+  }, [activeActivity, activeInterior, currentPlayerLocationOption]);
+
+  const photoMemoryContext = useMemo(() => {
+    if (photoMemoryLocationOptions[0]) {
+      return photoMemoryLocationOptions[0];
+    }
+    if (activeActivity) {
+      return {
+        contextLabel: activeActivity.title,
+        activityKey: activeActivity.activityKey,
+        activityTitle: activeActivity.title,
+        venue: activeActivity.hostName,
+      };
+    }
+    if (activeInterior) {
+      return {
+        contextLabel: activeInterior.venue,
+        venue: activeInterior.venue,
+      };
+    }
+    return { contextLabel: '候鸟沙城' };
+  }, [activeActivity, activeInterior, photoMemoryLocationOptions]);
+
   // 连环画永久链接：直接打开该篇灯箱（复用结局墙，跳过身份门）。
   if (comicId) {
     return <EndingsWall initialComicId={comicId as Id<'experiences'>} />;
@@ -128,17 +248,7 @@ export default function Home() {
     );
   }
   if (profile === null) {
-    return (
-      <main
-        className="screen-h bg-brown-900"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
-      >
-        <Onboarding userId={userId} onDone={() => undefined} />
-      </main>
-    );
+    return <Landing userId={userId} onDone={() => undefined} />;
   }
 
   return (
@@ -178,45 +288,30 @@ export default function Home() {
           </p>
         </div>
       </ReactModal>
-      {/*<div className="p-3 absolute top-0 right-0 z-10 text-2xl">
-        <Authenticated>
-          <UserButton afterSignOutUrl="/ai-town" />
-        </Authenticated>
 
-        <Unauthenticated>
-          <LoginButton />
-        </Unauthenticated>
-      </div> */}
-
-      {/* top navigation bar — festival masthead (solid, in normal flow) */}
-      <TopBar
-        controlMode={controlMode}
-        cameraFollow={cameraFollow}
-        isFullscreen={isFullscreen}
-        onToggleControlMode={toggleControlMode}
-        onToggleCameraFollow={toggleCameraFollow}
-        onToggleFullscreen={() => void toggleFullscreen()}
-        onHelp={() => setHelpModalOpen(true)}
-        showCollisionOverlay={showCollisionOverlay}
-        onToggleCollisionOverlay={() => setShowCollisionOverlay((visible) => !visible)}
-      />
-
-      <div className="relative min-h-0 flex-1 overflow-hidden shadow-2xl">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <Game
+          userId={userId}
           controlMode={controlMode}
           cameraFollow={cameraFollow}
+          isFullscreen={isFullscreen}
+          showCollisionOverlay={showCollisionOverlay}
           onToggleControlMode={toggleControlMode}
           onToggleCameraFollow={toggleCameraFollow}
           onSetCameraFollow={setCameraFollow}
+          onToggleFullscreen={() => void toggleFullscreen()}
+          onToggleCollisionOverlay={() => setShowCollisionOverlay((visible) => !visible)}
+          onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
+          onHelp={() => setHelpModalOpen(true)}
           onEnterVenueInterior={(interiorId) => {
             const interior = getVenueInterior(interiorId);
             if (interior) setActiveInterior(interior);
           }}
-          showCollisionOverlay={showCollisionOverlay}
         />
+
+        <PhotoMemoryNotifications userId={userId} />
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </div>
-      <Timeline />
 
       {/* 活动专属体验：作为覆盖层叠在小镇之上，关闭即回到小镇（小镇状态不丢） */}
       {activeActivity && (
@@ -230,14 +325,28 @@ export default function Home() {
           <Experience
             key={activeActivity.activityKey}
             activity={activeActivity}
+            onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
             onExit={() => setActiveActivity(null)}
           />
         </div>
       )}
 
       {activeInterior && (
-        <VenueInteriorMap interior={activeInterior} onExit={() => setActiveInterior(null)} />
+        <VenueInteriorMap
+          interior={activeInterior}
+          onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
+          onExit={() => setActiveInterior(null)}
+        />
       )}
+
+      <PhotoMemoryModal
+        open={photoMemoryOpen}
+        onClose={() => setPhotoMemoryOpen(false)}
+        userId={userId}
+        userName={profile.name}
+        context={photoMemoryContext}
+        locationOptions={photoMemoryLocationOptions}
+      />
     </main>
   );
 }

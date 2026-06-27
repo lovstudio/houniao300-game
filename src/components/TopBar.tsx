@@ -1,5 +1,6 @@
 import InteractButton from './buttons/InteractButton';
 import SettingsMenu from './SettingsMenu';
+import type { Id } from '../../convex/_generated/dataModel';
 
 // 候鸟驿站招牌 — the festival masthead: a migratory-bird seal, the gold game title, and the control deck.
 
@@ -22,6 +23,8 @@ function FlockSeal() {
 }
 
 export default function TopBar({
+  userId,
+  worldId,
   controlMode,
   cameraFollow,
   isFullscreen,
@@ -30,8 +33,11 @@ export default function TopBar({
   onToggleCameraFollow,
   onToggleFullscreen,
   onToggleCollisionOverlay,
+  onOpenPhotoMemory,
   onHelp,
 }: {
+  userId: string;
+  worldId?: Id<'worlds'>;
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
   isFullscreen: boolean;
@@ -40,6 +46,7 @@ export default function TopBar({
   onToggleCameraFollow: () => void;
   onToggleFullscreen: () => void;
   onToggleCollisionOverlay: () => void;
+  onOpenPhotoMemory: () => void;
   onHelp: () => void;
 }) {
   return (
@@ -57,19 +64,19 @@ export default function TopBar({
                 v{__APP_VERSION__}
               </span>
             </div>
-            {/* 博尔赫斯式标语：一本没有第一页、也没有最后一页的书 */}
+            {/* 品牌副线：诗名「沙之书」/ 品牌「候鸟沙城 · 候鸟300」 */}
             <span
               className="mt-0.5 hidden whitespace-nowrap text-[11px] italic tracking-[0.18em] text-brown-300/80 sm:inline"
               style={{ fontFamily: '"Noto Serif SC", serif' }}
             >
-              没有第一页，也没有最后一页
+              候鸟沙城 · 候鸟300
             </span>
           </div>
         </div>
 
         {/* control deck — primary action + settings menu */}
         <div className="masthead-in deck-group relative z-50 ml-auto flex items-center gap-1" style={{ animationDelay: '0.08s' }}>
-          <InteractButton />
+          <InteractButton userId={userId} worldId={worldId} />
           <SettingsMenu
             controlMode={controlMode}
             cameraFollow={cameraFollow}
@@ -79,6 +86,7 @@ export default function TopBar({
             onToggleCameraFollow={onToggleCameraFollow}
             onToggleFullscreen={onToggleFullscreen}
             onToggleCollisionOverlay={onToggleCollisionOverlay}
+            onOpenPhotoMemory={onOpenPhotoMemory}
             onHelp={onHelp}
           />
         </div>

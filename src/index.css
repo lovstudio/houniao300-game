@@ -114,8 +114,10 @@ body {
 .deck-group {
   padding: 4px;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(20, 12, 6, 0.5), rgba(20, 12, 6, 0.28));
-  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.08), inset 0 0 0 1px rgba(255, 220, 170, 0.06);
+  /* 作为游戏内浮层时背后没有招牌深色条，底衬需足够不透明，确保在浅色地图上也清晰可读 */
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.86), rgba(20, 12, 6, 0.74));
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.1), inset 0 0 0 1px rgba(255, 220, 170, 0.08),
+    0 2px 10px rgba(20, 12, 6, 0.4);
 }
 .deck-btn {
   display: inline-flex;
@@ -562,3 +564,45 @@ body {
   .splash-fade,
   .splash-rule { animation-duration: 0.4s; }
 }
+
+/* 候鸟300 现场瞬间轮播淡入 */
+@keyframes landingMoment {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.landing-moment {
+  animation: landingMoment 0.9s ease both;
+}
+
+/* 沙粒点阵下划线：呼应「沙之书」的颗粒质感，聚焦时变密、转陶土 */
+.sand-underline {
+  padding-bottom: 9px;
+  background-image: radial-gradient(circle, rgba(44, 38, 32, 0.42) 0.7px, transparent 0.8px);
+  background-size: 6px 2px;
+  background-position: 0 100%;
+  background-repeat: repeat-x;
+  transition: background-image 0.3s ease, background-size 0.3s ease;
+}
+.sand-underline:focus {
+  background-image: radial-gradient(circle, rgba(176, 86, 58, 0.85) 0.9px, transparent 1px);
+  background-size: 4px 2px;
+}
+
+/* ── 《沙之书》标题屏：瑰伟 · 3A 感 ───────────────────────── */
+@keyframes landingBloom {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.92; transform: scale(1.06); }
+}
+.landing-bloom { animation: landingBloom 9s ease-in-out infinite; }
+
+@keyframes ctaPulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.landing-cta { animation: ctaPulse 2.8s ease-in-out infinite; }
+
+@keyframes landingRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.landing-rise { animation: landingRise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }

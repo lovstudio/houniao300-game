@@ -128,6 +128,7 @@ function movementVector(key: string) {
 }
 
 export const PixiGame = (props: {
+  userId: string;
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
@@ -148,7 +149,8 @@ export const PixiGame = (props: {
   const convex = useConvex();
   const viewportRef = useRef<Viewport | undefined>();
 
-  const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
+  const humanTokenIdentifier =
+    useQuery(api.world.userStatus, { worldId: props.worldId, userId: props.userId }) ?? null;
   const humanPlayerId = [...props.game.world.players.values()].find(
     (p) => p.human === humanTokenIdentifier,
   )?.id;

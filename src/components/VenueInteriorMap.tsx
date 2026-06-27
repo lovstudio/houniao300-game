@@ -8,6 +8,7 @@ import {
 
 type Props = {
   interior?: VenueInteriorMapData;
+  onOpenPhotoMemory?: () => void;
   onExit: () => void;
 };
 
@@ -160,7 +161,11 @@ function SceneBackdrop({ scene }: { scene: VenueInteriorMapData['scene'] }) {
   return scene === 'bridge' ? <BridgeBackdrop /> : <RestaurantBackdrop />;
 }
 
-export default function VenueInteriorMap({ interior = BIRD_RESTAURANT_INTERIOR, onExit }: Props) {
+export default function VenueInteriorMap({
+  interior = BIRD_RESTAURANT_INTERIOR,
+  onOpenPhotoMemory,
+  onExit,
+}: Props) {
   const scene = interior.scene ?? 'restaurant';
   const heading = scene === 'restaurant' ? `${interior.venue}内场` : interior.venue;
   const subtitle = interior.subtitle ?? '夜市棚 · 餐桌 · 摊位 · 演出角';
@@ -176,13 +181,24 @@ export default function VenueInteriorMap({ interior = BIRD_RESTAURANT_INTERIOR, 
             {subtitle}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onExit}
-          className="shrink-0 border border-[#c99650] bg-[#3a251b] px-4 py-2 text-sm font-bold text-[#ffe7bc] shadow-[3px_3px_0_#120b08] transition hover:bg-[#5a3425] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-        >
-          离开
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {onOpenPhotoMemory && (
+            <button
+              type="button"
+              onClick={onOpenPhotoMemory}
+              className="border border-[#c99650] bg-[#3a251b] px-3 py-2 text-sm font-bold text-[#ffe7bc] shadow-[3px_3px_0_#120b08] transition hover:bg-[#5a3425] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+            >
+              照片记忆
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onExit}
+            className="border border-[#c99650] bg-[#3a251b] px-4 py-2 text-sm font-bold text-[#ffe7bc] shadow-[3px_3px_0_#120b08] transition hover:bg-[#5a3425] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+          >
+            离开
+          </button>
+        </div>
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden bg-[#241812] p-3 sm:p-5">

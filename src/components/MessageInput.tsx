@@ -11,11 +11,13 @@ export function MessageInput({
   worldId,
   engineId,
   humanPlayer,
+  userId,
   conversation,
 }: {
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   humanPlayer: Player;
+  userId: string;
   conversation: Conversation;
 }) {
   const descriptions = useQuery(api.world.gameDescriptions, { worldId });
@@ -67,6 +69,7 @@ export function MessageInput({
     messageUuid = messageUuid || crypto.randomUUID();
     await writeMessage({
       worldId,
+      userId,
       playerId: humanPlayer.id,
       conversationId: conversation.id,
       text,
