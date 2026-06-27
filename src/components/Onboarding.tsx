@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { Avatar, AVATAR_PRESETS, DEFAULT_PRESET } from '../lib/avatars';
 import { Gender } from '../lib/identity';
 import clsx from 'clsx';
@@ -20,22 +21,44 @@ const GENDERS: { value: Gender; label: string }[] = [
 export default function Onboarding({ userId, onDone }: { userId: string; onDone: () => void }) {
   const save = useMutation(api.profile.saveProfile);
   const genAvatar = useAction(api.profile.generateAvatar);
+  const genUploadUrl = useMutation(api.profile.generateUploadUrl);
 
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [avatar, setAvatar] = useState<AvatarChoice>({ kind: 'preset', preset: DEFAULT_PRESET });
   const [desc, setDesc] = useState('');
+  const [photo, setPhoto] = useState<{ storageId: Id<'_storage'>; previewUrl: string } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const headingRef = useRef<SandTextHandle>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const canSave = !!name.trim() && !!gender && !saving;
+  // 有照片或描述其一即可生成。
+  const canGenerate = !!name.trim() && !!gender && (!!desc.trim() || !!photo) && !generating;
+
+  const pickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    const uploadUrl = await genUploadUrl();
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    const { storageId } = (await res.json()) as { storageId: Id<'_storage'> };
+    setPhoto({ storageId, previewUrl: URL.createObjectURL(file) });
+  };
 
   const generate = async () => {
-    if (!desc.trim() || !name.trim() || !gender || generating) return;
+    if (!canGenerate || !gender) return;
     setGenerating(true);
     try {
-      const { storageId, url } = await genAvatar({ description: desc.trim(), name: name.trim(), gender });
+      const { storageId, url } = await genAvatar({
+        description: desc.trim(),
+        name: name.trim(),
+        gender,
+        photoStorageId: photo?.storageId,
+      });
       setAvatar({ kind: 'generated', storageId, url: url ?? '' });
     } finally {
       setGenerating(false);
@@ -137,11 +160,42 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
 
       {/* 头像：自定义 -> AI 生成 */}
       <div className="mb-9 border-t border-[rgba(44,38,32,0.12)] pt-4">
-        <p className="mb-2 text-[12px] text-[#7a7063]">或描述你想要的样子，AI 为你生成专属头像</p>
+        <p className="mb-2 text-[12px] text-[#7a7063]">上传真人照片或描述样子，AI 为你生成专属头像</p>
+
+        {/* 上传真人照片 */}
+        <div className="mb-3 flex items-center gap-3">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void pickPhoto(e.target.files?.[0])}
+          />
+          <button
+            className="shrink-0 text-[13px] tracking-[0.1em] text-[#b0563a] transition-opacity hover:opacity-70 disabled:opacity-30"
+            disabled={generating}
+            onClick={() => fileRef.current?.click()}
+          >
+            {photo ? '换张照片' : '上传照片 ↑'}
+          </button>
+          {photo && (
+            <>
+              <img src={photo.previewUrl} alt="" className="h-9 w-9 rounded-full object-cover ring-1 ring-[rgba(44,38,32,0.14)]" />
+              <button
+                className="text-[11px] text-[#a89e8d] transition-colors hover:text-[#b0563a]"
+                disabled={generating}
+                onClick={() => setPhoto(null)}
+              >
+                移除
+              </button>
+            </>
+          )}
+        </div>
+
         <div className="flex items-end gap-3">
           <input
             className={clsx(inputCls, 'flex-1 text-[14px]')}
-            placeholder="如：戴草帽的旅人、橙羽信使…"
+            placeholder={photo ? '可补充：想要的风格细节…' : '如：戴草帽的旅人、橙羽信使…'}
             value={desc}
             disabled={generating}
             onChange={(e) => setDesc(e.target.value)}
@@ -149,7 +203,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
           />
           <button
             className="shrink-0 pb-2 text-[13px] tracking-[0.1em] text-[#b0563a] transition-opacity hover:opacity-70 disabled:opacity-30"
-            disabled={generating || !desc.trim() || !name.trim() || !gender}
+            disabled={!canGenerate}
             onClick={() => void generate()}
           >
             {generating ? '生成中…' : '生成 →'}

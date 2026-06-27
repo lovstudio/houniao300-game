@@ -51,17 +51,40 @@ export const saveProfile = mutation({
   },
 });
 
+// 上传真人照片用：前端拿到一次性 URL，PUT 文件后得到 storageId。
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+});
+
 // 自定义头像：根据描述 + 名字/性别用文生图生成一张沙雕风头像，存储后返回预览。
+// 传入 photoStorageId（用户上传的真人照片）时走 image-edit，保留五官神态再风格化。
 export const generateAvatar = action({
   args: {
     description: v.string(),
     name: v.string(),
     gender: genderValidator,
+    photoStorageId: v.optional(v.id('_storage')),
   },
-  handler: async (ctx, { description, name, gender }): Promise<{ storageId: string; url: string | null }> => {
+  handler: async (
+    ctx,
+    { description, name, gender, photoStorageId },
+  ): Promise<{ storageId: string; url: string | null }> => {
     const genderWord = gender === 'male' ? 'male' : gender === 'female' ? 'female' : 'androgynous';
-    const prompt = `circular profile avatar portrait of a ${genderWord} character named "${name}", ${description}, cinematic sand-sculpture style, fine sand grain texture, warm golden-hour light, simple soft background, head and shoulders, centered`;
-    const blob = await generateImage(prompt);
+    const extra = description.trim() ? `, ${description.trim()}` : '';
+
+    let reference: Blob | undefined;
+    if (photoStorageId) {
+      const photo = await ctx.storage.get(photoStorageId);
+      if (!photo) throw new Error('上传的照片已失效，请重新上传');
+      reference = photo;
+    }
+
+    const prompt = reference
+      ? `restyle this person's photo into a circular profile avatar, keep their facial likeness and expression${extra}, cinematic sand-sculpture style, fine sand grain texture, warm golden-hour light, simple soft background, head and shoulders, centered`
+      : `circular profile avatar portrait of a ${genderWord} character named "${name}"${extra}, cinematic sand-sculpture style, fine sand grain texture, warm golden-hour light, simple soft background, head and shoulders, centered`;
+
+    const blob = await generateImage(prompt, reference);
     const storageId = await ctx.storage.store(blob);
     const url = await ctx.storage.getUrl(storageId);
     return { storageId, url };
