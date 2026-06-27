@@ -1,25 +1,18 @@
-import DeckButton from './DeckButton';
-import { JoinIcon } from './DeckIcons';
-import { toast } from 'react-toastify';
 import { useConvex, useMutation, useQuery } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
 import { ConvexError } from 'convex/values';
-import { Id } from '../../../convex/_generated/dataModel';
 import { useEffect, useRef } from 'react';
-import { waitForInput } from '../../hooks/sendInput';
-import { useServerGame } from '../../hooks/serverGame';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
+import { waitForInput } from './sendInput';
+import { useServerGame } from './serverGame';
+import { toast } from 'react-toastify';
 
 // 沙之书 · 方案 A：打开即自动入场，无需点击；不提供「离开」。
 // 身份按设备匿名 id（userId）区分，故天然支持多人各自独立化身。
 // 若被服务端按空闲回收（HUMAN_IDLE_TOO_LONG），isPlaying 由 true→false，
 // effect 重新触发会自动再次入场——所以事实上离不开这本书。
-export default function InteractButton({
-  userId,
-  worldId,
-}: {
-  userId: string;
-  worldId?: Id<'worlds'>;
-}) {
+// （原先寄生在 InteractButton 里，现抽成纯逻辑 hook：入场是世界规则，不该是一个按钮。）
+export function useAutoJoinWorld(userId: string, worldId?: Id<'worlds'>): boolean {
   const game = useServerGame(worldId);
   const humanTokenIdentifier = useQuery(
     api.world.userStatus,
@@ -60,13 +53,5 @@ export default function InteractButton({
     })();
   }, [worldId, game, humanTokenIdentifier, isPlaying, join, userId, convex]);
 
-  return (
-    <DeckButton
-      active={isPlaying}
-      title={isPlaying ? '你已在模拟世界中' : '正在进入模拟世界…'}
-      icon={<JoinIcon />}
-    >
-      {isPlaying ? '在世界中' : '进入中…'}
-    </DeckButton>
-  );
+  return isPlaying;
 }

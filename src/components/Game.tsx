@@ -6,11 +6,11 @@ import { setPanelOpenHandler } from '../lib/panelBus.ts';
 import { useElementSize } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
-import InteractButton from './buttons/InteractButton';
 import SettingsMenu from './SettingsMenu';
 import DeckButton from './buttons/DeckButton';
 import { ChevronIcon } from './buttons/DeckIcons';
 import SidebarTabs from './SidebarTabs.tsx';
+import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
 import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
@@ -81,6 +81,9 @@ export default function Game({
   // Send a periodic heartbeat to our world to keep it alive.
   useWorldHeartbeat();
 
+  // 打开即自动入场（方案 A）——入场是世界规则，不再是一个按钮。
+  useAutoJoinWorld(userId, worldId);
+
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
@@ -118,34 +121,22 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 游戏内悬浮控制台：加入世界 / 设置 / 照片记忆 / 帮助 / 面板 —— 所有交互都在游戏内部。
+          {/* 游戏内悬浮控制台：只留「手卷」开关；设置等都收进手卷里。
               放左上角，避免被右侧滑出的面板盖住。 */}
-          <div
-            className="deck-group absolute left-3 z-40 flex items-center gap-1"
-            style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
-          >
-            <InteractButton userId={userId} worldId={worldId} />
-            <SettingsMenu
-              controlMode={controlMode}
-              cameraFollow={cameraFollow}
-              isFullscreen={isFullscreen}
-              showCollisionOverlay={showCollisionOverlay}
-              onToggleControlMode={onToggleControlMode}
-              onToggleCameraFollow={onToggleCameraFollow}
-              onToggleFullscreen={onToggleFullscreen}
-              onToggleCollisionOverlay={onToggleCollisionOverlay}
-              onOpenPhotoMemory={onOpenPhotoMemory}
-              onHelp={onHelp}
-            />
-            <DeckButton
-              icon={<ChevronIcon />}
-              active={panelOpen}
-              onClick={() => setPanelOpen((v) => !v)}
-              title="状态 / 广播 / 节目单 / 作品 面板"
+          {!panelOpen && (
+            <div
+              className="deck-group absolute left-3 z-40 flex items-center gap-1"
+              style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
             >
-              面板
-            </DeckButton>
-          </div>
+              <DeckButton
+                icon={<ChevronIcon />}
+                onClick={() => setPanelOpen(true)}
+                title="展开沙城手卷（状态 / 广播 / 节目单 / 作品 / 设置）"
+              >
+                手卷
+              </DeckButton>
+            </div>
+          )}
 
           {SHOW_DEV_TOOLS && showCollisionOverlay && (
             <div className="pointer-events-none absolute bottom-3 left-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
@@ -180,16 +171,30 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           {/* 浮木卷轴左缘 */}
           <div className="sand-roller" />
           <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] lg:pt-0">
-            {/* 毛笔卷头 */}
+            {/* 毛笔卷头：卷名 + 设置 + 收起 */}
             <div className="sand-masthead shrink-0">
               <span className="t">沙城手卷</span>
-              <button
-                onClick={() => setPanelOpen(false)}
-                className="ml-auto text-sm text-brown-300 transition hover:text-brown-100"
-                title="收起手卷"
-              >
-                收起 ›
-              </button>
+              <div className="ml-auto flex items-center gap-1.5">
+                <SettingsMenu
+                  controlMode={controlMode}
+                  cameraFollow={cameraFollow}
+                  isFullscreen={isFullscreen}
+                  showCollisionOverlay={showCollisionOverlay}
+                  onToggleControlMode={onToggleControlMode}
+                  onToggleCameraFollow={onToggleCameraFollow}
+                  onToggleFullscreen={onToggleFullscreen}
+                  onToggleCollisionOverlay={onToggleCollisionOverlay}
+                  onOpenPhotoMemory={onOpenPhotoMemory}
+                  onHelp={onHelp}
+                />
+                <button
+                  onClick={() => setPanelOpen(false)}
+                  className="text-sm text-brown-300 transition hover:text-brown-100"
+                  title="收起手卷"
+                >
+                  收起 ›
+                </button>
+              </div>
             </div>
             <SidebarTabs
               worldId={worldId}
