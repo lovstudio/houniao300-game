@@ -272,6 +272,7 @@ export const INSTALLATIONS: Installation[] = [
     artist: '李振伟',
     title: '海之微光: 万物迁徙的共生坐标',
     zone: '鸟其林周边',
+    note: '现场为桥下场域：两侧沙丘墩托起横向桥梁，中部保留可进入、可穿行的桥下空间，面向海面形成视线通廊。',
     x: 1294,
     y: 986,
   },

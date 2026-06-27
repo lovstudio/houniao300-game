@@ -644,15 +644,15 @@ function drawI3BridgeInstallation(container: PIXI.Container, project: Projector)
 
   bridge.lineStyle(1.2 * project.scale, 0xf6d18c, 0.38);
   bridge.beginFill(0xd69e5b, 0.1);
-  bridge.drawEllipse(project.x(1300), project.y(972), 150 * project.scale, 78 * project.scale);
+  bridge.drawEllipse(project.x(1272), project.y(974), 112 * project.scale, 66 * project.scale);
   bridge.endFill();
 
   bridge.beginFill(0xb77849, 0.28);
   drawPolygon(bridge, project, [
-    [1260, 954],
-    [1330, 954],
-    [1372, 1020],
-    [1230, 1020],
+    [1224, 958],
+    [1296, 958],
+    [1338, 1015],
+    [1198, 1015],
   ]);
   bridge.endFill();
 
@@ -689,15 +689,15 @@ function drawI3BridgeInstallation(container: PIXI.Container, project: Projector)
     }
   };
 
-  drawMound(1198, 922, 132, 90);
-  drawMound(1338, 922, 132, 90, true);
+  drawMound(1166, 930, 98, 76);
+  drawMound(1278, 930, 98, 76, true);
 
-  const shadow = project.rect(1210, 928, 268, 22);
+  const shadow = project.rect(1170, 930, 206, 20);
   bridge.beginFill(0x1f1a17, 0.48);
   bridge.drawRoundedRect(shadow.x, shadow.y, shadow.width, shadow.height, 3 * project.scale);
   bridge.endFill();
 
-  const beam = project.rect(1210, 906, 268, 20);
+  const beam = project.rect(1170, 912, 206, 17);
   bridge.lineStyle(1.2 * project.scale, 0x5c4638, 0.92);
   bridge.beginFill(0x2d241f, 0.96);
   bridge.drawRoundedRect(beam.x, beam.y, beam.width, beam.height, 2 * project.scale);
@@ -707,10 +707,10 @@ function drawI3BridgeInstallation(container: PIXI.Container, project: Projector)
   bridge.lineTo(beam.x + beam.width - 5 * project.scale, beam.y + 4 * project.scale);
 
   bridge.lineStyle(1.1 * project.scale, 0xf2e2bd, 0.44);
-  bridge.moveTo(project.x(1270), project.y(950));
-  bridge.bezierCurveTo(project.x(1284), project.y(938), project.x(1320), project.y(938), project.x(1334), project.y(950));
-  bridge.moveTo(project.x(1268), project.y(1008));
-  bridge.bezierCurveTo(project.x(1286), project.y(988), project.x(1320), project.y(988), project.x(1338), project.y(1008));
+  bridge.moveTo(project.x(1248), project.y(950));
+  bridge.bezierCurveTo(project.x(1262), project.y(938), project.x(1300), project.y(938), project.x(1314), project.y(950));
+  bridge.moveTo(project.x(1246), project.y(1008));
+  bridge.bezierCurveTo(project.x(1264), project.y(988), project.x(1300), project.y(988), project.x(1318), project.y(1008));
 
   bridge.lineStyle(2.2 * project.scale, 0xf5c15f, 0.92);
   bridge.beginFill(0xf5c15f, 0.18);
@@ -718,7 +718,6 @@ function drawI3BridgeInstallation(container: PIXI.Container, project: Projector)
   bridge.endFill();
 
   container.addChild(bridge);
-  drawTextOnPlan(container, project, '桥下场域', entryX, entryY - 54, 11);
 }
 
 function drawSecondaryWallStructures(container: PIXI.Container, project: Projector) {

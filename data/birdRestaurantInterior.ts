@@ -172,7 +172,7 @@ export const I3_BRIDGE_FIELD_INTERIOR: VenueInteriorMap = {
   entrance: {
     exteriorSource: [1294, 986],
     interiorSource: [640, 530],
-    radiusTiles: 2.4,
+    radiusTiles: 4.2,
   },
   labels: [
     { id: 'label-title', label: '桥下场域', x: 640, y: 120 },
