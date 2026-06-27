@@ -81,6 +81,30 @@ export default defineSchema({
     .index('userId', ['userId'])
     .index('experienceId', ['experienceId']),
 
+  // ---- 物料管理（场所内场地图 / 作品点位的"照片→生成"溯源）----
+  // 每条 = 一个可生成单元的物料记录，key 唯一（'venue:<interiorId>' 或 'work:<installationId>'）。
+  // 源图走 Convex 文件存储（浏览器直传），生成结果（几何 JSON / 图注）落 generated 字段。
+  materials: defineTable({
+    key: v.string(),
+    kind: v.union(v.literal('venue'), v.literal('work')),
+    refId: v.string(), // interior id 或 installation id
+    title: v.string(), // 冗余存一份，方便后台检索/展示
+    sourceStorageId: v.optional(v.string()),
+    sourceName: v.optional(v.string()),
+    capturedAt: v.optional(v.string()),
+    status: v.union(
+      v.literal('idle'),
+      v.literal('generating'),
+      v.literal('ready'),
+      v.literal('error'),
+    ),
+    generated: v.optional(v.string()), // 生成结果 JSON 字符串
+    error: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index('key', ['key'])
+    .index('kind', ['kind']),
+
   messages: defineTable({
     conversationId,
     messageUuid: v.string(),
