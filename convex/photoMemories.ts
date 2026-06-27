@@ -10,7 +10,7 @@ import {
 } from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
-import { generateImage } from './util/image';
+import { generateImageTraced } from './util/image';
 import { uploadToQiniu } from './util/qiniu';
 
 const contextValidator = v.optional(
@@ -37,7 +37,8 @@ function buildPrompt(args: {
   activityTitle?: string;
   venue?: string;
   contextLabel?: string;
-  userPrompt?: string;
+  userPrompt?: string; // 累积的文字上下文（追问时把历轮拼接进来）
+  useSystemStyle?: boolean; // 默认 true：套用沙之书母题；false：仅保人物身份，场景/风格交给 userPrompt
 }) {
   const context = [
     args.activityTitle ? `festival activity: ${args.activityTitle}` : null,
@@ -46,6 +47,20 @@ function buildPrompt(args: {
   ]
     .filter(Boolean)
     .join(', ');
+
+  // 关闭系统风格：只保住"这是这个人的照片"的身份底线，其余场景/风格完全交给用户提示词。
+  if (args.useSystemStyle === false) {
+    return [
+      `Reimagine the uploaded real-world photo into a new artwork titled "${args.title}".`,
+      'Keep the main people, their identity and faces clearly recognizable from the original photo.',
+      args.userPrompt
+        ? `Follow the visitor's creative direction for scene and style: ${args.userPrompt}.`
+        : 'The visitor gave no direction; produce a tasteful, imaginative reinterpretation.',
+      'No readable text, watermark, logo, UI, or caption.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
 
   return [
     `Transform the uploaded real-world photo into a "Book of Sand" memory image titled "${args.title}".`,
@@ -104,7 +119,7 @@ export const generateUploadUrl = mutation({
   },
 });
 
-// 懒插入一条 pending 记忆并调度后台生成。前端拿到 memoryId 后订阅 getPhotoMemory 看进度，
+// 插入记忆 + 首轮 turn，调度后台生成。前端拿到 memoryId 后订阅 getPhotoConversation 看进度，
 // 不再 await 长 action（图像生成 20-60s，over-WS 等待易因重连丢失 → "action in flight 连接丢失"）。
 export const createPhotoMemory = mutation({
   args: {
@@ -115,10 +130,12 @@ export const createPhotoMemory = mutation({
     sharePublic: v.boolean(),
     context: contextValidator,
     userPrompt: v.optional(v.string()),
+    useSystemStyle: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<{ memoryId: Id<'photoMemories'> }> => {
     const now = Date.now();
     const title = normalizeTitle(args.title, args.context?.activityTitle ?? args.context?.venue);
+    const useSystemStyle = args.useSystemStyle ?? true;
     const memoryId = await ctx.db.insert('photoMemories', {
       userId: args.userId,
       userName: compact(args.userName, 24) ?? '候鸟',
@@ -130,112 +147,208 @@ export const createPhotoMemory = mutation({
       venue: compact(args.context?.venue, 48),
       contextLabel: compact(args.context?.contextLabel, 80),
       userPrompt: compact(args.userPrompt, 280),
+      useSystemStyle,
       status: 'pending',
       shared: args.sharePublic,
       sharedAt: args.sharePublic ? now : undefined,
       createdAt: now,
       updatedAt: now,
     });
-    await ctx.scheduler.runAfter(0, internal.photoMemories.runGeneration, { memoryId });
+    const turnId = await ctx.db.insert('photoMemoryTurns', {
+      memoryId,
+      index: 0,
+      userPrompt: compact(args.userPrompt, 280),
+      useSystemStyle,
+      status: 'pending',
+      createdAt: now,
+    });
+    await ctx.scheduler.runAfter(0, internal.photoMemories.runGeneration, { turnId });
     return { memoryId };
   },
 });
 
-// 按访客新提示词在原图基础上重绘，覆盖同一条记忆（不新增行，保真不漂移）。同样异步化。
-export const refinePhotoMemory = mutation({
-  args: { memoryId: v.id('photoMemories'), userId: v.string(), userPrompt: v.string() },
-  handler: async (ctx, { memoryId, userId, userPrompt }) => {
-    const memory = await ctx.db.get(memoryId);
-    if (!memory || memory.userId !== userId) throw new Error('照片记忆不存在或无权调整');
-    await ctx.db.patch(memoryId, {
-      userPrompt: compact(userPrompt, 280),
-      status: 'pending',
-      updatedAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, internal.photoMemories.runGeneration, { memoryId });
-  },
-});
-
-export const getMemory = internalQuery({
-  args: { memoryId: v.id('photoMemories') },
-  handler: async (ctx, { memoryId }): Promise<Doc<'photoMemories'> | null> =>
-    await ctx.db.get(memoryId),
-});
-
-export const setMemoryResult = internalMutation({
+// 追问：在同一条记忆上追加一轮 turn（不覆盖历史），始终以原图为参考、累积文字上下文。
+export const askPhotoMemory = mutation({
   args: {
     memoryId: v.id('photoMemories'),
+    userId: v.string(),
+    userPrompt: v.string(),
+    useSystemStyle: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { memoryId, userId, userPrompt, useSystemStyle }): Promise<{ turnId: Id<'photoMemoryTurns'> }> => {
+    const memory = await ctx.db.get(memoryId);
+    if (!memory || memory.userId !== userId) throw new Error('照片记忆不存在或无权调整');
+    const turns = await ctx.db
+      .query('photoMemoryTurns')
+      .withIndex('memoryId', (q) => q.eq('memoryId', memoryId))
+      .collect();
+    const nextIndex = turns.reduce((m, t) => Math.max(m, t.index), -1) + 1;
+    const turnId = await ctx.db.insert('photoMemoryTurns', {
+      memoryId,
+      index: nextIndex,
+      userPrompt: compact(userPrompt, 280),
+      useSystemStyle: useSystemStyle ?? memory.useSystemStyle ?? true,
+      status: 'pending',
+      createdAt: Date.now(),
+    });
+    await ctx.db.patch(memoryId, { status: 'pending', updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.photoMemories.runGeneration, { turnId });
+    return { turnId };
+  },
+});
+
+// 后台生成单个 turn 的输入：该 turn + 记忆 + 截至该 turn 的累积提示词上下文。
+export const turnInput = internalQuery({
+  args: { turnId: v.id('photoMemoryTurns') },
+  handler: async (ctx, { turnId }) => {
+    const turn = await ctx.db.get(turnId);
+    if (!turn) return null;
+    const memory = await ctx.db.get(turn.memoryId);
+    if (!memory) return null;
+    const turns = await ctx.db
+      .query('photoMemoryTurns')
+      .withIndex('memoryId', (q) => q.eq('memoryId', turn.memoryId))
+      .collect();
+    // 累积上下文：截至本轮（含）所有非空提示词，按 index 顺序拼接。
+    const accumulatedPrompt = turns
+      .filter((t) => t.index <= turn.index)
+      .sort((a, b) => a.index - b.index)
+      .map((t) => t.userPrompt?.trim())
+      .filter(Boolean)
+      .join('; ');
+    return { turn, memory, accumulatedPrompt };
+  },
+});
+
+export const setTurnResult = internalMutation({
+  args: {
+    turnId: v.id('photoMemoryTurns'),
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.string()),
+    trace: v.optional(v.string()),
   },
-  handler: async (ctx, { memoryId, imageUrl, imageStorageId }) => {
-    // imageUrl / imageStorageId 恰有一个有值（新图替换旧图），另一个置空避免取到旧定位。
-    await ctx.db.patch(memoryId, { imageUrl, imageStorageId, status: 'ready', updatedAt: Date.now() });
+  handler: async (ctx, { turnId, imageUrl, imageStorageId, trace }) => {
+    await ctx.db.patch(turnId, { status: 'ready', imageUrl, imageStorageId, trace });
   },
 });
 
-export const setMemoryFailed = internalMutation({
+export const setTurnFailed = internalMutation({
+  args: { turnId: v.id('photoMemoryTurns'), trace: v.optional(v.string()) },
+  handler: async (ctx, { turnId, trace }) => {
+    await ctx.db.patch(turnId, { status: 'failed', trace });
+  },
+});
+
+// 让记忆行的代表图/状态跟随"最新一张就绪的 turn"（相册卡片、体验主角参考都读这里）。
+export const syncMemoryFromTurns = internalMutation({
   args: { memoryId: v.id('photoMemories') },
   handler: async (ctx, { memoryId }) => {
-    await ctx.db.patch(memoryId, { status: 'failed', updatedAt: Date.now() });
+    const turns = await ctx.db
+      .query('photoMemoryTurns')
+      .withIndex('memoryId', (q) => q.eq('memoryId', memoryId))
+      .collect();
+    if (turns.length === 0) return;
+    turns.sort((a, b) => a.index - b.index);
+    const latest = turns[turns.length - 1];
+    const lastReady = [...turns].reverse().find((t) => t.status === 'ready');
+    const patch: Partial<Doc<'photoMemories'>> = { updatedAt: Date.now() };
+    if (latest.status === 'pending') {
+      patch.status = 'pending'; // 保留现有代表图
+    } else if (lastReady) {
+      patch.status = 'ready';
+      patch.imageUrl = lastReady.imageUrl;
+      patch.imageStorageId = lastReady.imageStorageId;
+    } else {
+      patch.status = 'failed';
+    }
+    await ctx.db.patch(memoryId, patch);
   },
 });
 
-// 后台生成：读原图 + 提示词 → 文生图 → 转存 → 回填。失败置 failed，前端可改提示词重试。
+// 后台生成一个 turn：读原图 + 累积提示词 → 文生图 → 转存 → 回填该 turn + 同步记忆代表图。
 export const runGeneration = internalAction({
-  args: { memoryId: v.id('photoMemories') },
-  handler: async (ctx, { memoryId }) => {
+  args: { turnId: v.id('photoMemoryTurns') },
+  handler: async (ctx, { turnId }) => {
     const tAll = Date.now();
-    const memory = await ctx.runQuery(internal.photoMemories.getMemory, { memoryId });
-    if (!memory) return;
+    const input = await ctx.runQuery(internal.photoMemories.turnInput, { turnId });
+    if (!input) return;
+    const { turn, memory, accumulatedPrompt } = input;
+    let trace: string | undefined;
     try {
       const tSrc = Date.now();
       const source = await ctx.storage.get(memory.originalStorageId);
       if (!source) throw new Error('原图不可用');
       console.log(
-        `[DEBUG][photo] runGeneration 取原图: getMs=${Date.now() - tSrc} sourceKB=${Math.round(source.size / 1024)} hasUserPrompt=${!!memory.userPrompt} memoryId=${memoryId}`,
+        `[DEBUG][photo] runGeneration turn#${turn.index} 取原图: getMs=${Date.now() - tSrc} sourceKB=${Math.round(source.size / 1024)} useSystemStyle=${turn.useSystemStyle} memoryId=${memory._id}`,
       );
       const prompt = buildPrompt({
         title: memory.title,
         activityTitle: compact(memory.activityTitle, 80),
         venue: compact(memory.venue, 48),
         contextLabel: compact(memory.contextLabel, 80),
-        userPrompt: compact(memory.userPrompt, 280),
+        userPrompt: accumulatedPrompt || undefined,
+        useSystemStyle: turn.useSystemStyle,
       });
-      const tGen = Date.now();
-      const generated = await generateImage(prompt, source);
-      const genMs = Date.now() - tGen;
+      const { blob, trace: imgTrace } = await generateImageTraced(prompt, source);
       const tStore = Date.now();
-      const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
+      const { imageUrl, imageStorageId } = await storeGenerated(ctx, blob);
       const storeMs = Date.now() - tStore;
-      await ctx.runMutation(internal.photoMemories.setMemoryResult, {
-        memoryId,
+      trace = JSON.stringify({
+        ...imgTrace,
+        sourceKB: Math.round(source.size / 1024),
+        storeMs,
+        totalMs: Date.now() - tAll,
+        useSystemStyle: turn.useSystemStyle,
+      });
+      await ctx.runMutation(internal.photoMemories.setTurnResult, {
+        turnId,
         imageUrl,
         imageStorageId,
+        trace,
       });
       console.log(
-        `[DEBUG][photo] runGeneration 完成: 总ms=${Date.now() - tAll} 文生图ms=${genMs} 转存ms=${storeMs} memoryId=${memoryId}`,
+        `[DEBUG][photo] runGeneration turn#${turn.index} 完成: 总ms=${Date.now() - tAll} 文生图ms=${imgTrace.apiMs} retries=${imgTrace.retries} 转存ms=${storeMs}`,
       );
     } catch (e) {
-      console.error(`[DEBUG][photo] runGeneration 失败: 总ms=${Date.now() - tAll} memoryId=${memoryId}`, e);
-      await ctx.runMutation(internal.photoMemories.setMemoryFailed, { memoryId });
+      const msg = e instanceof Error ? e.message : String(e);
+      trace = JSON.stringify({ error: msg, totalMs: Date.now() - tAll });
+      console.error(`[DEBUG][photo] runGeneration turn#${turn.index} 失败: 总ms=${Date.now() - tAll}`, e);
+      await ctx.runMutation(internal.photoMemories.setTurnFailed, { turnId, trace });
     }
+    await ctx.runMutation(internal.photoMemories.syncMemoryFromTurns, { memoryId: memory._id });
   },
 });
 
-// 前端订阅单条记忆，实时看生成/重绘进度与结果。
-export const getPhotoMemory = query({
+// 前端订阅一条记忆的完整"追问对话"：记忆基本信息 + 按序的每轮（提示词/图/状态/trace）。
+export const getPhotoConversation = query({
   args: { memoryId: v.id('photoMemories') },
   handler: async (ctx, { memoryId }) => {
     const m = await ctx.db.get(memoryId);
     if (!m) return null;
+    const turnsRaw = await ctx.db
+      .query('photoMemoryTurns')
+      .withIndex('memoryId', (q) => q.eq('memoryId', memoryId))
+      .collect();
+    turnsRaw.sort((a, b) => a.index - b.index);
+    const turns = await Promise.all(
+      turnsRaw.map(async (t) => ({
+        _id: t._id,
+        index: t.index,
+        userPrompt: t.userPrompt ?? null,
+        useSystemStyle: t.useSystemStyle,
+        status: t.status,
+        imageUrl: await resolveImageUrl(ctx, t),
+        trace: t.trace ?? null,
+        createdAt: t.createdAt,
+      })),
+    );
     return {
       _id: m._id,
-      // 旧行没有 status，但有图即视为 ready。
-      status: m.status ?? (m.imageUrl || m.imageStorageId ? 'ready' : 'pending'),
-      imageUrl: await resolveImageUrl(ctx, m),
       title: m.title,
       shared: m.shared,
+      useSystemStyle: m.useSystemStyle ?? true,
+      status: m.status ?? (m.imageUrl || m.imageStorageId ? 'ready' : 'pending'),
+      turns,
     };
   },
 });
