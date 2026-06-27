@@ -124,10 +124,10 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
             </Stage>
           </div>
           {/* 游戏内悬浮控制台：只留「手卷」开关；设置等都收进手卷里。
-              放左上角，避免被右侧滑出的面板盖住。 */}
+              放右上角，与手卷从右侧展开的方向一致。 */}
           {!panelOpen && (
             <div
-              className="deck-group absolute left-3 z-40 flex items-center gap-1"
+              className="deck-group absolute right-3 z-40 flex items-center gap-1"
               style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
             >
               <DeckButton
