@@ -121,7 +121,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           {/* 游戏内悬浮控制台：加入世界 / 设置 / 照片记忆 / 帮助 / 面板 —— 所有交互都在游戏内部。
               放左上角，避免被右侧滑出的面板盖住。 */}
           <div
-            className="absolute left-3 z-40 flex items-center gap-1"
+            className="deck-group absolute left-3 z-40 flex items-center gap-1"
             style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
           >
             <InteractButton userId={userId} worldId={worldId} />
