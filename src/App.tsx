@@ -2,7 +2,7 @@ import Game, { type ControlMode } from './components/Game.tsx';
 import Timeline from './components/Timeline.tsx';
 import Experience from './components/Experience.tsx';
 import EndingsWall from './components/EndingsWall.tsx';
-import Onboarding from './components/Onboarding.tsx';
+import Landing from './components/Landing.tsx';
 import VenueInteriorMap from './components/VenueInteriorMap.tsx';
 import {
   setActivityEnterHandler,
@@ -128,17 +128,7 @@ export default function Home() {
     );
   }
   if (profile === null) {
-    return (
-      <main
-        className="screen-h bg-brown-900"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
-      >
-        <Onboarding userId={userId} onDone={() => undefined} />
-      </main>
-    );
+    return <Landing userId={userId} onDone={() => undefined} />;
   }
 
   return (

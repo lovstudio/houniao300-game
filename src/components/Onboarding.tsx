@@ -61,15 +61,14 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
   const previewPreset = avatar.kind === 'preset' ? avatar.preset : null;
 
   return (
-    <div className="flex h-full items-center justify-center overflow-y-auto bg-brown-900 p-6 text-brown-100">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-4">
-          <Avatar url={previewUrl} preset={previewPreset} size="lg" />
-          <div>
-            <h1 className="font-display game-title text-3xl">欢迎来到候鸟沙城</h1>
-            <p className="text-sm text-brown-300">先创建你的身份，整个沙城通用。</p>
-          </div>
+    <div className="w-full max-w-md rounded-2xl border border-brown-700/60 bg-brown-900/80 p-6 text-brown-100 shadow-2xl backdrop-blur-md">
+      <div className="mb-6 flex items-center gap-4">
+        <Avatar url={previewUrl} preset={previewPreset} size="lg" />
+        <div>
+          <h1 className="font-display game-title text-3xl">登记成为候鸟</h1>
+          <p className="text-sm text-brown-300">先创建你的身份，整座候鸟沙城通用。</p>
         </div>
+      </div>
 
         {/* 名字 */}
         <label className="mb-1 block text-sm text-brown-300">名字</label>
@@ -153,9 +152,8 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
           disabled={!canSave}
           onClick={() => void finish()}
         >
-          {saving ? '保存中…' : '进入沙城'}
+          {saving ? '保存中…' : '进入候鸟沙城'}
         </button>
-      </div>
     </div>
   );
 }

@@ -57,12 +57,12 @@ export default function TopBar({
                 v{__APP_VERSION__}
               </span>
             </div>
-            {/* 博尔赫斯式标语：一本没有第一页、也没有最后一页的书 */}
+            {/* 品牌副线：诗名「沙之书」/ 品牌「候鸟沙城 · 候鸟300」 */}
             <span
               className="mt-0.5 hidden whitespace-nowrap text-[11px] italic tracking-[0.18em] text-brown-300/80 sm:inline"
               style={{ fontFamily: '"Noto Serif SC", serif' }}
             >
-              没有第一页，也没有最后一页
+              候鸟沙城 · 候鸟300
             </span>
           </div>
         </div>

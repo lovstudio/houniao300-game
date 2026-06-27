@@ -562,3 +562,12 @@ body {
   .splash-fade,
   .splash-rule { animation-duration: 0.4s; }
 }
+
+/* 候鸟300 现场瞬间轮播淡入 */
+@keyframes landingMoment {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.landing-moment {
+  animation: landingMoment 0.9s ease both;
+}
