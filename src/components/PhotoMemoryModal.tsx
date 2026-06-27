@@ -1,9 +1,31 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { toast } from 'react-toastify';
 import clsx from 'clsx';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
+
+// Convex 部署的 Dashboard 日志链接（best-effort，从 client 的 Convex URL 推导出 slug）。
+const CONVEX_LOG_URL = (() => {
+  try {
+    const u = new URL(import.meta.env.VITE_CONVEX_URL as string);
+    const slug = u.hostname.split('.')[0];
+    return `https://dashboard.convex.dev/d/${slug}/logs`;
+  } catch {
+    return 'https://dashboard.convex.dev';
+  }
+})();
+
+type ConvTurn = {
+  _id: Id<'photoMemoryTurns'>;
+  index: number;
+  userPrompt: string | null;
+  useSystemStyle: boolean;
+  status: 'pending' | 'ready' | 'failed';
+  imageUrl: string | null;
+  trace: string | null;
+  createdAt: number;
+};
 
 export type PhotoMemoryContext = {
   contextLabel: string;
@@ -96,6 +118,7 @@ export default function PhotoMemoryModal({
   const [tab, setTab] = useState<Tab>('upload');
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [useSystemStyle, setUseSystemStyle] = useState(true); // 默认套用沙之书风格
   const [sharePublic, setSharePublic] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -106,21 +129,52 @@ export default function PhotoMemoryModal({
 
   const generateUploadUrl = useMutation(api.photoMemories.generateUploadUrl);
   const createPhotoMemory = useMutation(api.photoMemories.createPhotoMemory);
-  const refinePhotoMemory = useMutation(api.photoMemories.refinePhotoMemory);
+  const askPhotoMemory = useMutation(api.photoMemories.askPhotoMemory);
   const setPhotoMemoryShared = useMutation(api.photoMemories.setPhotoMemoryShared);
   const mine = useQuery(api.photoMemories.listMyPhotoMemories, open ? { userId } : 'skip');
   const shared = useQuery(api.photoMemories.listSharedPhotoMemories, open ? {} : 'skip');
-  // 订阅当前这条记忆，看后台生成/重绘进度（避免 over-WS 等待长 action）。
+  // 订阅当前这条记忆的"追问对话"，看后台逐轮生成进度（避免 over-WS 等待长 action）。
   const live = useQuery(
-    api.photoMemories.getPhotoMemory,
+    api.photoMemories.getPhotoConversation,
     lastMemoryId ? { memoryId: lastMemoryId } : 'skip',
   );
 
-  // 派生状态：是否正在出图、出图结果、是否失败。
+  const turns: ConvTurn[] = live?.turns ?? [];
+  const latestTurn = turns[turns.length - 1];
+  const latestReady = [...turns].reverse().find((t) => t.status === 'ready');
+  // 派生状态：是否正在出图、最新结果图、是否失败。
   const generating =
-    !!lastMemoryId && (submitting || live === undefined || live?.status === 'pending');
-  const generatedUrl = live?.status === 'ready' ? live.imageUrl : null;
-  const failed = live?.status === 'failed';
+    !!lastMemoryId && (submitting || live === undefined || latestTurn?.status === 'pending');
+  const generatedUrl = latestReady?.imageUrl ?? null;
+  const failed = latestTurn?.status === 'failed';
+
+  // Debug：每轮 turn 出结果时，前端 console 打印可追踪信息 + Convex 日志链接。
+  const loggedTurns = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const t of turns) {
+      if (t.status === 'pending' || loggedTurns.current.has(t._id)) continue;
+      loggedTurns.current.add(t._id);
+      let parsed: unknown = t.trace;
+      try {
+        parsed = t.trace ? JSON.parse(t.trace) : null;
+      } catch {
+        /* keep raw */
+      }
+      // eslint-disable-next-line no-console
+      console.log(
+        `%c[照片记忆][trace] turn#${t.index} ${t.status}`,
+        'color:#c0654a;font-weight:bold',
+        {
+          memoryId: lastMemoryId,
+          prompt: t.userPrompt,
+          useSystemStyle: t.useSystemStyle,
+          ...(typeof parsed === 'object' && parsed ? parsed : { trace: parsed }),
+          平台日志: CONVEX_LOG_URL,
+        },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turns.map((t) => `${t._id}:${t.status}`).join(',')]);
 
   const normalizedLocationOptions = useMemo<PhotoMemoryLocationOption[]>(() => {
     const fallback: PhotoMemoryLocationOption = {
@@ -225,8 +279,10 @@ export default function PhotoMemoryModal({
           contextLabel: selectedContext?.contextLabel,
         },
         userPrompt: prompt.trim() || undefined,
+        useSystemStyle,
       });
       setLastMemoryId(result.memoryId);
+      setPrompt(''); // 首轮提示词已提交，清空输入框，等着继续追问
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : '照片提交失败');
@@ -235,14 +291,17 @@ export default function PhotoMemoryModal({
     }
   };
 
-  // 按提示词在原图基础上重绘，覆盖同一条记忆（后台异步，进度同样靠 live 订阅）。
-  const refine = async () => {
+  // 追问：在同一条记忆上追加一轮，始终以原图为参考、累积文字上下文（不覆盖历史）。
+  const ask = async () => {
     if (!lastMemoryId || !prompt.trim() || generating) return;
+    const text = prompt.trim();
+    setPrompt('');
     try {
-      await refinePhotoMemory({ memoryId: lastMemoryId, userId, userPrompt: prompt.trim() });
+      await askPhotoMemory({ memoryId: lastMemoryId, userId, userPrompt: text, useSystemStyle });
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : '重绘失败');
+      setPrompt(text); // 失败把输入还给用户
+      toast.error(e instanceof Error ? e.message : '追问失败');
     }
   };
 
@@ -302,7 +361,7 @@ export default function PhotoMemoryModal({
                       {generating && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 text-brown-100">
                           <span className="h-6 w-6 animate-spin rounded-full border-2 border-brown-500 border-t-clay-300" />
-                          <span className="text-sm">正在生成沙之书照片…</span>
+                          <span className="text-sm">正在生成…</span>
                         </div>
                       )}
                       {failed && (
@@ -337,48 +396,60 @@ export default function PhotoMemoryModal({
                 )}
               </div>
 
-              <div className="space-y-4 border-2 border-brown-700 bg-brown-800 p-4">
-                <div>
-                  <label className="mb-1 block text-sm text-brown-300">记忆名</label>
-                  <input
-                    className="w-full rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-brown-100 placeholder:text-brown-500"
-                    maxLength={32}
-                    value={title}
-                    placeholder="比如：篝火前的一刻"
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-brown-300">
-                    提示词（可选）
-                    {lastMemoryId && <span className="ml-1 text-brown-400">· 改完点重绘即可</span>}
+              {!lastMemoryId ? (
+                // 生成前：表单
+                <div className="space-y-4 border-2 border-brown-700 bg-brown-800 p-4">
+                  <div>
+                    <label className="mb-1 block text-sm text-brown-300">记忆名</label>
+                    <input
+                      className="w-full rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-brown-100 placeholder:text-brown-500"
+                      maxLength={32}
+                      value={title}
+                      placeholder="比如：篝火前的一刻"
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-brown-300">提示词（可选）</label>
+                    <textarea
+                      className="w-full resize-none rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-500"
+                      rows={2}
+                      maxLength={280}
+                      value={prompt}
+                      placeholder="想怎么呈现？比如：加上夕阳、戴草帽、更梦幻一些"
+                      onChange={(e) => setPrompt(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-brown-300">位置</label>
+                    <select
+                      className="w-full rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-brown-100"
+                      value={selectedContext?.id ?? ''}
+                      onChange={(e) => setSelectedLocationId(e.target.value)}
+                    >
+                      {normalizedLocationOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                          {option.detail ? ` · ${option.detail}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 truncate text-xs text-brown-400">{contextLine}</p>
+                  </div>
+                  <label className="flex cursor-pointer items-start gap-2 rounded border border-brown-700 bg-brown-900/60 p-3 text-sm text-brown-200 hover:border-clay-500">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 rounded border-brown-600 bg-brown-900 text-clay-600"
+                      checked={useSystemStyle}
+                      onChange={(e) => setUseSystemStyle(e.target.checked)}
+                    />
+                    <span>
+                      套用「沙之书」系统风格
+                      <span className="mt-0.5 block text-xs text-brown-400">
+                        取消则只保留人物身份，场景与风格完全由你的提示词决定（更自由）。
+                      </span>
+                    </span>
                   </label>
-                  <textarea
-                    className="w-full resize-none rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-500"
-                    rows={2}
-                    maxLength={280}
-                    value={prompt}
-                    placeholder="想怎么风格化？比如：加上夕阳、戴草帽、更梦幻一些"
-                    onChange={(e) => setPrompt(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-brown-300">位置</label>
-                  <select
-                    className="w-full rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-brown-100"
-                    value={selectedContext?.id ?? ''}
-                    onChange={(e) => setSelectedLocationId(e.target.value)}
-                  >
-                    {normalizedLocationOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                        {option.detail ? ` · ${option.detail}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 truncate text-xs text-brown-400">{contextLine}</p>
-                </div>
-                {!lastMemoryId && (
                   <label className="flex cursor-pointer items-center gap-2 rounded border border-brown-700 bg-brown-900/60 p-3 text-sm text-brown-200 hover:border-clay-500">
                     <input
                       type="checkbox"
@@ -388,45 +459,78 @@ export default function PhotoMemoryModal({
                     />
                     生成后共享给所有人可见
                   </label>
-                )}
-
-                {!lastMemoryId ? (
                   <button
                     type="button"
                     disabled={!file || submitting}
                     onClick={() => void submit()}
                     className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {submitting ? '正在提交…' : '生成沙之书照片'}
+                    {submitting ? '正在提交…' : '生成'}
                   </button>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs text-brown-400">
-                      {generating
-                        ? '正在生成中…完成后会自动出现在这里，也会进「我的相册」。'
-                        : failed
-                          ? '生成失败。改一下提示词，点重绘再试一次。'
-                          : '已生成并存入「我的相册」。改提示词后可在原图基础上重绘，覆盖这张。'}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={!prompt.trim() || generating}
-                      onClick={() => void refine()}
-                      className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {generating ? '正在生成…' : failed ? '改提示词重试' : '按提示词重绘'}
-                    </button>
+                </div>
+              ) : (
+                // 生成后：追问对话（chat sidebar）
+                <div className="flex max-h-[70vh] flex-col border-2 border-brown-700 bg-brown-800">
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-b-2 border-brown-700 px-3 py-2">
+                    <span className="font-display text-brown-100">追问 · 让画面继续演化</span>
                     <button
                       type="button"
                       disabled={generating}
                       onClick={resetForNew}
-                      className="w-full rounded border-2 border-brown-700 px-4 py-2.5 text-sm text-brown-100 hover:border-clay-500 disabled:opacity-50"
+                      className="shrink-0 rounded border-2 border-brown-700 px-2.5 py-1 text-xs text-brown-100 hover:border-clay-500 disabled:opacity-50"
                     >
                       再做一张新的
                     </button>
                   </div>
-                )}
-              </div>
+
+                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                    {turns.map((t) => (
+                      <ChatTurn key={t._id} turn={t} onView={setViewerUrl} />
+                    ))}
+                  </div>
+
+                  <div className="shrink-0 space-y-2 border-t-2 border-brown-700 p-3">
+                    <textarea
+                      className="w-full resize-none rounded border-2 border-brown-700 bg-brown-900 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-500"
+                      rows={2}
+                      maxLength={280}
+                      value={prompt}
+                      placeholder="继续追问，让画面演化…（始终基于你的原始照片）"
+                      onChange={(e) => setPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void ask();
+                      }}
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-brown-300">
+                        <input
+                          type="checkbox"
+                          className="rounded border-brown-600 bg-brown-900 text-clay-600"
+                          checked={useSystemStyle}
+                          onChange={(e) => setUseSystemStyle(e.target.checked)}
+                        />
+                        沙之书风格
+                      </label>
+                      <button
+                        type="button"
+                        disabled={!prompt.trim() || generating}
+                        onClick={() => void ask()}
+                        className="rounded bg-clay-700 px-4 py-2 text-sm font-bold text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {generating ? '生成中…' : '追问'}
+                      </button>
+                    </div>
+                    <a
+                      href={CONVEX_LOG_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-right text-[11px] text-brown-400 underline hover:text-clay-300"
+                    >
+                      查看平台日志（Convex Logs）
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -472,6 +576,67 @@ export default function PhotoMemoryModal({
             关闭
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+function parseTrace(s: string | null): Record<string, unknown> | null {
+  if (!s) return null;
+  try {
+    return JSON.parse(s) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+// 追问对话里的一条：提示词 + 生成图（可点查看）+ 一行 debug trace 摘要。
+function ChatTurn({ turn, onView }: { turn: ConvTurn; onView: (url: string) => void }) {
+  const tr = parseTrace(turn.trace);
+  const num = (v: unknown) => (typeof v === 'number' ? Math.round(v) : null);
+  return (
+    <div className="rounded-lg border border-brown-700/60 bg-brown-900/40 p-2">
+      <div className="mb-1.5 flex items-center gap-2 text-xs text-brown-300">
+        <span className="shrink-0 rounded bg-brown-700/60 px-1.5 py-0.5 text-[10px]">
+          #{turn.index + 1}
+        </span>
+        <span className="min-w-0 flex-1 truncate">
+          {turn.userPrompt || (turn.index === 0 ? '首轮生成' : '继续演化')}
+        </span>
+        {!turn.useSystemStyle && (
+          <span className="shrink-0 rounded bg-brown-700 px-1 text-[10px] text-brown-300">自由风格</span>
+        )}
+      </div>
+      <div className="aspect-square overflow-hidden rounded bg-brown-900">
+        {turn.status === 'ready' && turn.imageUrl ? (
+          <button
+            type="button"
+            onClick={() => onView(turn.imageUrl as string)}
+            className="block h-full w-full"
+            title="点击查看大图"
+          >
+            <img src={turn.imageUrl} alt="" className="h-full w-full object-cover" />
+          </button>
+        ) : turn.status === 'failed' ? (
+          <div className="flex h-full items-center justify-center text-xs text-brown-400">
+            生成失败
+          </div>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-brown-400">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-brown-600 border-t-clay-300" />
+            正在生成…
+          </div>
+        )}
+      </div>
+      {tr && num(tr.apiMs) !== null && (
+        <p className="mt-1 truncate text-[10px] text-brown-500">
+          {String(tr.model ?? '')} · API {num(tr.apiMs)}ms
+          {num(tr.retries) ? ` · 重试${num(tr.retries)}` : ''}
+          {num(tr.totalMs) !== null ? ` · 总${num(tr.totalMs)}ms` : ''}
+        </p>
+      )}
+      {tr && typeof tr.error === 'string' && (
+        <p className="mt-1 truncate text-[10px] text-red-400">{tr.error}</p>
       )}
     </div>
   );

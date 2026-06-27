@@ -38,9 +38,31 @@ async function toBlob(result: { data?: { b64_json?: string; url?: string }[] }):
 // 生成一张图片，返回 PNG Blob（调用方负责存入 Convex storage）。
 // 传入 reference 时走 /v1/images/edits（image edit）——用首格图锁定主角 + 色板 + 沙雕材质，
 // 保证连环画跨格视觉一致；不传则普通文生图。
+// 一次文生图的可追踪指标（写进 turn.trace，前端 console 打印，便于定位"很慢"的瓶颈）。
+export type ImageTrace = {
+  model: string;
+  host: string;
+  size: string;
+  mode: 'edit' | 't2i';
+  promptChars: number;
+  refKB: number;
+  apiMs: number; // 实际成功那次 API 请求耗时
+  retries: number; // >0 说明命中 429/5xx 退避 [1s,10s,20s]
+  toBlobMs: number;
+  outKB: number;
+  returnedAs: 'b64' | 'url' | 'empty';
+};
+
 export async function generateImage(prompt: string, reference?: Blob): Promise<Blob> {
+  return (await generateImageTraced(prompt, reference)).blob;
+}
+
+export async function generateImageTraced(
+  prompt: string,
+  reference?: Blob,
+): Promise<{ blob: Blob; trace: ImageTrace }> {
   const config = imageConfig();
-  const mode = reference ? 'edit(image+prompt)' : 't2i(prompt-only)';
+  const mode: 'edit' | 't2i' = reference ? 'edit' : 't2i';
   const refKB = reference ? Math.round(reference.size / 1024) : 0;
   console.log(
     `[DEBUG][image] generateImage 入口: mode=${mode} model=${config.model} size=${config.size} promptChars=${prompt.length} refKB=${refKB} host=${config.url}`,
@@ -82,8 +104,19 @@ export async function generateImage(prompt: string, reference?: Blob): Promise<B
   // ms = 实际成功那次请求的耗时；retries>0 说明命中了 429/5xx 退避（[1s,10s,20s]），是"很慢"的常见元凶。
   const t0 = Date.now();
   const blob = await toBlob(result);
-  console.log(
-    `[DEBUG][image] generateImage 完成: mode=${mode} apiMs=${ms} retries=${retries} toBlobMs=${Date.now() - t0} outKB=${Math.round(blob.size / 1024)} returnedAs=${result.data?.[0]?.b64_json ? 'b64' : result.data?.[0]?.url ? 'url(需再下载)' : 'empty'}`,
-  );
-  return blob;
+  const trace: ImageTrace = {
+    model: config.model,
+    host: config.url,
+    size: config.size,
+    mode,
+    promptChars: prompt.length,
+    refKB,
+    apiMs: ms,
+    retries,
+    toBlobMs: Date.now() - t0,
+    outKB: Math.round(blob.size / 1024),
+    returnedAs: result.data?.[0]?.b64_json ? 'b64' : result.data?.[0]?.url ? 'url' : 'empty',
+  };
+  console.log(`[DEBUG][image] generateImage 完成:`, trace);
+  return { blob, trace };
 }

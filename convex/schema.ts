@@ -96,9 +96,10 @@ export default defineSchema({
     activityTitle: v.optional(v.string()),
     venue: v.optional(v.string()),
     contextLabel: v.optional(v.string()),
-    userPrompt: v.optional(v.string()), // 访客的可选风格化提示词（生成/重绘共用）
+    userPrompt: v.optional(v.string()), // 访客的可选风格化提示词（首轮）
+    useSystemStyle: v.optional(v.boolean()), // 是否套用"沙之书"系统风格（默认 true）；艺术家可关
     // 生成异步化：客户端订阅本行而非等待长 action，避免"action in flight 连接丢失"。
-    // 旧行无此字段时按 ready 处理（有图即成功）。
+    // 旧行无此字段时按 ready 处理（有图即成功）。imageUrl/imageStorageId 镜像"最新一张就绪的追问图"。
     status: v.optional(v.union(v.literal('pending'), v.literal('ready'), v.literal('failed'))),
     shared: v.boolean(),
     sharedAt: v.optional(v.number()),
@@ -108,6 +109,20 @@ export default defineSchema({
     .index('userId', ['userId', 'createdAt'])
     .index('shared', ['shared', 'createdAt'])
     .index('activityKey', ['activityKey', 'createdAt']),
+
+  // 照片记忆的"追问"对话：每条 = 一次提示词 + 一张生成图，按 index 串成聊天线。
+  // 始终以 photoMemories.originalStorageId（真人原图）为参考，accumulate 文字上下文，避免人脸漂移。
+  photoMemoryTurns: defineTable({
+    memoryId: v.id('photoMemories'),
+    index: v.number(),
+    userPrompt: v.optional(v.string()),
+    useSystemStyle: v.boolean(),
+    status: v.union(v.literal('pending'), v.literal('ready'), v.literal('failed')),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.string()),
+    trace: v.optional(v.string()), // 生成追踪 JSON（模型/尺寸/耗时/重试…），前端 console 打印
+    createdAt: v.number(),
+  }).index('memoryId', ['memoryId', 'index']),
 
   messages: defineTable({
     conversationId,
