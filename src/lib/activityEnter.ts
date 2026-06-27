@@ -56,6 +56,29 @@ function styleFor(cat: string): string {
   return `${SAND_BASE}, ${variant}, accent color palette anchored on ${accent}`;
 }
 
+// 把作品点位转成进入描述。装置作品没有节目分类，统一退回暖色沙雕基调。
+// activityKey 用 id+title 唯一标识一件作品的专属体验。
+export function activityFromInstallation(item: {
+  id: string;
+  artist: string;
+  title: string;
+  zone: string;
+  note?: string;
+}): ActivityDescriptor {
+  return {
+    activityKey: `作品|${item.id}|${item.title}`,
+    title: item.title,
+    theme: `「${item.title}」——${item.artist}的装置作品，坐落在候鸟沙城的${item.zone}`,
+    style: DEFAULT_STYLE,
+    background:
+      item.note ?? `${item.artist}的作品《${item.title}》，就在${item.zone}。走近它，看看会发生什么。`,
+    hostName: item.zone,
+    category: '装置',
+    minPanels: 5,
+    maxPanels: 8,
+  };
+}
+
 // 把节目单条目转成进入描述。activityKey 用 date+time+venue+title 唯一标识一个活动。
 export function activityFromSchedule(item: {
   date: string;
