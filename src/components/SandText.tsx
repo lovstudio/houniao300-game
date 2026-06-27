@@ -93,6 +93,9 @@ const SandText = forwardRef<SandTextHandle, Props>(function SandText(
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // 文字切换 / 重挂载时回到成形态（否则 scatter 后的状态会被带过来）
+    modeRef.current = 'forming';
+
     let W = 0;
     let H = 0;
     let DPR = 1;
@@ -170,6 +173,7 @@ const SandText = forwardRef<SandTextHandle, Props>(function SandText(
           } as Grain);
         g.tx = t.x;
         g.ty = t.y;
+        g.life = 1;
         g.delay = (t.x / Math.max(1, W)) * 360 + Math.random() * 220;
         return g;
       });

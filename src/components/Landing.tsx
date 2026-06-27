@@ -16,6 +16,9 @@ const MOMENTS = [
   '白天一起运动，晚上一起看戏',
 ];
 
+// 标题屏题词：刺猬《火车驶向云外，梦安魂于九霄》最经典一句，拆两句逐行缓现缓隐
+const LYRIC = ['一代人终将老去', '但总有人正年轻'];
+
 const INK = '#2c2620';
 const INK_SOFT = '#7a7063';
 const serif = '"Noto Serif SC","Songti SC",serif';
@@ -24,12 +27,24 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
   const [phase, setPhase] = useState<'title' | 'enter'>('title');
   const [leaving, setLeaving] = useState(false);
   const [moment, setMoment] = useState(0);
+  const [lyric, setLyric] = useState(0);
   const titleRef = useRef<SandTextHandle>(null);
+  const lyricRef = useRef<SandTextHandle>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => setMoment((m) => (m + 1) % MOMENTS.length), 3600);
     return () => window.clearInterval(id);
   }, []);
+
+  // 题词逐行缓现缓隐：停留后散去，再凝下一句，循环（仅标题屏）
+  useEffect(() => {
+    if (phase !== 'title') return;
+    const id = window.setInterval(() => {
+      lyricRef.current?.scatter();
+      window.setTimeout(() => setLyric((p) => (p + 1) % LYRIC.length), 650);
+    }, 4200);
+    return () => window.clearInterval(id);
+  }, [phase]);
 
   const start = useCallback(() => {
     setLeaving((l) => {
@@ -122,7 +137,7 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             text="沙之书"
             tracking={0.16}
             settleMs={2600}
-            className="my-6 h-[clamp(180px,40vh,420px)] w-[min(92vw,760px)]"
+            className="mt-4 mb-5 h-[clamp(160px,36vh,380px)] w-[min(92vw,760px)]"
           />
 
           <div
@@ -150,6 +165,32 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             }}
           >
             孤独图书馆向北 200 米
+          </div>
+
+          {/* 题词：沙中逐行缓现缓隐 */}
+          <div className="splash-fade mt-8 flex flex-col items-center" style={{ animationDelay: '2.2s' }}>
+            <SandText
+              ref={lyricRef}
+              text={LYRIC[lyric]}
+              weight={500}
+              fontScale={0.72}
+              tracking={0.2}
+              settleMs={1100}
+              color="#6a6052"
+              className="h-[30px] w-[260px]"
+            />
+            <div
+              className="mt-2.5"
+              style={{
+                fontFamily: serif,
+                fontSize: '10px',
+                letterSpacing: '0.16em',
+                color: INK_SOFT,
+                opacity: 0.62,
+              }}
+            >
+              —— 刺猬《火车驶向云外，梦安魂于九霄》
+            </div>
           </div>
 
           {/* 呼吸式「开始」 */}
