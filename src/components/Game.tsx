@@ -8,6 +8,8 @@ import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import InteractButton from './buttons/InteractButton';
 import SettingsMenu from './SettingsMenu';
+import DeckButton from './buttons/DeckButton';
+import { ChevronIcon } from './buttons/DeckIcons';
 import SidebarTabs from './SidebarTabs.tsx';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
@@ -54,8 +56,10 @@ export default function Game({
     id: GameId<'players'>;
   }>();
   const [gameWrapperRef, { width, height }] = useElementSize();
-  // 移动端：侧边栏改为可开合抽屉（空间不够，不能常驻底部）。
-  const [panelOpen, setPanelOpen] = useState(false);
+  // 侧边栏统一为可折叠的浮层抽屉（覆盖在满屏地图上）。桌面端默认展开，移动端默认收起。
+  const [panelOpen, setPanelOpen] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024,
+  );
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -86,9 +90,9 @@ export default function Game({
   return (
     <>
       {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
-      <div className="fullscreen-game-frame game-frame grid h-full min-h-0 w-full lg:grid-rows-[1fr] lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
-        {/* Game area（移动端占满全屏） */}
-        <div className="relative min-h-0 min-w-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
+      <div className="fullscreen-game-frame game-frame relative h-full min-h-0 w-full overflow-hidden">
+        {/* Game area：始终满屏，面板浮在其上 */}
+        <div className="absolute inset-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <div className="absolute inset-0">
             <Stage width={width} height={height} options={{ backgroundColor: 0x181425 }}>
               {/* Re-propagate context because contexts are not shared between renderers.
@@ -114,9 +118,10 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 游戏内悬浮控制台：加入世界 / 设置 / 照片记忆 / 帮助 —— 所有交互都在游戏内部 */}
+          {/* 游戏内悬浮控制台：加入世界 / 设置 / 照片记忆 / 帮助 / 面板 —— 所有交互都在游戏内部。
+              放左上角，避免被右侧滑出的面板盖住。 */}
           <div
-            className="absolute right-3 z-40 flex items-center gap-1"
+            className="absolute left-3 z-40 flex items-center gap-1"
             style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
           >
             <InteractButton userId={userId} worldId={worldId} />
@@ -132,10 +137,18 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               onOpenPhotoMemory={onOpenPhotoMemory}
               onHelp={onHelp}
             />
+            <DeckButton
+              icon={<ChevronIcon />}
+              active={panelOpen}
+              onClick={() => setPanelOpen((v) => !v)}
+              title="状态 / 广播 / 节目单 / 作品 面板"
+            >
+              面板
+            </DeckButton>
           </div>
 
           {SHOW_DEV_TOOLS && showCollisionOverlay && (
-            <div className="pointer-events-none absolute left-3 top-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
+            <div className="pointer-events-none absolute bottom-3 left-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
               <div className="mb-1 font-semibold">碰撞染色</div>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
                 <span className="inline-flex items-center gap-1">
@@ -147,7 +160,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           )}
         </div>
 
-        {/* 移动端抽屉遮罩（z 高于招牌 z-30） */}
+        {/* 移动端抽屉遮罩（桌面端不遮挡地图，靠面板内的收起按钮关闭） */}
         {panelOpen && (
           <div
             className="fixed inset-0 z-[55] bg-black/50 lg:hidden"
@@ -155,19 +168,19 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           />
         )}
 
-        {/* 右侧面板：移动端为右侧滑入抽屉（z 高于招牌），桌面端为栅格常驻第二列 */}
+        {/* 右侧可折叠面板：所有断点统一为浮层抽屉，覆盖在满屏地图之上 */}
         <div
           className={clsx(
             'flex min-h-0 flex-col overflow-hidden bg-brown-800/95 text-brown-100',
-            'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm border-l-8 border-brown-900 shadow-2xl transition-transform duration-300',
+            'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm lg:w-96 lg:max-w-none',
+            'border-l-8 border-brown-900 shadow-2xl transition-transform duration-300',
             'pt-[env(safe-area-inset-top)] lg:pt-0',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
-            'lg:static lg:z-auto lg:w-96 lg:max-w-none lg:translate-x-0 lg:border-l-8 lg:shadow-none',
           )}
         >
           <button
             onClick={() => setPanelOpen(false)}
-            className="flex shrink-0 items-center border-b border-brown-700/50 px-3 py-2 text-sm text-brown-300 lg:hidden"
+            className="flex shrink-0 items-center gap-1 border-b border-brown-700/50 px-3 py-2 text-sm text-brown-300 hover:text-brown-100"
           >
             收起面板
           </button>
