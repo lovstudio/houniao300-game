@@ -84,12 +84,17 @@ async function storeGenerated(
   ctx: ActionCtx,
   blob: Blob,
 ): Promise<{ imageUrl?: string; imageStorageId?: string }> {
+  const t = Date.now();
   try {
     const unique = `photo-memories/${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    return { imageUrl: await uploadToQiniu(blob, unique) };
+    const url = await uploadToQiniu(blob, unique);
+    console.log(`[DEBUG][photo] storeGenerated 七牛上传成功: ms=${Date.now() - t} outKB=${Math.round(blob.size / 1024)}`);
+    return { imageUrl: url };
   } catch (e) {
-    console.error('照片记忆七牛上传失败，回退 Convex storage', e);
-    return { imageStorageId: await ctx.storage.store(blob) };
+    console.error(`[DEBUG][photo] 七牛上传失败回退 Convex storage: ms=${Date.now() - t}`, e);
+    const id = await ctx.storage.store(blob);
+    console.log(`[DEBUG][photo] storeGenerated Convex storage 兜底: 总ms=${Date.now() - t}`);
+    return { imageStorageId: id };
   }
 }
 
@@ -180,11 +185,16 @@ export const setMemoryFailed = internalMutation({
 export const runGeneration = internalAction({
   args: { memoryId: v.id('photoMemories') },
   handler: async (ctx, { memoryId }) => {
+    const tAll = Date.now();
     const memory = await ctx.runQuery(internal.photoMemories.getMemory, { memoryId });
     if (!memory) return;
     try {
+      const tSrc = Date.now();
       const source = await ctx.storage.get(memory.originalStorageId);
       if (!source) throw new Error('原图不可用');
+      console.log(
+        `[DEBUG][photo] runGeneration 取原图: getMs=${Date.now() - tSrc} sourceKB=${Math.round(source.size / 1024)} hasUserPrompt=${!!memory.userPrompt} memoryId=${memoryId}`,
+      );
       const prompt = buildPrompt({
         title: memory.title,
         activityTitle: compact(memory.activityTitle, 80),
@@ -192,15 +202,22 @@ export const runGeneration = internalAction({
         contextLabel: compact(memory.contextLabel, 80),
         userPrompt: compact(memory.userPrompt, 280),
       });
+      const tGen = Date.now();
       const generated = await generateImage(prompt, source);
+      const genMs = Date.now() - tGen;
+      const tStore = Date.now();
       const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
+      const storeMs = Date.now() - tStore;
       await ctx.runMutation(internal.photoMemories.setMemoryResult, {
         memoryId,
         imageUrl,
         imageStorageId,
       });
+      console.log(
+        `[DEBUG][photo] runGeneration 完成: 总ms=${Date.now() - tAll} 文生图ms=${genMs} 转存ms=${storeMs} memoryId=${memoryId}`,
+      );
     } catch (e) {
-      console.error('照片记忆生成失败', e);
+      console.error(`[DEBUG][photo] runGeneration 失败: 总ms=${Date.now() - tAll} memoryId=${memoryId}`, e);
       await ctx.runMutation(internal.photoMemories.setMemoryFailed, { memoryId });
     }
   },
