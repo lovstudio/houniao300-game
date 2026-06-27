@@ -57,6 +57,7 @@ export default function Home() {
   const [controlMode, setControlMode] = useState<ControlMode>('player');
   const [cameraFollow, setCameraFollow] = useState(true);
   const [showCollisionOverlay, setShowCollisionOverlay] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
   const [activeInterior, setActiveInterior] = useState<VenueInteriorMapData | null>(null);
@@ -303,11 +304,13 @@ export default function Home() {
           cameraFollow={cameraFollow}
           isFullscreen={isFullscreen}
           showCollisionOverlay={showCollisionOverlay}
+          calibrating={calibrating}
           onToggleControlMode={toggleControlMode}
           onToggleCameraFollow={toggleCameraFollow}
           onSetCameraFollow={setCameraFollow}
           onToggleFullscreen={() => void toggleFullscreen()}
           onToggleCollisionOverlay={() => setShowCollisionOverlay((visible) => !visible)}
+          onToggleCalibrating={() => setCalibrating((on) => !on)}
           onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
           onHelp={() => setHelpModalOpen(true)}
           onEnterVenueInterior={(interiorId) => {
