@@ -3,6 +3,7 @@ import Experience from './components/Experience.tsx';
 import EndingsWall from './components/EndingsWall.tsx';
 import Landing from './components/Landing.tsx';
 import VenueInteriorMap from './components/VenueInteriorMap.tsx';
+import MaterialsAdmin from './components/MaterialsAdmin.tsx';
 import {
   setActivityEnterHandler,
   activityFromSchedule,
@@ -76,6 +77,12 @@ export default function Home() {
 
   // 公测实时结局墙：?wall=1 进入，跳过身份门，纯公共投屏大屏视图。
   const isWall = useMemo(() => new URLSearchParams(window.location.search).get('wall') === '1', []);
+
+  // 物料管理后台：?materials=1 进入，跳过身份门，独立后台视图。
+  const isMaterials = useMemo(
+    () => new URLSearchParams(window.location.search).get('materials') === '1',
+    [],
+  );
 
   // 连环画永久链接：?comic=<experienceId> 落地，跳过身份门，直接打开该篇灯箱（公共只读）。
   const comicId = useMemo(() => new URLSearchParams(window.location.search).get('comic'), []);
@@ -260,6 +267,11 @@ export default function Home() {
   // 公测实时结局墙：公共大屏，不经身份门，直接渲染。
   if (isWall) {
     return <EndingsWall />;
+  }
+
+  // 物料管理后台：?materials=1，跳过身份门与游戏，独立管理页。
+  if (isMaterials) {
+    return <MaterialsAdmin />;
   }
 
   // 身份门：加载中显示占位，未录入则强制 onboarding。

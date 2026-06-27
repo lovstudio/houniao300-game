@@ -52,3 +52,4 @@ convex_local*
 /output
 /tmp
 poster-qr-isolated.png
+.claude/settings.local.json
