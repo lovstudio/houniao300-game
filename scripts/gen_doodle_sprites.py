@@ -100,9 +100,14 @@ def draw_figure(direction, phase, params):
     w = C * 0.05
     b = params['build']
     cx = C*0.5
-    # 走路: 相位 0/1/2 -> 中性/左迈/右迈 ; 1px 上下弹跳
-    stride = {0: 0.0, 1: -1.0, 2: 1.0}[phase]
-    bounce = (-C*0.012) if phase != 0 else 0.0
+    # 步态: 帧0=站立中性(停下时停在这帧), 帧1/2=左右脚交替迈步
+    # (左腿, 右腿) 沿"前进轴"的位移: +前 / -后
+    lf, rf = {0: (0, 0), 1: (1, -1), 2: (-1, 1)}[phase]
+    # 朝向决定前进轴: 上下=纵向, 左右=横向
+    fwd = {'down': (0, 1), 'up': (0, -1), 'left': (-1, 0), 'right': (1, 0)}[direction]
+    STEP = C*0.075   # 迈步幅度
+    LIFT = C*0.05    # 后摆脚抬起高度
+    bounce = (-C*0.014) if phase != 0 else 0.0  # 迈步时身体轻微上弹
     head_r = C*0.115
     head_cy = C*(0.5-0.305*b) + bounce
     sh_y = head_cy + head_r + w*0.4
@@ -110,7 +115,6 @@ def draw_figure(direction, phase, params):
     foot_y = C*0.94
     sh_w = C*0.155
     hip_w = C*0.065
-    swing = C*0.085*stride
 
     # T 恤 (梯形躯干 + 短袖)
     torso = [(cx-sh_w, sh_y), (cx+sh_w, sh_y),
@@ -135,10 +139,15 @@ def draw_figure(direction, phase, params):
         dot(d, cx+ex*0.7, ey, w*0.55)
     # 头发
     draw_hair(d, cx, head_cy, head_r, w, params['hair'], direction)
-    # 手臂 (体侧下垂, 走路轻摆)
-    stroke(d, (cx-sh_w*1.05, sh_y+w*1.4), (cx-sh_w*0.95-swing, hip_y+C*0.03), w)
-    stroke(d, (cx+sh_w*1.05, sh_y+w*1.4), (cx+sh_w*0.95+swing, hip_y+C*0.03), w)
-    # 腿 / 裙
+    # 手臂 (体侧下垂; 走路时与同侧腿反向摆)
+    arm_amt = C*0.06
+    for sgn, leg_st in ((-1, lf), (1, rf)):
+        ax = cx + sgn*sh_w*1.0
+        # 手臂沿前进轴反向摆 (横向朝向才明显; 纵向朝向手臂略前后)
+        ahx = ax - leg_st*arm_amt*fwd[0]
+        ahy = hip_y + C*0.03 - leg_st*arm_amt*fwd[1]*0.6
+        stroke(d, (ax, sh_y+w*1.4), (ahx, ahy), w)
+    # 裙
     if params['skirt']:
         d.polygon([(cx-hip_w*1.5, hip_y-w*0.4), (cx+hip_w*1.5, hip_y-w*0.4),
                    (cx+sh_w*1.05, hip_y+C*0.12), (cx-sh_w*1.05, hip_y+C*0.12)],
@@ -146,11 +155,17 @@ def draw_figure(direction, phase, params):
         leg_top = hip_y+C*0.12
     else:
         leg_top = hip_y
-    stroke(d, (cx-hip_w, leg_top), (cx-hip_w*1.25-swing, foot_y), w)
-    stroke(d, (cx+hip_w, leg_top), (cx+hip_w*1.25+swing, foot_y), w)
-    # 鞋
-    stroke(d, (cx-hip_w*1.25-swing, foot_y), (cx-hip_w*1.25-swing-C*0.055, foot_y), w*1.1)
-    stroke(d, (cx+hip_w*1.25+swing, foot_y), (cx+hip_w*1.25+swing+C*0.055, foot_y), w*1.1)
+    # 腿 (左右交替迈步, 后摆脚抬起)
+    toe = C*0.05
+    for sgn, st in ((-1, lf), (1, rf)):
+        fx = cx + sgn*hip_w*1.25 + st*STEP*fwd[0]
+        fy = foot_y + st*STEP*fwd[1]
+        if st < 0:           # 后摆脚抬起离地
+            fy -= LIFT
+        stroke(d, (cx + sgn*hip_w, leg_top), (fx, fy), w)
+        # 鞋: 横向朝向脚尖朝前, 纵向朝向脚尖朝外
+        tdx = fwd[0]*toe if fwd[0] != 0 else sgn*toe
+        stroke(d, (fx, fy), (fx + tdx, fy), w*1.1)
 
     return img.resize((T, T), Image.LANCZOS)
 
