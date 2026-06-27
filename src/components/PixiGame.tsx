@@ -487,6 +487,19 @@ export const PixiGame = (props: {
           };
         }
       } else {
+        // 点击移动（以及任何没有本地预测的情况）：把渲染交还给 historical 平滑插值，
+        // 与 NPC 完全一致。optimistic 的 lerp/snap settle 只用于收尾键盘预测；
+        // 用在点击移动上会变成 0.08 慢 lerp + 0.75 snap 跳跃，正是「卡顿卡顿」的来源。
+        if (
+          optimisticLocationRef.current === undefined &&
+          optimisticPathRef.current.length === 0 &&
+          !lastSentDestinationRef.current
+        ) {
+          publishOptimisticLocation(undefined);
+          lastOptimisticFrameAtRef.current = performanceNow;
+          optimisticFrameRef.current = window.requestAnimationFrame(tickOptimisticPlayer);
+          return;
+        }
         const pendingDestination = lastSentDestinationRef.current;
         const serverToPending = pendingDestination
           ? Math.sqrt(
