@@ -381,6 +381,15 @@ function InstallationDetail({
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        <img
+          src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/installations/${installation.id}.jpg`}
+          alt={installation.title}
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+          className="mb-3 w-full rounded-lg border border-brown-700/40 bg-brown-900/30 object-cover"
+        />
         <h3 className="font-display text-2xl leading-tight text-brown-100">{installation.title}</h3>
         <div className="mt-3 space-y-2 text-sm text-brown-200">
           <div className="flex gap-2">
