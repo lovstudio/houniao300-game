@@ -6,6 +6,8 @@ import { setPanelOpenHandler } from '../lib/panelBus.ts';
 import { useElementSize } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
+import InteractButton from './buttons/InteractButton';
+import SettingsMenu from './SettingsMenu';
 import SidebarTabs from './SidebarTabs.tsx';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
@@ -21,20 +23,30 @@ export default function Game({
   userId,
   controlMode,
   cameraFollow,
+  isFullscreen,
+  showCollisionOverlay,
   onToggleControlMode,
   onToggleCameraFollow,
   onSetCameraFollow,
+  onToggleFullscreen,
+  onToggleCollisionOverlay,
+  onOpenPhotoMemory,
+  onHelp,
   onEnterVenueInterior,
-  showCollisionOverlay,
 }: {
   userId: string;
   controlMode: ControlMode;
   cameraFollow: boolean;
+  isFullscreen: boolean;
+  showCollisionOverlay: boolean;
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
+  onToggleFullscreen: () => void;
+  onToggleCollisionOverlay: () => void;
+  onOpenPhotoMemory: () => void;
+  onHelp: () => void;
   onEnterVenueInterior?: (interiorId: string) => void;
-  showCollisionOverlay: boolean;
 }) {
   const convex = useConvex();
   const [selectedElement, setSelectedElement] = useState<{
@@ -104,6 +116,26 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </Stage>
             </div>
           </div>
+          {/* 游戏内悬浮控制台：加入世界 / 设置 / 照片记忆 / 帮助 —— 所有交互都在游戏内部 */}
+          <div
+            className="absolute right-3 z-40 flex items-center gap-1"
+            style={{ top: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
+          >
+            <InteractButton userId={userId} worldId={worldId} />
+            <SettingsMenu
+              controlMode={controlMode}
+              cameraFollow={cameraFollow}
+              isFullscreen={isFullscreen}
+              showCollisionOverlay={showCollisionOverlay}
+              onToggleControlMode={onToggleControlMode}
+              onToggleCameraFollow={onToggleCameraFollow}
+              onToggleFullscreen={onToggleFullscreen}
+              onToggleCollisionOverlay={onToggleCollisionOverlay}
+              onOpenPhotoMemory={onOpenPhotoMemory}
+              onHelp={onHelp}
+            />
+          </div>
+
           {SHOW_DEV_TOOLS && showCollisionOverlay && (
             <div className="pointer-events-none absolute left-3 top-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
               <div className="mb-1 font-semibold">碰撞染色</div>
