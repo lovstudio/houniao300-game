@@ -20,11 +20,13 @@ export type ViewportProps = {
 export function viewportMinScale(
   props: Pick<ViewportProps, 'screenWidth' | 'screenHeight' | 'worldWidth' | 'worldHeight'>,
 ) {
-  const fitWorldScale = Math.min(
+  // cover：取宽高比例里的较大者，确保地图铺满视口（较长的一轴裁到屏幕外、可平移），
+  // 而不是 contain（取较小者）那样四周留白。
+  const coverWorldScale = Math.max(
     props.screenWidth / props.worldWidth,
     props.screenHeight / props.worldHeight,
   );
-  return Math.min(3, Math.max(0.05, fitWorldScale));
+  return Math.min(3, Math.max(0.05, coverWorldScale));
 }
 
 // https://davidfig.github.io/pixi-viewport/jsdoc/Viewport.html
