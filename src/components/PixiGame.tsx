@@ -34,11 +34,12 @@ import { Location, playerLocation } from '../../convex/aiTown/location.ts';
 const MAP_SOURCE_WIDTH = 1703;
 const MAP_SOURCE_HEIGHT = 1279;
 const KEYBOARD_MOVE_REPEAT_MS = 180;
-// 必须与服务器 data/characters.ts 的 movementSpeed 一致，否则乐观预测会冲过头再被拽回，产生橡皮筋抖动。
-const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 0.75;
+// 应与服务器 movementSpeed 的实际位移速率（px/秒）一致，否则乐观预测会冲过头再被拽回，产生橡皮筋抖动。
+// 128x96 / 16px 网格下，瓦片单位速率较 64x48 / 32px 翻倍：原 0.75 → 1.5（px/秒不变）。
+const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 1.5;
 const MAX_OPTIMISTIC_PATH_LENGTH = 2;
-const SERVER_SNAP_DISTANCE_TILES = 0.75;
-const SERVER_SETTLE_DISTANCE_TILES = 0.05;
+const SERVER_SNAP_DISTANCE_TILES = 1.5;
+const SERVER_SETTLE_DISTANCE_TILES = 0.1;
 const SERVER_SETTLE_LERP = 0.08;
 const SERVER_CATCHUP_GRACE_MS = 2500;
 const MOVEMENT_KEYS = new Set([
