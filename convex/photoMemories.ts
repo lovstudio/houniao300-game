@@ -87,9 +87,22 @@ async function resolveImageUrl(
 }
 
 async function resolvePhotoMemory(ctx: QueryCtx, item: Doc<'photoMemories'>) {
+  // 相册展示这条记忆的每一张生成图（所有 ready 轮，按 index 顺序），而不仅是最新代表图。
+  const turns = await ctx.db
+    .query('photoMemoryTurns')
+    .withIndex('memoryId', (q) => q.eq('memoryId', item._id))
+    .collect();
+  turns.sort((a, b) => a.index - b.index);
+  const turnImages = (
+    await Promise.all(turns.filter((t) => t.status === 'ready').map((t) => resolveImageUrl(ctx, t)))
+  ).filter((u): u is string => !!u);
+  const repImage = await resolveImageUrl(ctx, item);
+  // 旧记忆没有 turns，回退到记忆自身的代表图。
+  const images = turnImages.length ? turnImages : repImage ? [repImage] : [];
   return {
     ...item,
-    imageUrl: await resolveImageUrl(ctx, item),
+    imageUrl: repImage,
+    images,
     originalUrl: await ctx.storage.getUrl(item.originalStorageId),
   };
 }
