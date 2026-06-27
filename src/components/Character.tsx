@@ -48,7 +48,8 @@ export const Character = ({
       const resolvedUrl = textureUrl.replace('/ai-town', basePrefix);
       const sheet = new Spritesheet(
         BaseTexture.from(resolvedUrl, {
-          scaleMode: PIXI.SCALE_MODES.NEAREST,
+          // 简笔画为平滑线条美术 (非像素风)，放大用 LINEAR 抗锯齿。
+          scaleMode: PIXI.SCALE_MODES.LINEAR,
         }),
         spritesheetData,
       );
@@ -106,6 +107,8 @@ export const Character = ({
         textures={spriteSheet.animations[direction]}
         animationSpeed={speed}
         anchor={{ x: 0.5, y: 0.5 }}
+        // 简笔画图集为 64px/帧 (原 32px)，缩回 0.5 保持世界占位不变。
+        scale={0.5}
       />
       {emoji && (
         <Text x={0} y={-24} scale={{ x: -0.8, y: 0.8 }} text={emoji} anchor={{ x: 0.5, y: 0.5 }} />
