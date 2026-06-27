@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Onboarding from './Onboarding.tsx';
 
-// 候鸟沙城 · 候鸟300 落地页 —— 首次抵达（profile===null）即此屏：
-// 一座「从沙滩上长出来的城」，沙粒被风扬起、凝成「沙之书」，鼠标可拨开沙；
-// 沙城只存在 300 小时，会消失、会迁徙——登记成为候鸟，即可进入。
-// 沿用产品暖色夜墨沙金体系，致敬博尔赫斯《沙之书》的质地，但说的是候鸟300 自己的话。
+// 候鸟沙城 · 候鸟300 落地页 —— 孤独图书馆式文学极简：
+// 暖雾纸底、炭墨衰线、大量留白；沙粒如纸上墨尘，被风扬起、凝成「沙之书」，鼠标可拨。
+// 一座从沙滩上长出来、只存在 300 小时、会消失会迁徙的城——登记成为候鸟，即可进入。
 
-// 「正在发生，却已经开始怀念的瞬间」—— 候鸟300 现场轮播
 const MOMENTS = [
   '直播一小时，留下一面候鸟的旗帜',
   '花车与人群，走向海边的篝火',
@@ -15,6 +13,11 @@ const MOMENTS = [
   '《Token 在燃烧》，点亮整片夜晚',
   '白天一起运动，晚上一起看戏',
 ];
+
+// 文学极简色板（暖雾纸 / 炭墨 / 陶土）
+const INK = '#2c2620';
+const INK_SOFT = '#7a7063';
+const TERRA = '#b0563a';
 
 type Grain = {
   x: number;
@@ -39,13 +42,12 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [moment, setMoment] = useState(0);
 
-  // 现场瞬间轮播
   useEffect(() => {
-    const id = window.setInterval(() => setMoment((m) => (m + 1) % MOMENTS.length), 3400);
+    const id = window.setInterval(() => setMoment((m) => (m + 1) % MOMENTS.length), 3600);
     return () => window.clearInterval(id);
   }, []);
 
-  // 沙粒动画：扬沙 → 凝成「沙之书」→ 落定后可拨沙
+  // 墨尘动画：扬起 → 凝成「沙之书」→ 落定后可拨
   useEffect(() => {
     if (reduce) return;
     const canvas = canvasRef.current;
@@ -87,15 +89,15 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
       const octx = off.getContext('2d');
       if (!octx) return;
 
-      const fontSize = Math.min(W * 0.32, H * 0.24, 220);
-      const titleCenterY = H * 0.21;
+      const fontSize = Math.min(W * 0.3, H * 0.22, 210);
+      const titleCenterY = H * 0.2;
       octx.fillStyle = '#fff';
       octx.textAlign = 'center';
       octx.textBaseline = 'middle';
       octx.font = `900 ${fontSize}px "Noto Serif SC","Songti SC",serif`;
 
       const txt = '沙之书';
-      const tracking = fontSize * 0.1;
+      const tracking = fontSize * 0.12;
       const widths = [...txt].map((c) => octx.measureText(c).width + tracking);
       const total = widths.reduce((a, b) => a + b, 0) - tracking;
       let x = W / 2 - total / 2;
@@ -119,9 +121,10 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
           ...spawnFromWind(),
           tx: 0,
           ty: 0,
-          r: Math.random() * 1.5 + 0.6,
-          col: `hsl(${36 + Math.random() * 12}, ${42 + Math.random() * 18}%, ${60 + Math.random() * 22}%)`,
-          spark: Math.random() < 0.07,
+          r: Math.random() * 1.4 + 0.7,
+          // 纸上墨尘：炭墨深浅不一
+          col: `hsl(34, ${10 + Math.random() * 12}%, ${16 + Math.random() * 16}%)`,
+          spark: Math.random() < 0.05,
           delay: 0,
         };
         g.tx = t.x;
@@ -131,15 +134,15 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
       });
 
       if (!drift.length) {
-        const n = Math.round((W * H) / 24000);
+        const n = Math.round((W * H) / 30000);
         for (let i = 0; i < n; i++) {
           drift.push({
             x: Math.random() * W,
             y: Math.random() * H,
-            r: Math.random() * 1.1 + 0.3,
-            vx: (Math.random() - 0.5) * 0.18,
-            vy: -(Math.random() * 0.22 + 0.05),
-            a: Math.random() * 0.3 + 0.05,
+            r: Math.random() * 1.0 + 0.3,
+            vx: (Math.random() - 0.5) * 0.16,
+            vy: -(Math.random() * 0.2 + 0.04),
+            a: Math.random() * 0.14 + 0.03,
           });
         }
       }
@@ -162,7 +165,8 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
       const t = ts - start;
       ctx.clearRect(0, 0, W, H);
 
-      ctx.fillStyle = '#b8a079';
+      // 氛围浮尘（极淡）
+      ctx.fillStyle = '#6b6052';
       for (const d of drift) {
         d.x += d.vx;
         d.y += d.vy;
@@ -204,8 +208,8 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
           p.vx *= friction;
           p.vy *= friction;
           if (mode === 'settled') {
-            p.vx += (Math.random() - 0.5) * 0.1;
-            p.vy += (Math.random() - 0.5) * 0.1;
+            p.vx += (Math.random() - 0.5) * 0.09;
+            p.vy += (Math.random() - 0.5) * 0.09;
           }
           p.x += p.vx;
           p.y += p.vy;
@@ -215,19 +219,11 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
         if (t < p.delay) alpha = 0;
         else if (mode === 'forming') alpha = Math.min(1, (t - p.delay) / 700);
 
-        ctx.globalAlpha = alpha;
-        if (p.spark) {
-          ctx.fillStyle = '#fec742';
-          ctx.shadowColor = '#c79a44';
-          ctx.shadowBlur = 6;
-        } else {
-          ctx.fillStyle = p.col;
-          ctx.shadowBlur = 0;
-        }
+        ctx.globalAlpha = alpha * 0.92;
+        ctx.fillStyle = p.spark ? TERRA : p.col;
         ctx.fillRect(p.x, p.y, p.r, p.r);
       }
       ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
 
       raf = requestAnimationFrame(tick);
     };
@@ -268,107 +264,128 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
 
   return (
     <div
-      className="fixed inset-0 z-[100] overflow-hidden bg-brown-900"
+      className="fixed inset-0 z-[100] overflow-hidden"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
-        // 海边落日 · 沙丘 · 暖光晕 —— 候鸟沙城从沙滩上长出来
+        color: INK,
+        // 暖雾纸：上方微亮（海与天的光），向下沉为沙白
         background:
-          'radial-gradient(120% 80% at 50% 12%, rgba(228,166,114,0.22) 0%, rgba(184,111,80,0.08) 30%, transparent 60%),' +
-          'radial-gradient(150% 120% at 50% 124%, rgba(184,111,80,0.30) 0%, transparent 56%),' +
-          '#181425',
+          'radial-gradient(120% 75% at 50% -8%, #f7f3ea 0%, #efe9dc 50%, #e6decd 100%)',
       }}
     >
-      {/* 沙粒画布（视口固定，标题约 21% 屏高，可拨沙） */}
-      {!reduce && <canvas ref={canvasRef} className="absolute inset-0" />}
-
-      {/* 暗角 */}
+      {/* 极淡纸纹颗粒 */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            'radial-gradient(120% 100% at 50% 50%, transparent 54%, rgba(0,0,0,0.5) 100%)',
+          opacity: 0.5,
+          mixBlendMode: 'multiply',
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E\")",
         }}
       />
 
-      {/* 顶部：候鸟300 · 正在发生 + 现场瞬间轮播 */}
-      <div
-        className="splash-fade pointer-events-none absolute inset-x-0 top-[max(14px,3vh)] z-10 px-6 text-center"
-        style={{ animationDelay: '0.3s' }}
-      >
-        <div
-          style={{
-            fontFamily: serif,
-            letterSpacing: '0.4em',
-            fontSize: 'clamp(10px,1.4vw,13px)',
-            color: '#caa979',
-          }}
-        >
-          候鸟300 · 正在发生
-        </div>
-        <div
-          key={moment}
-          className="landing-moment mx-auto mt-1 max-w-[90vw] truncate"
-          style={{
-            fontFamily: serif,
-            fontStyle: 'italic',
-            fontSize: 'clamp(11px,1.5vw,14px)',
-            color: '#8a7c66',
-            letterSpacing: '0.04em',
-          }}
-        >
-          {MOMENTS[moment]}
-        </div>
-      </div>
+      {/* 墨尘画布（视口固定，标题约 20% 屏高，可拨） */}
+      {!reduce && <canvas ref={canvasRef} className="absolute inset-0" />}
 
       {/* 内容滚动层 */}
       <div className="relative z-10 h-full overflow-y-auto">
-        <div className="flex min-h-full flex-col items-center px-6 pb-12 pt-6 text-center">
-          {/* 标题区：沙粒在 canvas 上绘制，此处留白；reduced-motion 用 DOM 标题兜底 */}
+        <div className="mx-auto flex min-h-full max-w-[560px] flex-col items-center px-8 pb-16 pt-7 text-center">
+          {/* 顶部：候鸟300 · 正在发生 + 现场瞬间 */}
+          <div className="splash-fade" style={{ animationDelay: '0.2s' }}>
+            <div
+              style={{
+                fontFamily: serif,
+                letterSpacing: '0.42em',
+                fontSize: 'clamp(10px,1.3vw,12px)',
+                color: INK_SOFT,
+              }}
+            >
+              候鸟300 · 正在发生
+            </div>
+            <div
+              key={moment}
+              className="landing-moment mt-1.5"
+              style={{
+                fontFamily: serif,
+                fontStyle: 'italic',
+                fontSize: 'clamp(11px,1.4vw,13px)',
+                color: INK_SOFT,
+                opacity: 0.78,
+                letterSpacing: '0.03em',
+              }}
+            >
+              {MOMENTS[moment]}
+            </div>
+          </div>
+
+          {/* 标题区：墨尘在 canvas 上绘制；reduced-motion 用 DOM 标题兜底 */}
           <h1 className="sr-only">沙之书 · 候鸟沙城</h1>
           {reduce ? (
             <div
-              className="game-title font-display mt-[12vh]"
-              style={{ fontSize: 'clamp(56px,16vw,180px)', lineHeight: 1, letterSpacing: '0.08em' }}
+              className="mt-[10vh]"
+              style={{
+                fontFamily: serif,
+                fontWeight: 900,
+                color: INK,
+                fontSize: 'clamp(64px,17vw,190px)',
+                lineHeight: 1,
+                letterSpacing: '0.12em',
+              }}
             >
               沙之书
             </div>
           ) : (
-            <div style={{ height: 'clamp(200px,32vh,300px)' }} />
+            <div style={{ height: 'clamp(196px,31vh,290px)' }} />
           )}
 
-          {/* 副标：品牌主从 —— 沙之书（诗名）/ 候鸟沙城 · 候鸟300（品牌） */}
+          {/* 品牌副线：候鸟沙城 · 候鸟300 / 选址 */}
           <div
-            className="splash-fade font-display game-title"
-            style={{ fontSize: 'clamp(18px,3vw,30px)', letterSpacing: '0.06em', animationDelay: '1.2s' }}
+            className="splash-fade"
+            style={{
+              fontFamily: serif,
+              fontWeight: 500,
+              fontSize: 'clamp(15px,2.2vw,20px)',
+              letterSpacing: '0.34em',
+              textIndent: '0.34em',
+              color: INK,
+              animationDelay: '1.2s',
+            }}
           >
             候鸟沙城
           </div>
           <div
-            className="splash-fade mt-1"
+            className="splash-fade mt-2"
             style={{
               fontFamily: serif,
-              fontSize: 'clamp(11px,1.5vw,14px)',
-              letterSpacing: '0.3em',
-              color: '#caa979',
+              fontSize: 'clamp(10px,1.3vw,12px)',
+              letterSpacing: '0.28em',
+              color: INK_SOFT,
               animationDelay: '1.35s',
             }}
           >
             候鸟300 · 孤独图书馆向北 200 米
           </div>
 
-          <div className="splash-rule" style={{ animationDelay: '1.5s' }} />
+          <div
+            className="splash-rule"
+            style={{
+              background: 'linear-gradient(90deg, transparent, rgba(44,38,32,0.28), transparent)',
+              animationDelay: '1.5s',
+            }}
+          />
 
           {/* 箴言：候鸟300 自己的话 */}
           <p
-            className="splash-fade max-w-[min(82vw,560px)]"
+            className="splash-fade max-w-[440px]"
             style={{
               fontFamily: serif,
               fontWeight: 300,
-              fontSize: 'clamp(14px,1.9vw,18px)',
-              lineHeight: 2,
-              color: '#EAD4AA',
-              letterSpacing: '0.04em',
+              fontSize: 'clamp(14px,1.8vw,17px)',
+              lineHeight: 2.1,
+              color: INK,
+              opacity: 0.86,
+              letterSpacing: '0.03em',
               animationDelay: '1.9s',
             }}
           >
@@ -378,7 +395,7 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
           </p>
 
           {/* 登记表单 */}
-          <div className="splash-fade mt-9 w-full max-w-md" style={{ animationDelay: '2.3s' }}>
+          <div className="splash-fade mt-12 w-full" style={{ animationDelay: '2.3s' }}>
             <Onboarding userId={userId} onDone={onDone} />
           </div>
         </div>
