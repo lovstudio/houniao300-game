@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import {
-  action,
   ActionCtx,
+  internalAction,
   internalMutation,
   internalQuery,
   mutation,
@@ -99,30 +99,9 @@ export const generateUploadUrl = mutation({
   },
 });
 
-export const insertPhotoMemory = internalMutation({
-  args: {
-    userId: v.string(),
-    userName: v.string(),
-    title: v.string(),
-    sourceType: v.union(v.literal('photo'), v.literal('video')),
-    originalStorageId: v.string(),
-    imageUrl: v.optional(v.string()),
-    imageStorageId: v.optional(v.string()),
-    activityKey: v.optional(v.string()),
-    activityTitle: v.optional(v.string()),
-    venue: v.optional(v.string()),
-    contextLabel: v.optional(v.string()),
-    shared: v.boolean(),
-    sharedAt: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  },
-  handler: async (ctx, args): Promise<Id<'photoMemories'>> => {
-    return await ctx.db.insert('photoMemories', args);
-  },
-});
-
-export const generatePhotoMemory = action({
+// 懒插入一条 pending 记忆并调度后台生成。前端拿到 memoryId 后订阅 getPhotoMemory 看进度，
+// 不再 await 长 action（图像生成 20-60s，over-WS 等待易因重连丢失 → "action in flight 连接丢失"）。
+export const createPhotoMemory = mutation({
   args: {
     userId: v.string(),
     userName: v.string(),
@@ -132,58 +111,53 @@ export const generatePhotoMemory = action({
     context: contextValidator,
     userPrompt: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{ memoryId: Id<'photoMemories'>; imageUrl: string | null }> => {
-    const source = await ctx.storage.get(args.originalStorageId);
-    if (!source) throw new Error('原图上传失败，请重新选择照片');
-
-    const title = normalizeTitle(args.title, args.context?.activityTitle ?? args.context?.venue);
-    const prompt = buildPrompt({
-      title,
-      activityTitle: compact(args.context?.activityTitle, 80),
-      venue: compact(args.context?.venue, 48),
-      contextLabel: compact(args.context?.contextLabel, 80),
-      userPrompt: compact(args.userPrompt, 280),
-    });
-
-    const generated = await generateImage(prompt, source);
-    const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
-
+  handler: async (ctx, args): Promise<{ memoryId: Id<'photoMemories'> }> => {
     const now = Date.now();
-    const memoryId = await ctx.runMutation(internal.photoMemories.insertPhotoMemory, {
+    const title = normalizeTitle(args.title, args.context?.activityTitle ?? args.context?.venue);
+    const memoryId = await ctx.db.insert('photoMemories', {
       userId: args.userId,
       userName: compact(args.userName, 24) ?? '候鸟',
       title,
       sourceType: 'photo',
       originalStorageId: args.originalStorageId,
-      imageUrl,
-      imageStorageId,
       activityKey: args.context?.activityKey,
       activityTitle: compact(args.context?.activityTitle, 120),
       venue: compact(args.context?.venue, 48),
       contextLabel: compact(args.context?.contextLabel, 80),
+      userPrompt: compact(args.userPrompt, 280),
+      status: 'pending',
       shared: args.sharePublic,
       sharedAt: args.sharePublic ? now : undefined,
       createdAt: now,
       updatedAt: now,
     });
-
-    return {
-      memoryId,
-      imageUrl: imageUrl ?? (imageStorageId ? await ctx.storage.getUrl(imageStorageId) : null),
-    };
+    await ctx.scheduler.runAfter(0, internal.photoMemories.runGeneration, { memoryId });
+    return { memoryId };
   },
 });
 
-export const getOwnedMemory = internalQuery({
-  args: { memoryId: v.id('photoMemories'), userId: v.string() },
-  handler: async (ctx, { memoryId, userId }): Promise<Doc<'photoMemories'> | null> => {
-    const m = await ctx.db.get(memoryId);
-    if (!m || m.userId !== userId) return null;
-    return m;
+// 按访客新提示词在原图基础上重绘，覆盖同一条记忆（不新增行，保真不漂移）。同样异步化。
+export const refinePhotoMemory = mutation({
+  args: { memoryId: v.id('photoMemories'), userId: v.string(), userPrompt: v.string() },
+  handler: async (ctx, { memoryId, userId, userPrompt }) => {
+    const memory = await ctx.db.get(memoryId);
+    if (!memory || memory.userId !== userId) throw new Error('照片记忆不存在或无权调整');
+    await ctx.db.patch(memoryId, {
+      userPrompt: compact(userPrompt, 280),
+      status: 'pending',
+      updatedAt: Date.now(),
+    });
+    await ctx.scheduler.runAfter(0, internal.photoMemories.runGeneration, { memoryId });
   },
 });
 
-export const patchPhotoMemoryImage = internalMutation({
+export const getMemory = internalQuery({
+  args: { memoryId: v.id('photoMemories') },
+  handler: async (ctx, { memoryId }): Promise<Doc<'photoMemories'> | null> =>
+    await ctx.db.get(memoryId),
+});
+
+export const setMemoryResult = internalMutation({
   args: {
     memoryId: v.id('photoMemories'),
     imageUrl: v.optional(v.string()),
@@ -191,38 +165,61 @@ export const patchPhotoMemoryImage = internalMutation({
   },
   handler: async (ctx, { memoryId, imageUrl, imageStorageId }) => {
     // imageUrl / imageStorageId 恰有一个有值（新图替换旧图），另一个置空避免取到旧定位。
-    await ctx.db.patch(memoryId, { imageUrl, imageStorageId, updatedAt: Date.now() });
+    await ctx.db.patch(memoryId, { imageUrl, imageStorageId, status: 'ready', updatedAt: Date.now() });
   },
 });
 
-// 生成后按访客提示词在原图基础上重绘，覆盖同一条记忆（不新增行），保真不漂移。
-export const refinePhotoMemory = action({
-  args: {
-    memoryId: v.id('photoMemories'),
-    userId: v.string(),
-    userPrompt: v.string(),
+export const setMemoryFailed = internalMutation({
+  args: { memoryId: v.id('photoMemories') },
+  handler: async (ctx, { memoryId }) => {
+    await ctx.db.patch(memoryId, { status: 'failed', updatedAt: Date.now() });
   },
-  handler: async (ctx, { memoryId, userId, userPrompt }): Promise<{ imageUrl: string | null }> => {
-    const memory = await ctx.runQuery(internal.photoMemories.getOwnedMemory, { memoryId, userId });
-    if (!memory) throw new Error('照片记忆不存在或无权调整');
-    const source = await ctx.storage.get(memory.originalStorageId);
-    if (!source) throw new Error('原图已不可用，无法继续调整');
+});
 
-    const prompt = buildPrompt({
-      title: memory.title,
-      activityTitle: compact(memory.activityTitle, 80),
-      venue: compact(memory.venue, 48),
-      contextLabel: compact(memory.contextLabel, 80),
-      userPrompt: compact(userPrompt, 280),
-    });
-    const generated = await generateImage(prompt, source);
-    const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
-    await ctx.runMutation(internal.photoMemories.patchPhotoMemoryImage, {
-      memoryId,
-      imageUrl,
-      imageStorageId,
-    });
-    return { imageUrl: imageUrl ?? (imageStorageId ? await ctx.storage.getUrl(imageStorageId) : null) };
+// 后台生成：读原图 + 提示词 → 文生图 → 转存 → 回填。失败置 failed，前端可改提示词重试。
+export const runGeneration = internalAction({
+  args: { memoryId: v.id('photoMemories') },
+  handler: async (ctx, { memoryId }) => {
+    const memory = await ctx.runQuery(internal.photoMemories.getMemory, { memoryId });
+    if (!memory) return;
+    try {
+      const source = await ctx.storage.get(memory.originalStorageId);
+      if (!source) throw new Error('原图不可用');
+      const prompt = buildPrompt({
+        title: memory.title,
+        activityTitle: compact(memory.activityTitle, 80),
+        venue: compact(memory.venue, 48),
+        contextLabel: compact(memory.contextLabel, 80),
+        userPrompt: compact(memory.userPrompt, 280),
+      });
+      const generated = await generateImage(prompt, source);
+      const { imageUrl, imageStorageId } = await storeGenerated(ctx, generated);
+      await ctx.runMutation(internal.photoMemories.setMemoryResult, {
+        memoryId,
+        imageUrl,
+        imageStorageId,
+      });
+    } catch (e) {
+      console.error('照片记忆生成失败', e);
+      await ctx.runMutation(internal.photoMemories.setMemoryFailed, { memoryId });
+    }
+  },
+});
+
+// 前端订阅单条记忆，实时看生成/重绘进度与结果。
+export const getPhotoMemory = query({
+  args: { memoryId: v.id('photoMemories') },
+  handler: async (ctx, { memoryId }) => {
+    const m = await ctx.db.get(memoryId);
+    if (!m) return null;
+    return {
+      _id: m._id,
+      // 旧行没有 status，但有图即视为 ready。
+      status: m.status ?? (m.imageUrl || m.imageStorageId ? 'ready' : 'pending'),
+      imageUrl: await resolveImageUrl(ctx, m),
+      title: m.title,
+      shared: m.shared,
+    };
   },
 });
 
@@ -275,12 +272,14 @@ export const latestMemoryForActivity = internalQuery({
     ctx,
     { activityKey, userId },
   ): Promise<{ imageStorageId: string | null; imageUrl: string | null } | null> => {
-    const item = await ctx.db
+    // 取最新一张"已出图"的记忆（跳过 pending/failed），作为主角参考。
+    const recent = await ctx.db
       .query('photoMemories')
       .withIndex('userId', (q) => q.eq('userId', userId))
       .order('desc')
       .filter((q) => q.eq(q.field('activityKey'), activityKey))
-      .first();
+      .take(10);
+    const item = recent.find((m) => m.imageUrl || m.imageStorageId);
     if (!item) return null;
     return { imageStorageId: item.imageStorageId ?? null, imageUrl: item.imageUrl ?? null };
   },
