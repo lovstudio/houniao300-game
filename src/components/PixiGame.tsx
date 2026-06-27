@@ -525,10 +525,12 @@ export const PixiGame = (props: {
             y: previousLocation.y + (serverLocation.y - previousLocation.y) * SERVER_SETTLE_LERP,
             dx: serverLocation.dx,
             dy: serverLocation.dy,
-            speed: 0,
+            // 保留服务器速度: 点击寻路时服务器在动(speed>0)就播放走路动画, 到站(speed=0)才停。
+            speed: serverLocation.speed,
           };
         } else {
-          nextLocation = { ...serverLocation, speed: 0 };
+          // 稳定态跟随服务器位置, 连同其速度一起 (此前硬写 0 导致点击移动不播放走路动画)。
+          nextLocation = serverLocation;
         }
       }
 
