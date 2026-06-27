@@ -114,8 +114,10 @@ body {
 .deck-group {
   padding: 4px;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(20, 12, 6, 0.5), rgba(20, 12, 6, 0.28));
-  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.08), inset 0 0 0 1px rgba(255, 220, 170, 0.06);
+  /* 作为游戏内浮层时背后没有招牌深色条，底衬需足够不透明，确保在浅色地图上也清晰可读 */
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.86), rgba(20, 12, 6, 0.74));
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.1), inset 0 0 0 1px rgba(255, 220, 170, 0.08),
+    0 2px 10px rgba(20, 12, 6, 0.4);
 }
 .deck-btn {
   display: inline-flex;
