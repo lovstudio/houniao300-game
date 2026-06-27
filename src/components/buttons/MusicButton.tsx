@@ -4,7 +4,8 @@ import SettingRow from './SettingRow';
 import { MusicIcon } from './DeckIcons';
 
 // base-aware path: `/ai-town/assets/bgm.mp3` in dev, `/assets/bgm.mp3` on the dedicated domain.
-const BGM_URL = `${import.meta.env.BASE_URL}assets/bgm.mp3`;
+// BASE_URL may or may not carry a trailing slash, so normalize before joining.
+const BGM_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/assets/bgm.mp3`;
 
 export default function MusicButton() {
   const [isPlaying, setPlaying] = useState(false);
