@@ -79,7 +79,7 @@ export default function CalibrationPanel() {
   const ready = working.length >= 3 && rms != null;
 
   return (
-    <div className="pointer-events-auto absolute right-2 top-2 z-40 w-72 select-none rounded-lg border border-brown-700/70 bg-brown-900/92 p-3 text-brown-100 shadow-2xl backdrop-blur-sm">
+    <div className="pointer-events-auto absolute left-2 top-14 z-40 w-72 max-w-[calc(100vw-1rem)] select-none rounded-lg border border-brown-700/70 bg-brown-900/92 p-3 text-brown-100 shadow-2xl backdrop-blur-sm">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-semibold text-brown-300">GPS 标定</span>
         <span className="text-[11px] text-brown-200/60">
@@ -100,21 +100,32 @@ export default function CalibrationPanel() {
           </button>
         </div>
       ) : (
-        <div className="mb-2 flex gap-1.5">
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="锚点名（选填，如 工坊门口）"
-            className="min-w-0 flex-1 rounded bg-brown-800 px-2 py-1.5 text-[12px] text-brown-100 placeholder:text-brown-200/40 focus:outline-none"
-          />
-          <button
-            onClick={captureGps}
-            disabled={!geo.reading}
-            className="shrink-0 rounded bg-brown-500 px-2.5 py-1.5 text-[12px] font-medium text-brown-900 transition hover:bg-brown-300 disabled:opacity-40"
-          >
-            采集 GPS
-          </button>
-        </div>
+        <>
+          <div className="mb-2 flex gap-1.5">
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="锚点名（选填，如 工坊门口）"
+              className="min-w-0 flex-1 rounded bg-brown-800 px-2 py-1.5 text-[12px] text-brown-100 placeholder:text-brown-200/40 focus:outline-none"
+            />
+            <button
+              onClick={captureGps}
+              disabled={!geo.reading}
+              className="shrink-0 rounded bg-brown-500 px-2.5 py-1.5 text-[12px] font-medium text-brown-900 transition hover:bg-brown-300 disabled:opacity-40"
+            >
+              采集 GPS
+            </button>
+          </div>
+          {!geo.reading && (
+            <div className="mb-2 text-[11px] text-brown-300/80">
+              {geo.status === 'denied'
+                ? '定位权限被拒绝，请在浏览器允许定位后重开此开关。'
+                : geo.status === 'unsupported'
+                  ? '此设备/浏览器不支持定位。'
+                  : '定位未就绪：等待 GPS 锁定后「采集 GPS」才可点。'}
+            </div>
+          )}
+        </>
       )}
 
       {/* 锚点列表 */}
