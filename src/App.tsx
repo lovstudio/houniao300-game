@@ -27,6 +27,8 @@ import type { Id } from '../convex/_generated/dataModel';
 import ReactModal from 'react-modal';
 import TopBar from './components/TopBar.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
+import PhotoMemoryModal from './components/PhotoMemoryModal.tsx';
+import PhotoMemoryNotifications from './components/PhotoMemoryNotifications.tsx';
 
 export default function Home() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
@@ -37,6 +39,7 @@ export default function Home() {
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
   const [activeInterior, setActiveInterior] = useState<VenueInteriorMapData | null>(null);
+  const [photoMemoryOpen, setPhotoMemoryOpen] = useState(false);
 
   // 公测实时结局墙：?wall=1 进入，跳过身份门，纯公共投屏大屏视图。
   const isWall = useMemo(() => new URLSearchParams(window.location.search).get('wall') === '1', []);
@@ -108,6 +111,24 @@ export default function Home() {
       }
       return nextFollow;
     });
+
+  const photoMemoryContext = useMemo(() => {
+    if (activeActivity) {
+      return {
+        contextLabel: activeActivity.title,
+        activityKey: activeActivity.activityKey,
+        activityTitle: activeActivity.title,
+        venue: activeActivity.hostName,
+      };
+    }
+    if (activeInterior) {
+      return {
+        contextLabel: activeInterior.venue,
+        venue: activeInterior.venue,
+      };
+    }
+    return { contextLabel: '候鸟沙城' };
+  }, [activeActivity, activeInterior]);
 
   // 连环画永久链接：直接打开该篇灯箱（复用结局墙，跳过身份门）。
   if (comicId) {
@@ -196,6 +217,7 @@ export default function Home() {
         onToggleControlMode={toggleControlMode}
         onToggleCameraFollow={toggleCameraFollow}
         onToggleFullscreen={() => void toggleFullscreen()}
+        onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
         onHelp={() => setHelpModalOpen(true)}
         showCollisionOverlay={showCollisionOverlay}
         onToggleCollisionOverlay={() => setShowCollisionOverlay((visible) => !visible)}
@@ -214,6 +236,7 @@ export default function Home() {
           }}
           showCollisionOverlay={showCollisionOverlay}
         />
+        <PhotoMemoryNotifications userId={userId} />
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </div>
       <Timeline />
@@ -230,14 +253,27 @@ export default function Home() {
           <Experience
             key={activeActivity.activityKey}
             activity={activeActivity}
+            onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
             onExit={() => setActiveActivity(null)}
           />
         </div>
       )}
 
       {activeInterior && (
-        <VenueInteriorMap interior={activeInterior} onExit={() => setActiveInterior(null)} />
+        <VenueInteriorMap
+          interior={activeInterior}
+          onOpenPhotoMemory={() => setPhotoMemoryOpen(true)}
+          onExit={() => setActiveInterior(null)}
+        />
       )}
+
+      <PhotoMemoryModal
+        open={photoMemoryOpen}
+        onClose={() => setPhotoMemoryOpen(false)}
+        userId={userId}
+        userName={profile.name}
+        context={photoMemoryContext}
+      />
     </main>
   );
 }

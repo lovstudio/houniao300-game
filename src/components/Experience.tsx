@@ -12,9 +12,11 @@ import clsx from 'clsx';
 // 进入某个活动的专属游戏。游戏隶属于该活动且独立。
 export default function Experience({
   activity,
+  onOpenPhotoMemory,
   onExit,
 }: {
   activity: ActivityDescriptor;
+  onOpenPhotoMemory: () => void;
   onExit: () => void;
 }) {
   const userId = useMemo(getAnonUserId, []);
@@ -30,6 +32,7 @@ export default function Experience({
         avatarUrl={profile?.avatarUrl ?? null}
         avatarPreset={profile?.avatarPreset ?? null}
         onStart={setExperienceId}
+        onOpenPhotoMemory={onOpenPhotoMemory}
         onExit={onExit}
       />
     );
@@ -38,6 +41,7 @@ export default function Experience({
     <ComicPlayer
       experienceId={experienceId}
       activity={activity}
+      onOpenPhotoMemory={onOpenPhotoMemory}
       onExit={onExit}
       onReplay={() => setExperienceId(null)}
     />
@@ -52,6 +56,7 @@ function ActivityIntro({
   avatarUrl,
   avatarPreset,
   onStart,
+  onOpenPhotoMemory,
   onExit,
 }: {
   activity: ActivityDescriptor;
@@ -60,6 +65,7 @@ function ActivityIntro({
   avatarUrl: string | null;
   avatarPreset: string | null;
   onStart: (id: Id<'experiences'>) => void;
+  onOpenPhotoMemory: () => void;
   onExit: () => void;
 }) {
   const badges = useQuery(api.experience.activityBadges, { activityKey: activity.activityKey });
@@ -84,9 +90,14 @@ function ActivityIntro({
             <Avatar url={avatarUrl} preset={avatarPreset} size="sm" />
             <span className="text-sm text-brown-200">{userName}</span>
           </div>
-          <button className="text-sm text-brown-300 underline" onClick={onExit}>
-            返回小镇
-          </button>
+          <div className="flex items-center gap-3">
+            <button className="text-sm text-brown-300 underline" onClick={onOpenPhotoMemory}>
+              照片记忆
+            </button>
+            <button className="text-sm text-brown-300 underline" onClick={onExit}>
+              返回小镇
+            </button>
+          </div>
         </div>
 
         <h1 className="font-display game-title mb-2 text-4xl">{activity.title}</h1>
@@ -131,11 +142,13 @@ function ActivityIntro({
 function ComicPlayer({
   experienceId,
   activity,
+  onOpenPhotoMemory,
   onExit,
   onReplay,
 }: {
   experienceId: Id<'experiences'>;
   activity: ActivityDescriptor;
+  onOpenPhotoMemory: () => void;
   onExit: () => void;
   onReplay: () => void;
 }) {
@@ -174,9 +187,14 @@ function ComicPlayer({
       <div className="flex min-h-0 flex-col overflow-y-auto p-4 lg:p-8">
         <div className="mb-3 flex items-center justify-between">
           <h1 className="font-display text-2xl text-brown-100">{event?.title}</h1>
-          <button className="text-sm text-brown-300 underline" onClick={onExit}>
-            返回小镇
-          </button>
+          <div className="flex items-center gap-3">
+            <button className="text-sm text-brown-300 underline" onClick={onOpenPhotoMemory}>
+              照片记忆
+            </button>
+            <button className="text-sm text-brown-300 underline" onClick={onExit}>
+              返回小镇
+            </button>
+          </div>
         </div>
 
         <div className="relative mx-auto aspect-square w-full max-w-2xl overflow-hidden border-4 border-brown-700 bg-brown-800">
