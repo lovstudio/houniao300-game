@@ -18,6 +18,7 @@ import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 export type ControlMode = 'player' | 'camera';
 
 export default function Game({
+  userId,
   controlMode,
   cameraFollow,
   onToggleControlMode,
@@ -26,6 +27,7 @@ export default function Game({
   onEnterVenueInterior,
   showCollisionOverlay,
 }: {
+  userId: string;
   controlMode: ControlMode;
   cameraFollow: boolean;
   onToggleControlMode: () => void;
@@ -82,6 +84,7 @@ export default function Game({
 https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-531549215 */}
                 <ConvexProvider client={convex}>
                   <PixiGame
+                    userId={userId}
                     game={game}
                     worldId={worldId}
                     engineId={engineId}
@@ -142,6 +145,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
             worldId={worldId}
             engineId={engineId}
             game={game}
+            userId={userId}
             playerId={selectedElement?.id}
             setSelectedElement={setSelectedElement}
             onActivate={() => setPanelOpen(true)}

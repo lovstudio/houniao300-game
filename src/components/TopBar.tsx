@@ -1,5 +1,6 @@
 import InteractButton from './buttons/InteractButton';
 import SettingsMenu from './SettingsMenu';
+import type { Id } from '../../convex/_generated/dataModel';
 
 // 候鸟驿站招牌 — the festival masthead: a migratory-bird seal, the gold game title, and the control deck.
 
@@ -22,6 +23,8 @@ function FlockSeal() {
 }
 
 export default function TopBar({
+  userId,
+  worldId,
   controlMode,
   cameraFollow,
   isFullscreen,
@@ -32,6 +35,8 @@ export default function TopBar({
   onToggleCollisionOverlay,
   onHelp,
 }: {
+  userId: string;
+  worldId?: Id<'worlds'>;
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
   isFullscreen: boolean;
@@ -69,7 +74,7 @@ export default function TopBar({
 
         {/* control deck — primary action + settings menu */}
         <div className="masthead-in deck-group relative z-50 ml-auto flex items-center gap-1" style={{ animationDelay: '0.08s' }}>
-          <InteractButton />
+          <InteractButton userId={userId} worldId={worldId} />
           <SettingsMenu
             controlMode={controlMode}
             cameraFollow={cameraFollow}

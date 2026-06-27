@@ -53,6 +53,7 @@ export default function Home() {
   // 全局玩家身份：未完成 onboarding 前，强制停在录入页。
   const userId = useMemo(getAnonUserId, []);
   const profile = useQuery(api.profile.getProfile, { userId });
+  const worldStatus = useQuery(api.world.defaultWorldStatus);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -180,6 +181,8 @@ export default function Home() {
 
       {/* top navigation bar — festival masthead (solid, in normal flow) */}
       <TopBar
+        userId={userId}
+        worldId={worldStatus?.worldId}
         controlMode={controlMode}
         cameraFollow={cameraFollow}
         isFullscreen={isFullscreen}
@@ -193,6 +196,7 @@ export default function Home() {
 
       <div className="relative min-h-0 flex-1 overflow-hidden shadow-2xl">
         <Game
+          userId={userId}
           controlMode={controlMode}
           cameraFollow={cameraFollow}
           onToggleControlMode={toggleControlMode}
