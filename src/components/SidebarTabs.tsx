@@ -736,32 +736,31 @@ function StateTab({
   conversations.forEach((c) => c.participants.forEach((_v, k) => inConvo.add(k as string)));
 
   const stats = [
-    { k: 'AI 居民', v: agents.length },
-    { k: '真人玩家', v: humans },
-    { k: '进行中对话', v: conversations.length },
-    { k: '正在交谈', v: inConvo.size },
+    { k: 'AI 居民', v: agents.length, g: '居' },
+    { k: '真人玩家', v: humans, g: '客' },
+    { k: '进行中对话', v: conversations.length, g: '语' },
+    { k: '正在交谈', v: inConvo.size, g: '叙' },
   ];
 
   const nameOf = (pid: string) => game.playerDescriptions.get(pid as never)?.name ?? '居民';
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {stats.map((s) => (
-          <div
-            key={s.k}
-            className="rounded-lg border border-[#cbb287] bg-[#e8d6b0] px-3 py-2.5"
-          >
+          <div key={s.k} className="sand-stat">
+            <span className="corner">{s.g}</span>
             <div className="font-num text-4xl font-semibold leading-none text-[#9c4b34]">{s.v}</div>
-            <div className="mt-1 text-xs text-[#6b5238]">{s.k}</div>
+            <div className="mt-1.5 text-xs tracking-wide text-[#6b5238]">{s.k}</div>
           </div>
         ))}
       </div>
 
-      <h3 className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wider text-[#6b5238]">
-        居民动态
-      </h3>
-      <div className="space-y-1">
+      <div className="mb-1.5 mt-5 flex items-center gap-2">
+        <h3 className="text-[13px] font-bold tracking-[0.18em] text-[#2a1c14]">居 民 动 态</h3>
+        <span className="h-px flex-1 bg-gradient-to-r from-[#cbb287] to-transparent" />
+      </div>
+      <div>
         {players
           .filter((p) => !p.human)
           .map((p) => {
@@ -773,15 +772,25 @@ function StateTab({
                   setSelectedElement({ kind: 'player', id: p.id });
                   focusMapTile(p.position.x, p.position.y);
                 }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-[#e8d6b0]"
+                className="flex w-full items-center gap-2.5 border-b border-dashed border-[#cdb79a]/70 px-1 py-2.5 text-left transition hover:bg-[#e8d6b0]/60"
               >
                 <span
                   className={
                     'h-2 w-2 shrink-0 rounded-full ' + (talking ? 'bg-[#c0654a]' : 'bg-[#b3a489]')
                   }
+                  style={talking ? { boxShadow: '0 0 0 3px rgba(192,101,74,0.14)' } : undefined}
                 />
-                <span className="truncate text-sm text-[#2a1c14]">{nameOf(p.id as string)}</span>
-                <span className="ml-auto shrink-0 text-[11px] text-[#9c7e5e]">
+                <span className="truncate text-[15px] font-medium text-[#2a1c14]">
+                  {nameOf(p.id as string)}
+                </span>
+                <span
+                  className={
+                    'ml-auto shrink-0 text-xs ' +
+                    (talking
+                      ? 'font-semibold text-[#9c4b34]'
+                      : 'italic text-[#9c7e5e]')
+                  }
+                >
                   {talking ? '交谈中' : '漫步'}
                 </span>
               </button>

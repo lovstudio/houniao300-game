@@ -165,7 +165,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
         {/* 右侧可折叠手卷：浮木轴 + 毛笔卷头，统一为浮层抽屉覆盖在满屏地图之上 */}
         <div
           className={clsx(
-            'flex min-h-0 overflow-hidden bg-[#efe1c2] text-[#2a1c14]',
+            'sand-paper-bg flex min-h-0 overflow-hidden text-[#2a1c14]',
             'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm lg:w-96 lg:max-w-none',
             'shadow-2xl transition-transform duration-300',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
@@ -176,7 +176,10 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] lg:pt-0">
             {/* 毛笔卷头：卷名 + 设置 + 收起 */}
             <div className="sand-masthead shrink-0">
-              <span className="t">沙城手卷</span>
+              <div className="flex min-w-0 flex-col">
+                <span className="t">沙城手卷</span>
+                <span className="sub">奉 候 鸟 而 来</span>
+              </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <SettingsMenu
                   controlMode={controlMode}

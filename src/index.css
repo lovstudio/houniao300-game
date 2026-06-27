@@ -297,22 +297,58 @@ body {
   }
 }
 
-/* 侧栏卷头：毛笔卷名 + 收起 */
+/* 纸面：暖色渐变 + 烘焙进背景的纤维噪点（无 ::after，内容正常压在上面） */
+.sand-paper-bg {
+  background-image: var(--sand-noise),
+    radial-gradient(125% 80% at 28% 8%, #f6ead0, #efe1c2 52%, #e7d6b1 100%);
+  background-size: 170px, cover;
+  background-blend-mode: multiply, normal;
+}
+
+/* 侧栏卷头：干净的深木条 + 描金底线（与浅纸卷身形成层次） */
 .sand-masthead {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(198, 154, 90, 0.4);
-  background: linear-gradient(180deg, rgba(60, 40, 24, 0.55), rgba(36, 24, 14, 0.2));
+  padding: 11px 14px;
+  background: linear-gradient(180deg, #4a3320, #382514);
+  border-bottom: 2px solid var(--sand-gold);
+  box-shadow: 0 1px 0 rgba(255, 220, 170, 0.12) inset, 0 3px 8px -2px rgba(0, 0, 0, 0.4);
 }
 .sand-masthead .t {
   font-family: 'Ma Shan Zheng', cursive;
-  font-size: 22px;
+  font-size: 23px;
   letter-spacing: 3px;
   line-height: 1;
-  color: #f3e3c4;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  color: #f6e8c8;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.sand-masthead .sub {
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  color: #c9a86a;
+  margin-top: 4px;
+}
+
+/* 数据砖：渐变纸砖 + 毛笔角落水印字 */
+.sand-stat {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  padding: 13px 14px 11px;
+  background: linear-gradient(158deg, #f5e9ca, #e7d4ad);
+  border: 1px solid #d3bd92;
+  box-shadow: 0 6px 14px -10px rgba(38, 24, 12, 0.55), 0 1px 0 rgba(255, 255, 255, 0.45) inset;
+}
+.sand-stat .corner {
+  position: absolute;
+  right: -4px;
+  top: -12px;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 48px;
+  line-height: 1;
+  color: rgba(192, 101, 74, 0.13);
+  pointer-events: none;
 }
 
 /* 印章式 tab（浅纸卷签） */
