@@ -40,7 +40,12 @@ async function toBlob(result: { data?: { b64_json?: string; url?: string }[] }):
 // 保证连环画跨格视觉一致；不传则普通文生图。
 export async function generateImage(prompt: string, reference?: Blob): Promise<Blob> {
   const config = imageConfig();
-  const { result } = await retryWithBackoff(async () => {
+  const mode = reference ? 'edit(image+prompt)' : 't2i(prompt-only)';
+  const refKB = reference ? Math.round(reference.size / 1024) : 0;
+  console.log(
+    `[DEBUG][image] generateImage 入口: mode=${mode} model=${config.model} size=${config.size} promptChars=${prompt.length} refKB=${refKB} host=${config.url}`,
+  );
+  const { result, ms, retries } = await retryWithBackoff(async () => {
     let resp: Response;
     if (reference) {
       const form = new FormData();
@@ -74,5 +79,11 @@ export async function generateImage(prompt: string, reference?: Blob): Promise<B
     return (await resp.json()) as { data?: { b64_json?: string; url?: string }[] };
   });
 
-  return toBlob(result);
+  // ms = 实际成功那次请求的耗时；retries>0 说明命中了 429/5xx 退避（[1s,10s,20s]），是"很慢"的常见元凶。
+  const t0 = Date.now();
+  const blob = await toBlob(result);
+  console.log(
+    `[DEBUG][image] generateImage 完成: mode=${mode} apiMs=${ms} retries=${retries} toBlobMs=${Date.now() - t0} outKB=${Math.round(blob.size / 1024)} returnedAs=${result.data?.[0]?.b64_json ? 'b64' : result.data?.[0]?.url ? 'url(需再下载)' : 'empty'}`,
+  );
+  return blob;
 }
