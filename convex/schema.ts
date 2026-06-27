@@ -96,6 +96,10 @@ export default defineSchema({
     activityTitle: v.optional(v.string()),
     venue: v.optional(v.string()),
     contextLabel: v.optional(v.string()),
+    userPrompt: v.optional(v.string()), // 访客的可选风格化提示词（生成/重绘共用）
+    // 生成异步化：客户端订阅本行而非等待长 action，避免"action in flight 连接丢失"。
+    // 旧行无此字段时按 ready 处理（有图即成功）。
+    status: v.optional(v.union(v.literal('pending'), v.literal('ready'), v.literal('failed'))),
     shared: v.boolean(),
     sharedAt: v.optional(v.number()),
     createdAt: v.number(),

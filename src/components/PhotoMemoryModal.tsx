@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { toast } from 'react-toastify';
 import clsx from 'clsx';
 import { api } from '../../convex/_generated/api';
@@ -99,17 +99,27 @@ export default function PhotoMemoryModal({
   const [sharePublic, setSharePublic] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false); // 上传+建记录的短暂请求
   const [lastMemoryId, setLastMemoryId] = useState<Id<'photoMemories'> | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
 
   const generateUploadUrl = useMutation(api.photoMemories.generateUploadUrl);
-  const generatePhotoMemory = useAction(api.photoMemories.generatePhotoMemory);
-  const refinePhotoMemory = useAction(api.photoMemories.refinePhotoMemory);
+  const createPhotoMemory = useMutation(api.photoMemories.createPhotoMemory);
+  const refinePhotoMemory = useMutation(api.photoMemories.refinePhotoMemory);
   const setPhotoMemoryShared = useMutation(api.photoMemories.setPhotoMemoryShared);
   const mine = useQuery(api.photoMemories.listMyPhotoMemories, open ? { userId } : 'skip');
   const shared = useQuery(api.photoMemories.listSharedPhotoMemories, open ? {} : 'skip');
+  // 订阅当前这条记忆，看后台生成/重绘进度（避免 over-WS 等待长 action）。
+  const live = useQuery(
+    api.photoMemories.getPhotoMemory,
+    lastMemoryId ? { memoryId: lastMemoryId } : 'skip',
+  );
+
+  // 派生状态：是否正在出图、出图结果、是否失败。
+  const generating =
+    !!lastMemoryId && (submitting || live === undefined || live?.status === 'pending');
+  const generatedUrl = live?.status === 'ready' ? live.imageUrl : null;
+  const failed = live?.status === 'failed';
 
   const normalizedLocationOptions = useMemo<PhotoMemoryLocationOption[]>(() => {
     const fallback: PhotoMemoryLocationOption = {
@@ -167,7 +177,6 @@ export default function PhotoMemoryModal({
 
   const chooseFile = (next: File | undefined) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setLastImageUrl(null);
     setLastMemoryId(null);
     setFile(next ?? null);
     setPreviewUrl(next ? URL.createObjectURL(next) : null);
@@ -179,16 +188,15 @@ export default function PhotoMemoryModal({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
-    setLastImageUrl(null);
     setLastMemoryId(null);
     setPrompt('');
     setTitle('');
   };
 
+  // 上传原图 + 建一条 pending 记忆并触发后台生成；进度靠 live 订阅，不在此 await 长任务。
   const submit = async () => {
-    if (!file || busy) return;
-    setBusy(true);
-    setLastImageUrl(null);
+    if (!file || submitting || generating) return;
+    setSubmitting(true);
     try {
       const png = await fileToPngBlob(file);
       const uploadUrl = await generateUploadUrl();
@@ -200,7 +208,7 @@ export default function PhotoMemoryModal({
       if (!upload.ok) throw new Error(`照片上传失败 ${upload.status}`);
       const { storageId } = (await upload.json()) as { storageId?: string };
       if (!storageId) throw new Error('照片上传后没有返回 storageId');
-      const result = await generatePhotoMemory({
+      const result = await createPhotoMemory({
         userId,
         userName,
         title,
@@ -214,34 +222,23 @@ export default function PhotoMemoryModal({
         },
         userPrompt: prompt.trim() || undefined,
       });
-      setLastImageUrl(result.imageUrl);
       setLastMemoryId(result.memoryId);
-      toast.success(`已生成「${title.trim() || selectedContext?.activityTitle || '沙城照片'}」`);
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : '照片生成失败');
+      toast.error(e instanceof Error ? e.message : '照片提交失败');
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   };
 
-  // 生成后按提示词在原图基础上重绘，覆盖同一条记忆。
+  // 按提示词在原图基础上重绘，覆盖同一条记忆（后台异步，进度同样靠 live 订阅）。
   const refine = async () => {
-    if (!lastMemoryId || !prompt.trim() || busy) return;
-    setBusy(true);
+    if (!lastMemoryId || !prompt.trim() || generating) return;
     try {
-      const result = await refinePhotoMemory({
-        memoryId: lastMemoryId,
-        userId,
-        userPrompt: prompt.trim(),
-      });
-      setLastImageUrl(result.imageUrl);
-      toast.success('已按提示词重绘');
+      await refinePhotoMemory({ memoryId: lastMemoryId, userId, userPrompt: prompt.trim() });
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : '重绘失败');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -282,10 +279,27 @@ export default function PhotoMemoryModal({
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
               <div className="overflow-hidden border-2 border-brown-700 bg-brown-800">
                 <div className="aspect-square bg-brown-900">
-                  {lastImageUrl ? (
-                    <img src={lastImageUrl} alt="" className="h-full w-full object-cover" />
+                  {generatedUrl ? (
+                    <img src={generatedUrl} alt="" className="h-full w-full object-cover" />
                   ) : previewUrl ? (
-                    <img src={previewUrl} alt="" className="h-full w-full object-cover opacity-90" />
+                    <div className="relative h-full w-full">
+                      <img
+                        src={previewUrl}
+                        alt=""
+                        className="h-full w-full object-cover opacity-90"
+                      />
+                      {generating && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 text-brown-100">
+                          <span className="h-6 w-6 animate-spin rounded-full border-2 border-brown-500 border-t-clay-300" />
+                          <span className="text-sm">正在生成沙之书照片…</span>
+                        </div>
+                      )}
+                      {failed && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/55 px-6 text-center text-sm text-brown-100">
+                          生成失败，可改提示词后重试
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <label className="flex h-full cursor-pointer flex-col items-center justify-center gap-3 px-6 text-center text-brown-300 hover:bg-brown-800/70">
                       <span className="font-display text-2xl text-brown-100">选择真实照片</span>
@@ -368,28 +382,32 @@ export default function PhotoMemoryModal({
                 {!lastMemoryId ? (
                   <button
                     type="button"
-                    disabled={!file || busy}
+                    disabled={!file || submitting}
                     onClick={() => void submit()}
                     className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {busy ? '正在生成…' : '生成沙之书照片'}
+                    {submitting ? '正在提交…' : '生成沙之书照片'}
                   </button>
                 ) : (
                   <div className="space-y-2">
                     <p className="text-xs text-brown-400">
-                      已生成并存入「我的相册」。改提示词后可在原图基础上重绘，覆盖这张。
+                      {generating
+                        ? '正在生成中…完成后会自动出现在这里，也会进「我的相册」。'
+                        : failed
+                          ? '生成失败。改一下提示词，点重绘再试一次。'
+                          : '已生成并存入「我的相册」。改提示词后可在原图基础上重绘，覆盖这张。'}
                     </p>
                     <button
                       type="button"
-                      disabled={!prompt.trim() || busy}
+                      disabled={!prompt.trim() || generating}
                       onClick={() => void refine()}
                       className="w-full rounded bg-clay-700 px-4 py-3 font-display text-lg text-white hover:bg-clay-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {busy ? '正在重绘…' : '按提示词重绘'}
+                      {generating ? '正在生成…' : failed ? '改提示词重试' : '按提示词重绘'}
                     </button>
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={generating}
                       onClick={resetForNew}
                       className="w-full rounded border-2 border-brown-700 px-4 py-2.5 text-sm text-brown-100 hover:border-clay-500 disabled:opacity-50"
                     >
