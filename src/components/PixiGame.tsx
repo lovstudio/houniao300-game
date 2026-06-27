@@ -29,7 +29,8 @@ import { Location, playerLocation } from '../../convex/aiTown/location.ts';
 const MAP_SOURCE_WIDTH = 1703;
 const MAP_SOURCE_HEIGHT = 1279;
 const KEYBOARD_MOVE_REPEAT_MS = 180;
-const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 4;
+// 必须与服务器 data/characters.ts 的 movementSpeed 一致，否则乐观预测会冲过头再被拽回，产生橡皮筋抖动。
+const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 0.75;
 const MAX_OPTIMISTIC_PATH_LENGTH = 2;
 const SERVER_SNAP_DISTANCE_TILES = 0.75;
 const SERVER_SETTLE_DISTANCE_TILES = 0.05;
@@ -102,6 +103,66 @@ function isMapDestinationBlocked(destination: { x: number; y: number }, state: R
 
 type GridDestination = { x: number; y: number };
 type SentDestination = GridDestination & { t: number };
+
+// 客户端 4-邻接 A*，复刻服务器 movement.ts:findRoute 的网格寻路，用于点击移动的本地预测。
+// 地图仅 53×53，open set 用线性扫描足矣（KISS）。找不到路径时返回空数组，交还给服务器。
+function findOptimisticGridPath(
+  start: GridDestination,
+  destination: GridDestination,
+  state: RuntimeGameState,
+): GridDestination[] {
+  if (start.x === destination.x && start.y === destination.y) return [];
+  const w = state.game.worldMap.width;
+  const h = state.game.worldMap.height;
+  const idx = (x: number, y: number) => y * w + x;
+  const heuristic = (x: number, y: number) =>
+    Math.abs(x - destination.x) + Math.abs(y - destination.y);
+  const open: Array<{ x: number; y: number; g: number; f: number }> = [
+    { x: start.x, y: start.y, g: 0, f: heuristic(start.x, start.y) },
+  ];
+  const gScore = new Map<number, number>([[idx(start.x, start.y), 0]]);
+  const cameFrom = new Map<number, number>();
+  const closed = new Set<number>();
+  const directions = [
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+  ];
+  while (open.length > 0) {
+    let bestIndex = 0;
+    for (let i = 1; i < open.length; i++) {
+      if (open[i].f < open[bestIndex].f) bestIndex = i;
+    }
+    const current = open.splice(bestIndex, 1)[0];
+    const currentKey = idx(current.x, current.y);
+    if (current.x === destination.x && current.y === destination.y) {
+      const path: GridDestination[] = [];
+      let key = currentKey;
+      while (cameFrom.has(key)) {
+        path.push({ x: key % w, y: Math.floor(key / w) });
+        key = cameFrom.get(key)!;
+      }
+      return path.reverse();
+    }
+    if (closed.has(currentKey)) continue;
+    closed.add(currentKey);
+    for (const { dx, dy } of directions) {
+      const nx = current.x + dx;
+      const ny = current.y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const neighborKey = idx(nx, ny);
+      if (closed.has(neighborKey)) continue;
+      if (isMapDestinationBlocked({ x: nx, y: ny }, state)) continue;
+      const tentativeG = current.g + 1;
+      if (gScore.has(neighborKey) && tentativeG >= gScore.get(neighborKey)!) continue;
+      gScore.set(neighborKey, tentativeG);
+      cameFrom.set(neighborKey, currentKey);
+      open.push({ x: nx, y: ny, g: tentativeG, f: tentativeG + heuristic(nx, ny) });
+    }
+  }
+  return [];
+}
 
 function isKeyboardInputTarget(target: EventTarget | null) {
   const element = target as HTMLElement | null;
@@ -214,12 +275,21 @@ export const PixiGame = (props: {
     if (!state || isMapDestinationBlocked(roundedTiles, state)) {
       return;
     }
-    setLastDestination({ t: Date.now(), ...gameSpaceTiles });
+    const now = Date.now();
+    setLastDestination({ t: now, ...gameSpaceTiles });
     console.log(`Moving to ${JSON.stringify(roundedTiles)}`);
-    optimisticPathRef.current = [];
-    lastSentDestinationRef.current = null;
-    optimisticLocationRef.current = undefined;
-    setOptimisticHumanLocation(undefined);
+    // 本地立即规划路径并乐观移动，避免等待服务器 ~2-3s 的输入/步进/缓冲延迟（起步 lag）。
+    const humanPlayer = state.game.world.players.get(humanPlayerId as never);
+    const startLocation = humanPlayer ? playerLocation(humanPlayer) : undefined;
+    const startTile = startLocation
+      ? { x: Math.round(startLocation.x), y: Math.round(startLocation.y) }
+      : null;
+    optimisticPathRef.current = startTile
+      ? findOptimisticGridPath(startTile, roundedTiles, state)
+      : [];
+    lastSentDestinationRef.current = { ...roundedTiles, t: now };
+    optimisticLocationRef.current = startLocation;
+    setOptimisticHumanLocation(startLocation);
     await toastOnError(moveTo({ playerId: humanPlayerId, destination: roundedTiles }));
   };
   const { width, height, tileDim } = props.game.worldMap;
@@ -498,8 +568,10 @@ export const PixiGame = (props: {
         const distanceToServer = locationDistance(previousLocation, serverLocation);
         if (
           pendingDestination &&
-          Date.now() - pendingDestination.t < SERVER_CATCHUP_GRACE_MS &&
-          serverToPending > SERVER_SETTLE_DISTANCE_TILES
+          serverToPending > SERVER_SETTLE_DISTANCE_TILES &&
+          // 服务器仍在赶来（移动中），或仍处于起步前的宽限期：冻结在本地终点等它追上，
+          // 避免本地预测（领先 ~2-3s）走完后回退跳变。任意长度路径都靠 speed>0 兜住。
+          (serverLocation.speed > 0 || Date.now() - pendingDestination.t < SERVER_CATCHUP_GRACE_MS)
         ) {
           nextLocation = { ...previousLocation, speed: 0 };
         } else if (distanceToServer > SERVER_SNAP_DISTANCE_TILES) {
