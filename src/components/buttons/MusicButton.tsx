@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
-import { sound } from '@pixi/sound';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import SettingRow from './SettingRow';
 import { MusicIcon } from './DeckIcons';
 
@@ -8,20 +7,32 @@ import { MusicIcon } from './DeckIcons';
 const BGM_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/assets/bgm.mp3`;
 
 export default function MusicButton() {
+  // Plain HTML5 <audio>: streams the 13MB file and loops natively. We deliberately avoid
+  // @pixi/sound here, which decodes the whole clip into a Web Audio buffer and fails on
+  // large files / suspended AudioContext ("Unable to decode audio data").
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setPlaying] = useState(false);
 
-  const flipSwitch = async () => {
-    if (isPlaying) {
-      sound.stop('background');
-    } else {
-      // lazy add so the 13MB file is only fetched once the user opts in
-      if (!sound.exists('background')) {
-        sound.add('background', BGM_URL).loop = true;
-      }
-      await sound.play('background');
+  const flipSwitch = useCallback(async () => {
+    if (!audioRef.current) {
+      const el = new Audio(BGM_URL);
+      el.loop = true;
+      el.preload = 'none'; // only fetched once the user opts in
+      audioRef.current = el;
     }
-    setPlaying(!isPlaying);
-  };
+    const el = audioRef.current;
+    if (isPlaying) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      try {
+        await el.play(); // called from a user gesture, so autoplay policy is satisfied
+        setPlaying(true);
+      } catch (err) {
+        console.error('BGM play failed', err);
+      }
+    }
+  }, [isPlaying]);
 
   const handleKeyPress = useCallback(
     (event: { key: string }) => {
@@ -36,6 +47,9 @@ export default function MusicButton() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [handleKeyPress]);
+
+  // stop playback if the button unmounts
+  useEffect(() => () => audioRef.current?.pause(), []);
 
   return (
     <SettingRow
