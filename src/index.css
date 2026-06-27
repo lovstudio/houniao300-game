@@ -25,6 +25,14 @@
     'Segoe UI Emoji', 'Segoe UI Symbol';
 }
 
+/* 沙之书设计系统：毛笔题字 + 衬线数字 */
+.font-brush {
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
+}
+.font-num {
+  font-family: 'Cormorant Garamond', 'Noto Serif SC', serif;
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -137,7 +145,12 @@ body {
 .deck-btn .deck-ico {
   display: grid;
   place-items: center;
-  opacity: 0.85;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: rgba(255, 240, 220, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 235, 205, 0.22) inset;
+  opacity: 0.95;
 }
 .deck-btn-off {
   background: rgba(255, 236, 200, 0.05);
@@ -171,6 +184,161 @@ body {
     width: 14px;
     height: 14px;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   沙之书 · 沙城手卷 设计系统
+   持久 UI（HUD/侧栏）= 暗色风蚀手卷；弹窗 = 浅羊皮纸手札。
+   共用：陶土火漆 --clay/--seal、毛笔题字、描金线、浮木轴。
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --sand-ink: #2a1c14;
+  --sand-ink-soft: #6b5238;
+  --sand-paper: #f1e3c4;
+  --sand-paper-hi: #faf3df;
+  --sand-clay: #c0654a;
+  --sand-clay-deep: #9c4b34;
+  --sand-gold: #c69a5a;
+  --sand-seal: #ad3f29;
+  --sand-noise: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* 浮木卷轴：贴在侧栏左缘 */
+.sand-roller {
+  width: 14px;
+  flex: none;
+  border-radius: 8px;
+  margin: 12px 0;
+  background: linear-gradient(90deg, #3f2a19, #7a5234 45%, #a9764a 55%, #4e3422);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 8px 18px -6px #000;
+}
+
+/* 侧栏卷头：毛笔卷名 + 收起 */
+.sand-masthead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(198, 154, 90, 0.4);
+  background: linear-gradient(180deg, rgba(60, 40, 24, 0.55), rgba(36, 24, 14, 0.2));
+}
+.sand-masthead .t {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 22px;
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #f3e3c4;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* 印章式 tab */
+.sand-tab {
+  position: relative;
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
+  letter-spacing: 2px;
+  border-radius: 7px 7px 3px 3px;
+  transition: 0.18s;
+  color: #cdb088;
+  background: linear-gradient(180deg, rgba(70, 48, 30, 0.7), rgba(44, 30, 18, 0.6));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
+}
+.sand-tab:hover {
+  color: #f0dcb6;
+}
+.sand-tab-on {
+  color: #fff1de;
+  background: linear-gradient(180deg, var(--sand-seal), #8e3320);
+  box-shadow: 0 0 0 1px rgba(255, 210, 180, 0.3) inset, 0 3px 8px rgba(140, 40, 20, 0.45);
+}
+
+/* 描金内框（卷/札通用） */
+.sand-gilt {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(198, 154, 90, 0.5);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.sand-gilt::before,
+.sand-gilt::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 0 solid var(--sand-gold);
+}
+.sand-gilt::before {
+  left: -1px;
+  top: -1px;
+  border-left-width: 2px;
+  border-top-width: 2px;
+  border-top-left-radius: 10px;
+}
+.sand-gilt::after {
+  right: -1px;
+  bottom: -1px;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-bottom-right-radius: 10px;
+}
+
+/* 浅羊皮纸手札（弹窗） */
+.sand-letter {
+  position: relative;
+  font-family: 'Noto Serif SC', serif;
+  color: var(--sand-ink);
+  background: linear-gradient(180deg, var(--sand-paper-hi), var(--sand-paper) 42%, #ecdcbb 100%);
+  border: 1px solid #ddc79c;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 0 0 1px rgba(255, 255, 255, 0.35) inset,
+    0 26px 60px -18px rgba(20, 12, 6, 0.75);
+}
+.sand-letter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: var(--sand-noise);
+  background-size: 180px;
+  opacity: 0.45;
+  mix-blend-mode: multiply;
+}
+.sand-letter .body {
+  position: relative;
+  z-index: 1;
+}
+.sand-letter h1,
+.sand-letter h2,
+.sand-letter h3 {
+  font-family: 'Ma Shan Zheng', cursive;
+  color: var(--sand-ink);
+}
+.sand-letter p {
+  color: var(--sand-ink-soft);
+}
+
+/* 火漆封印（关闭键） */
+.sand-wax {
+  position: absolute;
+  right: -12px;
+  top: -12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  color: #ffe2d4;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 20px;
+  background: radial-gradient(circle at 38% 32%, #d98a6e, var(--sand-seal) 60%, #7a2616);
+  box-shadow: 0 0 0 1px rgba(255, 200, 170, 0.35) inset, 0 6px 14px -4px rgba(0, 0, 0, 0.6);
+  transition: transform 0.2s;
+}
+.sand-wax:hover {
+  transform: rotate(8deg) scale(1.06);
 }
 
 /* ── Settings popover ───────────────────────────────────── */
