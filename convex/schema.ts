@@ -113,6 +113,21 @@ export default defineSchema({
     .index('conversationId', ['worldId', 'conversationId'])
     .index('messageUuid', ['conversationId', 'messageUuid']),
 
+  // GPS→地图 标定锚点（全场单例，最新一条为准）。由现场操作员用标定工具采集后写入，
+  // 所有玩家共享同一套坐标变换。
+  gpsCalibration: defineTable({
+    anchors: v.array(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+        sourceX: v.number(),
+        sourceY: v.number(),
+        label: v.optional(v.string()),
+      }),
+    ),
+    updatedAt: v.number(),
+  }),
+
   ...agentTables,
   ...aiTownTables,
   ...engineTables,

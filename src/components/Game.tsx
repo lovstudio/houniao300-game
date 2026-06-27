@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import PixiGame from './PixiGame.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
+import CalibrationPanel from './CalibrationPanel.tsx';
 
 import { useElementSize } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
@@ -55,6 +56,11 @@ export default function Game({
     id: GameId<'players'>;
   }>();
   const [gameWrapperRef, { width, height }] = useElementSize();
+  // 操作员标定工具：?calibrate=1 开启（采集 GPS↔地图锚点）。
+  const calibrating = useMemo(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calibrate') === '1',
+    [],
+  );
   // 侧边栏统一为可折叠的浮层抽屉（覆盖在满屏地图上）。桌面端默认展开，移动端默认收起。
   const [panelOpen, setPanelOpen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 1024,
@@ -96,6 +102,7 @@ export default function Game({
         {/* Game area：始终满屏，面板浮在其上 */}
         <div className="absolute inset-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <SignalHud />
+          {calibrating && <CalibrationPanel />}
           <div className="absolute inset-0">
             <Stage width={width} height={height} options={{ backgroundColor: 0x181425 }}>
               {/* Re-propagate context because contexts are not shared between renderers.

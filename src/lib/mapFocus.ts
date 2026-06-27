@@ -29,6 +29,26 @@ export function focusMapTile(tileX: number, tileY: number) {
   tileListener?.(tileX, tileY);
 }
 
+// Calibration capture: while a handler is registered, map taps are routed here (in
+// aerial-source coords) instead of moving the player — used by the GPS calibration tool.
+export type MapTapCaptureListener = (sourceX: number, sourceY: number) => void;
+
+let tapCaptureListener: MapTapCaptureListener | null = null;
+
+export function setMapTapCaptureHandler(fn: MapTapCaptureListener | null) {
+  tapCaptureListener = fn;
+}
+
+export function isMapTapCaptureActive(): boolean {
+  return tapCaptureListener !== null;
+}
+
+export function captureMapTap(sourceX: number, sourceY: number): boolean {
+  if (!tapCaptureListener) return false;
+  tapCaptureListener(sourceX, sourceY);
+  return true;
+}
+
 // Reverse direction: a venue marker on the map was clicked; open its schedule in the sidebar.
 export type VenueSelectListener = (venue: string) => void;
 
