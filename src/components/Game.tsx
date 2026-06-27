@@ -72,7 +72,7 @@ export default function Game({
   return (
     <>
       {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
-      <div className="fullscreen-game-frame game-frame grid h-full min-h-0 w-full lg:grid-rows-[1fr] lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
+      <div className="fullscreen-game-frame game-frame grid h-full min-h-0 w-full md:grid-rows-[1fr] md:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
         {/* Game area（移动端占满全屏） */}
         <div className="relative min-h-0 min-w-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <div className="absolute inset-0">
@@ -117,7 +117,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
         {/* 移动端抽屉遮罩（z 高于招牌 z-30） */}
         {panelOpen && (
           <div
-            className="fixed inset-0 z-[55] bg-black/50 lg:hidden"
+            className="fixed inset-0 z-[55] bg-black/50 md:hidden"
             onClick={() => setPanelOpen(false)}
           />
         )}
@@ -127,14 +127,14 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           className={clsx(
             'flex min-h-0 flex-col overflow-hidden bg-brown-800/95 text-brown-100',
             'fixed inset-y-0 right-0 z-[60] w-[86%] max-w-sm border-l-8 border-brown-900 shadow-2xl transition-transform duration-300',
-            'pt-[env(safe-area-inset-top)] lg:pt-0',
+            'pt-[env(safe-area-inset-top)] md:pt-0',
             panelOpen ? 'translate-x-0' : 'translate-x-full',
-            'lg:static lg:z-auto lg:w-96 lg:max-w-none lg:translate-x-0 lg:border-l-8 lg:shadow-none',
+            'md:static md:z-auto md:w-96 md:max-w-none md:translate-x-0 md:border-l-8 md:shadow-none',
           )}
         >
           <button
             onClick={() => setPanelOpen(false)}
-            className="flex shrink-0 items-center border-b border-brown-700/50 px-3 py-2 text-sm text-brown-300 lg:hidden"
+            className="flex shrink-0 items-center border-b border-brown-700/50 px-3 py-2 text-sm text-brown-300 md:hidden"
           >
             收起面板
           </button>
