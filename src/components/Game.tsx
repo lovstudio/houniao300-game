@@ -6,7 +6,7 @@ import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
 import { selectInstallationOnMap } from '../lib/mapFocus.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
-import { resolveInterior } from '../../data/birdRestaurantInterior.ts';
+import type { VenueInteriorMap } from '../../data/birdRestaurantInterior.ts';
 import type { Id } from '../../convex/_generated/dataModel';
 
 import { useElementSize, useMediaQuery } from 'usehooks-ts';
@@ -36,7 +36,7 @@ export default function Game({
   userId,
   worldId,
   engineId,
-  interiorId,
+  interior,
   controlMode,
   cameraFollow,
   isFullscreen,
@@ -58,7 +58,7 @@ export default function Game({
   // 可能为 undefined（默认世界状态加载中）；下方守卫会拦截。
   worldId?: Id<'worlds'>;
   engineId?: Id<'engines'>;
-  interiorId?: string;
+  interior?: VenueInteriorMap;
   controlMode: ControlMode;
   cameraFollow: boolean;
   isFullscreen: boolean;
@@ -105,8 +105,6 @@ export default function Game({
     setPanelOpenHandler(() => setPanelOpen(true));
     return () => setPanelOpenHandler(null);
   }, []);
-
-  const interior = interiorId ? resolveInterior(interiorId) : undefined;
 
   const game = useServerGame(worldId);
 

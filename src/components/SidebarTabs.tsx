@@ -18,7 +18,6 @@ import {
   focusMapTile,
   setInstallationSelectHandler,
   setVenueSelectHandler,
-  enterVenueInterior,
 } from '../lib/mapFocus';
 import {
   INSTALLATIONS,
@@ -27,12 +26,12 @@ import {
   type Installation,
   type InstallationZone,
 } from '../../data/installations';
-import { enterActivity, activityFromSchedule, activityFromInstallation } from '../lib/activityEnter';
+import { activityFromSchedule, activityFromInstallation } from '../lib/activityEnter';
 import { setPanelTabHandler } from '../lib/panelBus';
-import { openPhotoMemory } from '../lib/photoMemoryBus';
 import { toast } from 'react-toastify';
-import { VENUE_INTERIOR_MAPS, artworkInteriorId } from '../../data/birdRestaurantInterior';
+import { VENUE_INTERIOR_MAPS, workInteriorId, venueInteriorId } from '../../data/birdRestaurantInterior';
 import MaterialControls from './MaterialControls';
+import EntityActions, { useInteriorReady } from './EntityActions';
 
 type Tab = 'state' | 'spaces' | 'works' | 'schedule';
 
@@ -306,6 +305,7 @@ function SpaceDetail({
     : undefined;
   const onmap = !!VENUE_COORDS[space.title];
   const canLocate = !!interior || onmap;
+  const spaceReady = useInteriorReady({ kind: 'venue', refId: space.refId, authored: space.built });
   const activities = SCHEDULE.filter((s) => s.venue === space.title).sort((a, b) =>
     a.date === b.date ? a.min - b.min : Number(a.date) - Number(b.date),
   );
@@ -331,47 +331,26 @@ function SpaceDetail({
         <span
           className={
             'ml-auto rounded px-2 py-0.5 text-xs font-bold ' +
-            (space.built ? 'bg-[#1da76e] text-white' : 'bg-[#dcc89f] text-[#5b4632]')
+            (spaceReady ? 'bg-[#1da76e] text-white' : 'bg-[#dcc89f] text-[#5b4632]')
           }
         >
-          {space.built ? '已生成内景' : '待生成'}
+          {spaceReady ? '已生成内景' : '待生成'}
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{space.title}</h3>
         <p className="mt-2 text-sm text-[#5b4632]">{space.subtitle}</p>
 
-        {space.built && (
-          <button
-            onClick={() => enterVenueInterior(space.refId)}
-            className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
-          >
-            进入可走动内景
-          </button>
-        )}
-        <div className="mt-2 flex gap-2">
-          {canLocate && (
-            <button
-              onClick={locate}
-              className="flex-1 rounded border-2 border-brown-700 px-3 py-2.5 text-sm font-bold text-brown-100 hover:border-clay-500"
-            >
-              在地图上定位
-            </button>
-          )}
-          <button
-            onClick={() =>
-              openPhotoMemory({
-                id: `venue:${space.refId}`,
-                label: space.title,
-                contextLabel: space.title,
-                venue: space.title,
-              })
-            }
-            className="flex-1 rounded border-2 border-brown-700 px-3 py-2.5 text-sm font-bold text-brown-100 hover:border-clay-500"
-          >
-            在此拍照记忆
-          </button>
-        </div>
+        <EntityActions
+          interior={{ id: space.built ? space.refId : venueInteriorId(space.refId), ready: spaceReady }}
+          onLocate={canLocate ? locate : undefined}
+          photoMemory={{
+            id: `venue:${space.refId}`,
+            label: space.title,
+            contextLabel: space.title,
+            venue: space.title,
+          }}
+        />
 
         {activities.length > 0 && (
           <div className="mt-5">
@@ -611,6 +590,7 @@ function InstallationDetail({
   const [busy, setBusy] = useState(false);
   const mine = artwork.ownerUserId === userId;
   const canManage = isAdmin || mine;
+  const interiorReady = useInteriorReady({ kind: 'work', refId: artwork.slug });
   const imgSrc =
     artwork.imageUrl ??
     `${import.meta.env.BASE_URL.replace(/\/$/, '')}/installations/${artwork.slug}.jpg`;
@@ -723,57 +703,31 @@ function InstallationDetail({
             {busy ? '申领中…' : '申领这件作品'}
           </button>
         )}
-        {artwork.kind === 'space' && (
-          <button
-            onClick={() => {
-              if (artwork.ownerUserId && artwork.ownerUserId !== userId) {
-                void record({
-                  worldId,
-                  artworkId: artwork._id,
-                  kind: 'artwork_entered',
-                  actorUserId: userId,
-                  actorName: myName,
-                });
-              }
-              enterVenueInterior(artworkInteriorId(artwork.slug));
-            }}
-            className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
-          >
-            走进这座建筑
-          </button>
-        )}
-        <button
-          onClick={() => enterActivity(activityFromInstallation(installation))}
-          className={
-            artwork.kind === 'space'
-              ? 'mt-2 w-full rounded border border-clay-700 px-3 py-2.5 text-base font-semibold text-clay-700 hover:bg-clay-700/10'
-              : 'mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500'
-          }
-        >
-          进入这个作品的专属体验
-        </button>
-        <button
-          onClick={() =>
-            openPhotoMemory({
-              id: `installation:${artwork.slug}`,
-              label: artwork.title,
-              detail: `${artwork.artistName} · ${artwork.zone}`,
-              contextLabel: artwork.title,
-              activityKey: activityFromInstallation(installation).activityKey,
-              activityTitle: artwork.title,
-              venue: artwork.zone,
-            })
-          }
-          className="mt-2 w-full rounded border-2 border-brown-700 px-3 py-2.5 text-base font-bold text-brown-100 hover:border-clay-500"
-        >
-          在这件作品下拍张照片记忆
-        </button>
-        <button
-          onClick={onLocate}
-          className="mt-2 w-full rounded border-2 border-brown-700 px-3 py-2.5 text-base font-bold text-brown-100 hover:border-clay-500"
-        >
-          在地图上定位
-        </button>
+        <EntityActions
+          interior={{ id: workInteriorId(artwork.slug), ready: interiorReady }}
+          activity={activityFromInstallation(installation)}
+          onLocate={onLocate}
+          photoMemory={{
+            id: `installation:${artwork.slug}`,
+            label: artwork.title,
+            detail: `${artwork.artistName} · ${artwork.zone}`,
+            contextLabel: artwork.title,
+            activityKey: activityFromInstallation(installation).activityKey,
+            activityTitle: artwork.title,
+            venue: artwork.zone,
+          }}
+          onBeforeEnterInterior={() => {
+            if (artwork.ownerUserId && artwork.ownerUserId !== userId) {
+              void record({
+                worldId,
+                artworkId: artwork._id,
+                kind: 'artwork_entered',
+                actorUserId: userId,
+                actorName: myName,
+              });
+            }
+          }}
+        />
 
         {/* 生成游戏资产仅对作品归属者本人或管理员开放 */}
         {canManage && (
@@ -1112,6 +1066,14 @@ function ScheduleDetail({
   onVenue: (venue: string) => void;
 }) {
   const onmap = !!VENUE_COORDS[item.venue];
+  const builtMap = VENUE_INTERIOR_MAPS.find((m) => m.venue === item.venue);
+  const venueRefId = builtMap ? builtMap.id : item.venue;
+  const venueReady = useInteriorReady({ kind: 'venue', refId: venueRefId, authored: !!builtMap });
+  // 活动可进入「所在场馆」内景：场馆已建/在地图上才提供该入口（场外剧场无内景）。
+  const venueInterior =
+    builtMap || onmap
+      ? { id: builtMap ? builtMap.id : venueInteriorId(item.venue), ready: venueReady }
+      : undefined;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
@@ -1175,12 +1137,17 @@ function ScheduleDetail({
         <p className="mt-4 whitespace-pre-wrap rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#2a1c14]">
           {item.desc}
         </p>
-        <button
-          onClick={() => enterActivity(activityFromSchedule(item))}
-          className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
-        >
-          进入这个活动的专属体验
-        </button>
+        <EntityActions
+          interior={venueInterior}
+          activity={activityFromSchedule(item)}
+          onLocate={onmap ? () => focusVenueOnMap(item.venue) : undefined}
+          photoMemory={{
+            id: `venue:${item.venue}`,
+            label: item.venue,
+            contextLabel: item.venue,
+            venue: item.venue,
+          }}
+        />
       </div>
     </div>
   );
