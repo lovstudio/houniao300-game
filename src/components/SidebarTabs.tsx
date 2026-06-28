@@ -31,16 +31,17 @@ import { enterActivity, activityFromSchedule, activityFromInstallation } from '.
 import { setPanelTabHandler } from '../lib/panelBus';
 import { openPhotoMemory } from '../lib/photoMemoryBus';
 import { toast } from 'react-toastify';
-import MaterialsPanel from './MaterialsPanel';
+import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior';
+import MaterialControls from './MaterialControls';
 
-type Tab = 'state' | 'chat' | 'schedule' | 'works' | 'materials';
+type Tab = 'state' | 'chat' | 'spaces' | 'works' | 'schedule';
 
 const TABS: { id: Tab; label: string; short: string }[] = [
   { id: 'state', label: '状态', short: '状' },
   { id: 'chat', label: '广播', short: '广' },
-  { id: 'schedule', label: '节目单', short: '单' },
+  { id: 'spaces', label: '空间', short: '空' },
   { id: 'works', label: '作品', short: '作' },
-  { id: 'materials', label: '物料', short: '物' },
+  { id: 'schedule', label: '活动', short: '动' },
 ];
 
 const TODAY_DAY = (() => {
@@ -168,9 +169,9 @@ export default function SidebarTabs({
             onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
           />
         )}
+        {tab === 'spaces' && <SpacesTab />}
         {tab === 'schedule' && <ScheduleTab venueFocus={venueFocus} />}
         {tab === 'works' && <WorksTab installationFocus={installationFocus} />}
-        {tab === 'materials' && <MaterialsPanel />}
       </div>
     </div>
   );
@@ -253,6 +254,142 @@ function focusVenueOnMap(venue: string) {
 
 function focusInstallationOnMap(installation: Installation) {
   focusMapVenue(installation.x, installation.y, installation.id);
+}
+
+// ---- 空间集：场内可走动场所，每个可上传源图并用 Scale 生成内景 ----
+type SpaceItem = {
+  refId: string; // interior id 或 venue 名
+  title: string;
+  subtitle: string;
+  built: boolean; // 是否已有可走动内景
+};
+
+const SPACES: SpaceItem[] = (() => {
+  const builtVenues = new Set(VENUE_INTERIOR_MAPS.map((m) => m.venue));
+  const built: SpaceItem[] = VENUE_INTERIOR_MAPS.map((m) => ({
+    refId: m.id,
+    title: m.venue,
+    subtitle: m.subtitle ?? '可走动内景',
+    built: true,
+  }));
+  const counts: Record<string, number> = {};
+  SCHEDULE.forEach((s) => (counts[s.venue] = (counts[s.venue] ?? 0) + 1));
+  const onMap: SpaceItem[] = Object.entries(VENUE_COORDS)
+    .filter(([venue, c]) => c && !builtVenues.has(venue))
+    .map(([venue]) => ({
+      refId: venue,
+      title: venue,
+      subtitle: counts[venue] ? `${counts[venue]} 场活动` : '场内场所',
+      built: false,
+    }));
+  return [...built, ...onMap];
+})();
+
+function SpacesTab() {
+  const [query, setQuery] = useState('');
+  const [detail, setDetail] = useState<SpaceItem | null>(null);
+
+  if (detail) {
+    return <SpaceDetail space={detail} onBack={() => setDetail(null)} />;
+  }
+
+  const q = query.trim().toLowerCase();
+  const items = q ? SPACES.filter((s) => `${s.title} ${s.subtitle}`.toLowerCase().includes(q)) : SPACES;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-[#dcc89f] px-3 py-3">
+        <div className="flex items-baseline gap-2">
+          <h3 className="font-display text-xl leading-none text-[#2a1c14]">空间集</h3>
+          <span className="text-xs text-[#9c7e5e]">{SPACES.length} 处 · 照片→内景</span>
+        </div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索场所名"
+          className="mt-3 w-full rounded border border-[#dcc89f] bg-[#f3e7cb] px-3 py-2 text-sm text-[#2a1c14] placeholder:text-[#9c7e5e] focus:border-clay-500 focus:outline-none"
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {items.length ? (
+          <div className="space-y-1.5">
+            {items.map((s) => (
+              <button
+                key={s.refId}
+                onClick={() => setDetail(s)}
+                className="group flex w-full items-center gap-2.5 rounded border border-[#dcc89f] bg-[#f3e7cb] px-2.5 py-2 text-left transition hover:border-clay-600/70 hover:bg-[#efe0c0]"
+              >
+                <span
+                  className={
+                    'h-1.5 w-1.5 shrink-0 rounded-full ' + (s.built ? 'bg-[#1da76e]' : 'bg-[#c0654a]')
+                  }
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-[#2a1c14] group-hover:underline">
+                    {s.title}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-[#6b5238]">{s.subtitle}</span>
+                </span>
+                <span
+                  className={
+                    'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ' +
+                    (s.built ? 'bg-[#1da76e] text-white' : 'bg-[#dcc89f] text-[#5b4632]')
+                  }
+                >
+                  {s.built ? '已生成内景' : '待生成'}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Centered>没有匹配的空间。</Centered>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpaceDetail({ space, onBack }: { space: SpaceItem; onBack: () => void }) {
+  const onmap = !!VENUE_COORDS[space.title];
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+        <button
+          onClick={onBack}
+          className="shrink-0 rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#dcc89f]"
+        >
+          ← 返回
+        </button>
+        <span
+          className={
+            'ml-auto rounded px-2 py-0.5 text-xs font-bold ' +
+            (space.built ? 'bg-[#1da76e] text-white' : 'bg-[#dcc89f] text-[#5b4632]')
+          }
+        >
+          {space.built ? '已生成内景' : '待生成'}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{space.title}</h3>
+        <p className="mt-2 text-sm text-[#5b4632]">{space.subtitle}</p>
+        <p className="mt-3 rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#5b4632]">
+          空间是玩家可走动的固定场所。上传该场所的实拍/平面参考图，用 Scale 把它转成游戏内景几何
+          （墙体、摊位、桌椅、通道）。
+          {space.built
+            ? '此空间已内置可走动内景，生成结果作为重建候选供审阅。'
+            : onmap
+              ? '生成后可作为该场所内景的初始版本。'
+              : ''}
+        </p>
+        <MaterialControls
+          kind="venue"
+          refId={space.refId}
+          title={space.title}
+          genLabel="用 Scale 生成内景"
+        />
+      </div>
+    </div>
+  );
 }
 
 function WorksTab({ installationFocus }: { installationFocus: { id: string; n: number } | null }) {
@@ -453,6 +590,13 @@ function InstallationDetail({
         >
           在地图上定位
         </button>
+
+        <MaterialControls
+          kind="work"
+          refId={installation.id}
+          title={`${installation.id} · ${installation.title}`}
+          genLabel="生成游戏资产"
+        />
       </div>
     </div>
   );
