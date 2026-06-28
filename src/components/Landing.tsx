@@ -16,7 +16,7 @@ const MOMENTS = [
   '白天一起运动，晚上一起看戏',
 ];
 
-// 标题屏题词：刺猬《火车驶向云外，梦安魂于九霄》最经典一句，拆两句逐行缓现缓隐
+// 标题屏题词：拆两句逐行缓现缓隐（不标注出处）
 const LYRIC = ['一代人终将老去', '但总有人正年轻'];
 
 const INK = '#2c2620';
@@ -142,7 +142,7 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
 
           {/* 题词：沙中逐行缓现缓隐，安放右下角，不抢「开始」CTA */}
           <div
-            className="splash-fade absolute bottom-[max(5vh,22px)] right-[max(4vw,18px)] flex flex-col items-end"
+            className="splash-fade absolute bottom-[max(17vh,120px)] right-[max(4vw,18px)] flex flex-col items-end"
             style={{ animationDelay: '2.4s' }}
           >
             <SandText
@@ -155,19 +155,6 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
               color="#574f43"
               className="h-[40px] w-[320px]"
             />
-            <div
-              className="mt-2.5"
-              style={{
-                fontFamily: serif,
-                fontSize: '12px',
-                letterSpacing: '0.12em',
-                color: INK_SOFT,
-                opacity: 0.78,
-                textAlign: 'right',
-              }}
-            >
-              —— 刺猬《火车驶向云外，梦安魂于九霄》
-            </div>
           </div>
 
           {/* 呼吸式「开始」 */}
