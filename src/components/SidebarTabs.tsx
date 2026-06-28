@@ -19,6 +19,7 @@ import {
   focusMapTile,
   setInstallationSelectHandler,
   setVenueSelectHandler,
+  enterVenueInterior,
 } from '../lib/mapFocus';
 import {
   INSTALLATIONS,
@@ -169,7 +170,14 @@ export default function SidebarTabs({
             onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
           />
         )}
-        {tab === 'spaces' && <SpacesTab />}
+        {tab === 'spaces' && (
+          <SpacesTab
+            onViewVenueSchedule={(venue) => {
+              setVenueFocus((prev) => ({ venue, n: (prev?.n ?? 0) + 1 }));
+              setTab('schedule');
+            }}
+          />
+        )}
         {tab === 'schedule' && <ScheduleTab venueFocus={venueFocus} />}
         {tab === 'works' && <WorksTab installationFocus={installationFocus} />}
       </div>
@@ -285,12 +293,18 @@ const SPACES: SpaceItem[] = (() => {
   return [...built, ...onMap];
 })();
 
-function SpacesTab() {
+function SpacesTab({ onViewVenueSchedule }: { onViewVenueSchedule: (venue: string) => void }) {
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState<SpaceItem | null>(null);
 
   if (detail) {
-    return <SpaceDetail space={detail} onBack={() => setDetail(null)} />;
+    return (
+      <SpaceDetail
+        space={detail}
+        onBack={() => setDetail(null)}
+        onViewVenueSchedule={onViewVenueSchedule}
+      />
+    );
   }
 
   const q = query.trim().toLowerCase();
@@ -349,8 +363,33 @@ function SpacesTab() {
   );
 }
 
-function SpaceDetail({ space, onBack }: { space: SpaceItem; onBack: () => void }) {
+function SpaceDetail({
+  space,
+  onBack,
+  onViewVenueSchedule,
+}: {
+  space: SpaceItem;
+  onBack: () => void;
+  onViewVenueSchedule: (venue: string) => void;
+}) {
+  const interior = space.built
+    ? VENUE_INTERIOR_MAPS.find((m) => m.id === space.refId)
+    : undefined;
   const onmap = !!VENUE_COORDS[space.title];
+  const canLocate = !!interior || onmap;
+  const activities = SCHEDULE.filter((s) => s.venue === space.title).sort((a, b) =>
+    a.date === b.date ? a.min - b.min : Number(a.date) - Number(b.date),
+  );
+
+  const locate = () => {
+    if (interior) {
+      const [sx, sy] = interior.entrance.exteriorSource;
+      focusMapVenue(sx, sy, space.title);
+    } else if (onmap) {
+      focusVenueOnMap(space.title);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
@@ -372,7 +411,62 @@ function SpaceDetail({ space, onBack }: { space: SpaceItem; onBack: () => void }
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{space.title}</h3>
         <p className="mt-2 text-sm text-[#5b4632]">{space.subtitle}</p>
-        <p className="mt-3 rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#5b4632]">
+
+        {space.built && (
+          <button
+            onClick={() => enterVenueInterior(space.refId)}
+            className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
+          >
+            进入可走动内景
+          </button>
+        )}
+        <div className="mt-2 flex gap-2">
+          {canLocate && (
+            <button
+              onClick={locate}
+              className="flex-1 rounded border-2 border-brown-700 px-3 py-2.5 text-sm font-bold text-brown-100 hover:border-clay-500"
+            >
+              在地图上定位
+            </button>
+          )}
+          <button
+            onClick={() =>
+              openPhotoMemory({
+                id: `venue:${space.refId}`,
+                label: space.title,
+                contextLabel: space.title,
+                venue: space.title,
+              })
+            }
+            className="flex-1 rounded border-2 border-brown-700 px-3 py-2.5 text-sm font-bold text-brown-100 hover:border-clay-500"
+          >
+            在此拍照记忆
+          </button>
+        </div>
+
+        {activities.length > 0 && (
+          <div className="mt-5">
+            <div className="mb-1.5 flex items-center gap-2">
+              <h4 className="text-[13px] font-bold tracking-[0.16em] text-[#2a1c14]">
+                这里的活动
+              </h4>
+              <span className="text-xs text-[#9c7e5e]">{activities.length} 场</span>
+              <span className="h-px flex-1 bg-gradient-to-r from-[#cbb287] to-transparent" />
+            </div>
+            <div>
+              {activities.map((s, i) => (
+                <ScheduleRow
+                  key={i}
+                  s={s}
+                  showDate
+                  onClick={() => onViewVenueSchedule(space.title)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="mt-5 rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#5b4632]">
           空间是玩家可走动的固定场所。上传该场所的实拍/平面参考图，用 Scale 把它转成游戏内景几何
           （墙体、摊位、桌椅、通道）。
           {space.built

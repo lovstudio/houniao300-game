@@ -30,6 +30,7 @@ import PhotoMemoryModal, {
 } from './components/PhotoMemoryModal.tsx';
 import PhotoMemoryNotifications from './components/PhotoMemoryNotifications.tsx';
 import { setPhotoMemoryOpener } from './lib/photoMemoryBus.ts';
+import { setEnterInteriorHandler } from './lib/mapFocus.ts';
 import { useServerGame } from './hooks/serverGame.ts';
 
 const MAP_SOURCE_WIDTH = 1703;
@@ -117,6 +118,15 @@ export default function Home() {
       setPhotoMemoryOpen(true);
     });
     return () => setPhotoMemoryOpener(null);
+  }, []);
+
+  // 空间集「进入内景」按钮：与走近入口按空格走同一出口。
+  useEffect(() => {
+    setEnterInteriorHandler((interiorId) => {
+      const interior = getVenueInterior(interiorId);
+      if (interior) setActiveInterior(interior);
+    });
+    return () => setEnterInteriorHandler(null);
   }, []);
 
   // 扫码深链：?exp=<activityKey> 落地后自动打开对应活动的连环画体验。

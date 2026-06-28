@@ -74,3 +74,16 @@ export function setInstallationSelectHandler(fn: InstallationSelectListener | nu
 export function selectInstallationOnMap(installationId: string) {
   installationSelectListener?.(installationId);
 }
+
+// 空间集里点击「进入内景」时，请求 App 打开对应可走动内景（与走近入口按空格同一出口）。
+export type EnterInteriorListener = (interiorId: string) => void;
+
+let enterInteriorListener: EnterInteriorListener | null = null;
+
+export function setEnterInteriorHandler(fn: EnterInteriorListener | null) {
+  enterInteriorListener = fn;
+}
+
+export function enterVenueInterior(interiorId: string) {
+  enterInteriorListener?.(interiorId);
+}
