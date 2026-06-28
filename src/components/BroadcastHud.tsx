@@ -32,6 +32,13 @@ type FeedItem =
       targetName?: string;
     };
 
+type FeedFilter = 'all' | 'mine' | 'broadcast';
+const FILTERS: { id: FeedFilter; label: string }[] = [
+  { id: 'all', label: '全部' },
+  { id: 'mine', label: '我的对话' },
+  { id: 'broadcast', label: '广播' },
+];
+
 // 主视觉右上角的「动态」浮层：广播 + 通知合一。
 // 默认折叠显示最近 1-3 行，点击展开为可滚动面板。
 export default function BroadcastHud({
@@ -44,6 +51,7 @@ export default function BroadcastHud({
   onSelectAgent: (id: GameId<'players'>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [filter, setFilter] = useState<FeedFilter>('all');
   const msgs = useQuery(api.messages.listRecentMessages, { worldId, limit: 80 });
   const notes = useQuery(api.notifications.listMine, { userId });
   const unread = useQuery(api.notifications.unreadCount, { userId }) ?? 0;
@@ -75,10 +83,17 @@ export default function BroadcastHud({
     return items;
   }, [msgs, notes]);
 
-  // 展开后滚到底部（最新）。
+  // 按筛选标签过滤：我的对话 = 通知流（传话/回应/系统通知）；广播 = 全城公开发言。
+  const shown = useMemo(() => {
+    if (filter === 'all') return feed;
+    if (filter === 'broadcast') return feed.filter((it) => it.kind === 'broadcast');
+    return feed.filter((it) => it.kind === 'notify');
+  }, [feed, filter]);
+
+  // 展开 / 切换筛选 / 新内容时滚到底部（最新）。
   useEffect(() => {
     if (expanded && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [expanded, feed.length]);
+  }, [expanded, filter, shown.length]);
 
   const preview = feed.slice(-1); // 折叠态显示最新一条
 
@@ -116,22 +131,44 @@ export default function BroadcastHud({
         </button>
 
         {expanded && (
-          <div
-            ref={scrollRef}
-            className="max-h-[60vh] min-h-0 overflow-y-auto border-t border-brown-700/50 px-2.5 py-2"
-          >
-            {feed.length ? (
-              <div className="space-y-0.5">
-                {feed.map((it) => (
-                  <FeedRow key={it.kind + it.id} it={it} onSelectAgent={onSelectAgent} />
-                ))}
-              </div>
-            ) : (
-              <p className="px-1 py-4 text-center text-[11px] leading-relaxed text-brown-200/50">
-                还没有动态。AI 居民的公开发言，以及别人来看你作品的提醒，都会出现在这里。
-              </p>
-            )}
-          </div>
+          <>
+            <div className="flex shrink-0 gap-1 border-t border-brown-700/50 px-2.5 py-1.5">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={clsx(
+                    'rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
+                    filter === f.id
+                      ? 'bg-clay-600 text-white'
+                      : 'text-brown-200/55 hover:bg-brown-700/40 hover:text-brown-200/80',
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div
+              ref={scrollRef}
+              className="max-h-[56vh] min-h-0 overflow-y-auto border-t border-brown-700/40 px-2.5 py-2"
+            >
+              {shown.length ? (
+                <div className="space-y-0.5">
+                  {shown.map((it) => (
+                    <FeedRow key={it.kind + it.id} it={it} onSelectAgent={onSelectAgent} />
+                  ))}
+                </div>
+              ) : (
+                <p className="px-1 py-4 text-center text-[11px] leading-relaxed text-brown-200/50">
+                  {filter === 'broadcast'
+                    ? '还没有居民公开发言。'
+                    : filter === 'mine'
+                      ? '还没有你的对话。向沙城传话，或 @ 一位居民开聊。'
+                      : '还没有动态。'}
+                </p>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
