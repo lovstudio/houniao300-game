@@ -329,6 +329,14 @@ function ComicFallback({ badge }: { badge: ActivityBadge }) {
   );
 }
 
+// 一格图的展示状态：有图即 ready；无图但标 failed 则 failed；其余（含旧行无 imageStatus）按 pending。
+// 关键：只有 pending 才显示"正在绘制"，failed 不再永久卡住、允许继续答题。
+function imageState(p?: { imageUrl?: string | null; imageStatus?: string } | null): 'ready' | 'failed' | 'pending' {
+  if (p?.imageUrl) return 'ready';
+  if (p?.imageStatus === 'failed') return 'failed';
+  return 'pending';
+}
+
 // ---------- 连环画播放器 ----------
 function ComicPlayer({
   experienceId,
@@ -356,9 +364,10 @@ function ComicPlayer({
   const latest = panels[panels.length - 1];
   const current = viewIndex !== null ? panels[viewIndex] : latest;
   const isViewingLatest = current?._id === latest?._id;
-  // 仅当查看的是最新一格、非收尾、已生成图片、未完成体验时才可交互。
+  // 可交互条件：查看最新格、非收尾、体验进行中，且图已不再 pending（ready 正常 / failed 也放行，
+  // 否则生图失败的非收尾格会永久卡死，无法继续答题）。
   const interactive =
-    isViewingLatest && latest && !latest.isFinal && !!latest.imageUrl && experience.status === 'active';
+    isViewingLatest && latest && !latest.isFinal && imageState(latest) !== 'pending' && experience.status === 'active';
 
   const submit = async (value: string) => {
     if (!value.trim() || submitting) return;
@@ -389,8 +398,13 @@ function ComicPlayer({
         </div>
 
         <div className="relative mx-auto aspect-square w-full max-w-2xl overflow-hidden border-4 border-brown-700 bg-brown-800">
-          {current?.imageUrl ? (
+          {imageState(current) === 'ready' && current?.imageUrl ? (
             <img src={current.imageUrl} alt="" className="h-full w-full object-cover" />
+          ) : imageState(current) === 'failed' ? (
+            <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center text-brown-300">
+              <span>这一幕没能画出来</span>
+              <span className="text-sm text-brown-400">故事继续，往下走吧</span>
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center text-brown-300">
               <Spinner /> 正在绘制画面…
@@ -477,11 +491,11 @@ function ComicPlayer({
                   : 'border-brown-700',
               )}
             >
-              {p.imageUrl ? (
+              {imageState(p) === 'ready' && p.imageUrl ? (
                 <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full items-center justify-center text-xs text-brown-400">
-                  绘制中
+                  {imageState(p) === 'failed' ? '未生成' : '绘制中'}
                 </span>
               )}
               <span className="absolute left-0 top-0 bg-brown-900/80 px-1 text-xs text-brown-100">

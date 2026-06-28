@@ -1,6 +1,5 @@
 import { v } from 'convex/values';
 import {
-  ActionCtx,
   internalAction,
   internalMutation,
   internalQuery,
@@ -11,7 +10,7 @@ import {
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { generateImageTraced } from './util/image';
-import { uploadToQiniu } from './util/qiniu';
+import { newRequestId, storeGeneratedImage } from './util/generation';
 
 const contextValidator = v.optional(
   v.object({
@@ -105,25 +104,6 @@ async function resolvePhotoMemory(ctx: QueryCtx, item: Doc<'photoMemories'>) {
     images,
     originalUrl: await ctx.storage.getUrl(item.originalStorageId),
   };
-}
-
-// 把生成图优先转存七牛 CDN（imageUrl），失败回退 Convex storage（imageStorageId），绝不漏图。
-async function storeGenerated(
-  ctx: ActionCtx,
-  blob: Blob,
-): Promise<{ imageUrl?: string; imageStorageId?: string }> {
-  const t = Date.now();
-  try {
-    const unique = `photo-memories/${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const url = await uploadToQiniu(blob, unique);
-    console.log(`[DEBUG][photo] storeGenerated 七牛上传成功: ms=${Date.now() - t} outKB=${Math.round(blob.size / 1024)}`);
-    return { imageUrl: url };
-  } catch (e) {
-    console.error(`[DEBUG][photo] 七牛上传失败回退 Convex storage: ms=${Date.now() - t}`, e);
-    const id = await ctx.storage.store(blob);
-    console.log(`[DEBUG][photo] storeGenerated Convex storage 兜底: 总ms=${Date.now() - t}`);
-    return { imageStorageId: id };
-  }
 }
 
 export const generateUploadUrl = mutation({
@@ -283,6 +263,7 @@ export const runGeneration = internalAction({
   args: { turnId: v.id('photoMemoryTurns') },
   handler: async (ctx, { turnId }) => {
     const tAll = Date.now();
+    const requestId = newRequestId();
     const input = await ctx.runQuery(internal.photoMemories.turnInput, { turnId });
     if (!input) return;
     const { turn, memory, accumulatedPrompt } = input;
@@ -303,9 +284,7 @@ export const runGeneration = internalAction({
         useSystemStyle: turn.useSystemStyle,
       });
       const { blob, trace: imgTrace } = await generateImageTraced(prompt, source);
-      const tStore = Date.now();
-      const { imageUrl, imageStorageId } = await storeGenerated(ctx, blob);
-      const storeMs = Date.now() - tStore;
+      const { imageUrl, imageStorageId, storeMs } = await storeGeneratedImage(ctx, blob, 'photo-memories', requestId);
       trace = JSON.stringify({
         ...imgTrace,
         sourceKB: Math.round(source.size / 1024),

@@ -1,6 +1,5 @@
-// Tiny module-level bus so the bottom Timeline (rendered in App) can drive the
-// PixiGame camera, which lives inside a separate Pixi renderer that React context
-// does not cross.
+// Tiny module-level bus so UI outside the renderer can drive the PixiGame camera,
+// which lives inside a separate Pixi renderer that React context does not cross.
 
 export type MapFocusListener = (sourceX: number, sourceY: number, label: string) => void;
 

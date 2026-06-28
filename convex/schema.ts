@@ -58,6 +58,11 @@ export default defineSchema({
     imagePrompt: v.string(),
     imageUrl: v.optional(v.string()), // 七牛 CDN https URL（新图首选）
     imageStorageId: v.optional(v.string()), // Convex storage（旧图兼容 / 七牛失败回退）
+    // 生图可观测：状态 + 追踪 JSON（ImageTrace + 落盘耗时）+ 失败阶段/原因。
+    // 旧行无 imageStatus：前端按"有图即 ready，否则 pending"兜底。
+    imageStatus: v.optional(v.union(v.literal('pending'), v.literal('ready'), v.literal('failed'))),
+    imageTrace: v.optional(v.string()), // JSON.stringify(ImageTrace + storeMs/totalMs)
+    imageError: v.optional(v.string()), // 失败阶段 + 错误信息
     narration: v.string(),
     question: v.optional(v.string()),
     options: v.array(v.string()),
@@ -142,7 +147,9 @@ export default defineSchema({
       v.literal('error'),
     ),
     generated: v.optional(v.string()), // 生成结果 JSON 字符串
-    error: v.optional(v.string()),
+    error: v.optional(v.string()), // 失败短消息（截断），明细看日志
+    errorCode: v.optional(v.string()), // 失败归类（llm_http/bad_json/empty/unknown）
+    trace: v.optional(v.string()), // 生成追踪 JSON（model/durationMs/retries/requestId）
     updatedAt: v.number(),
   })
     .index('key', ['key'])
