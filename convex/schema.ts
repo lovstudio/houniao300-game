@@ -4,12 +4,27 @@ import { agentTables } from './agent/schema';
 import { aiTownTables } from './aiTown/schema';
 import { conversationId, playerId } from './aiTown/ids';
 import { engineTables } from './engine/schema';
+import { EMBEDDING_DIMENSION } from './util/llm';
 
 export default defineSchema({
   music: defineTable({
     storageId: v.string(),
     type: v.union(v.literal('background'), v.literal('player')),
   }),
+
+  // ---- 候鸟300 知识库（RAG）：内置文档分块 + 向量索引，被 @ 的 AI 据此作答 ----
+  kbChunks: defineTable({
+    chunkId: v.string(), // '<source>#<i>'，幂等去重
+    source: v.string(),
+    title: v.string(),
+    text: v.string(),
+    embedding: v.array(v.float64()),
+  })
+    .index('chunkId', ['chunkId'])
+    .vectorIndex('embedding', {
+      vectorField: 'embedding',
+      dimensions: EMBEDDING_DIMENSION,
+    }),
 
   // ---- AIGC 连环画体验模块（独立于 AI Town 引擎）----
   // 全局玩家身份（landing 强制录入一次）。鉴权接入后 userId 可换成真实 user。
