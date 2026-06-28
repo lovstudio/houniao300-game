@@ -17,6 +17,11 @@ import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 
 export type ControlMode = 'player' | 'camera';
 
+// 玩家走近一个「空间」入口或一件「作品」时，提示其可按空格查看详情/进入。
+export type NearbyPrompt =
+  | { kind: 'venue'; interiorId: string; label: string }
+  | { kind: 'installation'; id: string; label: string };
+
 export default function Game({
   controlMode,
   cameraFollow,
@@ -42,6 +47,8 @@ export default function Game({
   const [gameWrapperRef, { width, height }] = useElementSize();
   // 移动端：侧边栏改为可开合抽屉（空间不够，不能常驻底部）。
   const [panelOpen, setPanelOpen] = useState(false);
+  // 玩家走近空间入口或作品时的「按空格查看详情」提示。
+  const [nearbyPrompt, setNearbyPrompt] = useState<NearbyPrompt | null>(null);
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -96,11 +103,25 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     showCollisionOverlay={showCollisionOverlay}
                     historicalTime={historicalTime}
                     setSelectedElement={setSelectedElement}
+                    setNearbyPrompt={setNearbyPrompt}
                   />
                 </ConvexProvider>
               </Stage>
             </div>
           </div>
+          {/* 走近空间/作品时的交互提示（不拦截指针） */}
+          {nearbyPrompt && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/85 px-4 py-2 text-sm text-brown-100 shadow-xl backdrop-blur-sm">
+                <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
+                  空格
+                </kbd>
+                <span>
+                  {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}「{nearbyPrompt.label}」
+                </span>
+              </div>
+            </div>
+          )}
           {SHOW_DEV_TOOLS && showCollisionOverlay && (
             <div className="pointer-events-none absolute left-3 top-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
               <div className="mb-1 font-semibold">碰撞染色</div>

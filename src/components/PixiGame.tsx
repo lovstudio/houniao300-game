@@ -14,13 +14,18 @@ import { DebugPath } from './DebugPath.tsx';
 import { DebugCollisionOverlay } from './DebugCollisionOverlay.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
-import { setMapFocusHandler, setMapFocusTileHandler } from '../lib/mapFocus.ts';
+import {
+  setMapFocusHandler,
+  setMapFocusTileHandler,
+  selectInstallationOnMap,
+} from '../lib/mapFocus.ts';
+import { INSTALLATIONS } from '../../data/installations.ts';
 import {
   sandCityGeometryControlsCollision,
   tilePositionBlockedBySolidGeometry,
 } from '../../data/sandCityGeometry.ts';
 import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior.ts';
-import type { ControlMode } from './Game.tsx';
+import type { ControlMode, NearbyPrompt } from './Game.tsx';
 import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
@@ -28,6 +33,8 @@ import { Location, playerLocation } from '../../convex/aiTown/location.ts';
 
 const MAP_SOURCE_WIDTH = 1703;
 const MAP_SOURCE_HEIGHT = 1279;
+// 走近作品多少格内开始提示「按空格查看详情」。
+const INSTALLATION_PROMPT_RADIUS_TILES = 2.5;
 const KEYBOARD_MOVE_REPEAT_MS = 180;
 const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 4;
 const MAX_OPTIMISTIC_PATH_LENGTH = 2;
@@ -142,6 +149,7 @@ export const PixiGame = (props: {
   onEnterVenueInterior?: (interiorId: string) => void;
   showCollisionOverlay: boolean;
   setSelectedElement: SelectElement;
+  setNearbyPrompt: (prompt: NearbyPrompt | null) => void;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -166,7 +174,12 @@ export const PixiGame = (props: {
   const lastOptimisticFrameAtRef = useRef<number>();
   const lastSentDestinationRef = useRef<SentDestination | null>(null);
   const latestGameStateRef = useRef<RuntimeGameState>();
-  const nearInteriorEntranceRef = useRef<string | null>(null);
+  // 当前可按空格交互的最近目标（空间入口或作品），供键盘处理读取。
+  const nearbyTargetRef = useRef<NearbyPrompt | null>(null);
+  const nearbyKeyRef = useRef<string | null>(null);
+  // 让 keydown 一次性监听器始终拿到最新的进入回调（props 每次渲染都会变）。
+  const onEnterVenueInteriorRef = useRef(props.onEnterVenueInterior);
+  onEnterVenueInteriorRef.current = props.onEnterVenueInterior;
 
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
@@ -243,47 +256,67 @@ export const PixiGame = (props: {
     worldWidthPx,
   };
 
+  // 走近一个「空间」入口或一件「作品」时，发布提示让玩家可按空格查看详情/进入。
+  // 取最近的单个目标，避免同时弹多个提示。
   useEffect(() => {
-    if (!props.onEnterVenueInterior || !humanPlayerId) {
-      nearInteriorEntranceRef.current = null;
+    const publish = (next: NearbyPrompt | null) => {
+      const key = next ? `${next.kind}:${next.kind === 'venue' ? next.interiorId : next.id}` : null;
+      if (key === nearbyKeyRef.current) return;
+      nearbyKeyRef.current = key;
+      nearbyTargetRef.current = next;
+      props.setNearbyPrompt(next);
+    };
+
+    if (!humanPlayerId) {
+      publish(null);
       return;
     }
-
     const humanPlayer = props.game.world.players.get(humanPlayerId);
     if (!humanPlayer) {
-      nearInteriorEntranceRef.current = null;
+      publish(null);
       return;
     }
 
+    const { width: mapWidth, height: mapHeight } = props.game.worldMap;
     const location = optimisticHumanLocation ?? playerLocation(humanPlayer);
-    let nearestInteriorId: string | null = null;
+    let nearest: NearbyPrompt | null = null;
     let nearestDistance = Infinity;
 
     for (const interior of VENUE_INTERIOR_MAPS) {
       const [sourceX, sourceY] = interior.entrance.exteriorSource;
-      const entryTile = {
-        x: (sourceX / MAP_SOURCE_WIDTH) * props.game.worldMap.width,
-        y: (sourceY / MAP_SOURCE_HEIGHT) * props.game.worldMap.height,
-      };
-      const distance = Math.hypot(location.x - entryTile.x, location.y - entryTile.y);
+      const entryX = (sourceX / MAP_SOURCE_WIDTH) * mapWidth;
+      const entryY = (sourceY / MAP_SOURCE_HEIGHT) * mapHeight;
+      const distance = Math.hypot(location.x - entryX, location.y - entryY);
       if (distance <= interior.entrance.radiusTiles && distance < nearestDistance) {
         nearestDistance = distance;
-        nearestInteriorId = interior.id;
+        nearest = { kind: 'venue', interiorId: interior.id, label: interior.venue };
       }
     }
 
-    if (nearestInteriorId && nearInteriorEntranceRef.current !== nearestInteriorId) {
-      props.onEnterVenueInterior(nearestInteriorId);
+    for (const installation of INSTALLATIONS) {
+      const tileX = (installation.x / MAP_SOURCE_WIDTH) * mapWidth;
+      const tileY = (installation.y / MAP_SOURCE_HEIGHT) * mapHeight;
+      const distance = Math.hypot(location.x - tileX, location.y - tileY);
+      if (distance <= INSTALLATION_PROMPT_RADIUS_TILES && distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = { kind: 'installation', id: installation.id, label: installation.title };
+      }
     }
-    nearInteriorEntranceRef.current = nearestInteriorId;
+
+    publish(nearest);
   }, [
     humanPlayerId,
     optimisticHumanLocation,
     props.game,
     props.game.worldMap.height,
     props.game.worldMap.width,
-    props.onEnterVenueInterior,
+    props.setNearbyPrompt,
   ]);
+
+  // 卸载时清除提示。
+  useEffect(() => {
+    return () => props.setNearbyPrompt(null);
+  }, [props.setNearbyPrompt]);
 
   useEffect(() => {
     const currentState = () => latestGameStateRef.current;
@@ -570,6 +603,19 @@ export const PixiGame = (props: {
           }
           startHeldMovementLoop();
           tickHeldMovement();
+        }
+        return;
+      }
+
+      if (key === ' ' || event.code === 'Space') {
+        const target = nearbyTargetRef.current;
+        if (target) {
+          event.preventDefault();
+          if (target.kind === 'venue') {
+            onEnterVenueInteriorRef.current?.(target.interiorId);
+          } else {
+            selectInstallationOnMap(target.id);
+          }
         }
         return;
       }
