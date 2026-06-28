@@ -1,16 +1,177 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BIRD_RESTAURANT_INTERIOR,
   type InteriorCircle,
   type InteriorRect,
   type VenueInteriorMap as VenueInteriorMapData,
 } from '../../data/birdRestaurantInterior';
+import { characters } from '../../data/characters';
 
 type Props = {
   interior?: VenueInteriorMapData;
+  // 内场里行走的角色（与外部地图同一套立绘）；缺省回退到第一个角色。
+  characterName?: string;
   onOpenPhotoMemory?: () => void;
   onExit: () => void;
 };
+
+// 32x32folk.png 实际为 768x512，每帧 64px，即 12 列 × 8 行。
+const SHEET_COLS = 12;
+const SHEET_ROWS = 8;
+// 角色行走速度（source 像素 / 秒）与帧动画节奏。
+const WALK_SPEED_PX_PER_SEC = 280;
+const WALK_FRAME_INTERVAL_SEC = 0.14;
+// 角色立绘在 source 坐标里的占位（正方形），约等于外部地图里的世界尺寸。
+const AVATAR_SOURCE_SIZE = 92;
+// 角色中心不可越过的边距，避免走出墙体/棚顶。
+const AVATAR_INSET = 28;
+
+type Direction = 'down' | 'left' | 'right' | 'up';
+
+type WalkState = {
+  x: number;
+  y: number;
+  dir: Direction;
+  frame: number;
+  moving: boolean;
+};
+
+function frameKey(dir: Direction, frame: number): string {
+  return frame === 0 ? dir : `${dir}${frame + 1}`;
+}
+
+// 点击/触摸地图 → 角色朝目标点平滑走动；direction 由运动向量推导，moving 时循环 3 帧。
+function useInteriorWalk(interior: VenueInteriorMapData) {
+  const start = interior.entrance.interiorSource;
+  const [state, setState] = useState<WalkState>({
+    x: start[0],
+    y: start[1],
+    dir: 'down',
+    frame: 0,
+    moving: false,
+  });
+  const ref = useRef<WalkState>(state);
+  const targetRef = useRef<{ x: number; y: number } | null>(null);
+
+  // 切换内场（不同场馆）时把角色复位到入口。
+  useEffect(() => {
+    const reset: WalkState = {
+      x: interior.entrance.interiorSource[0],
+      y: interior.entrance.interiorSource[1],
+      dir: 'down',
+      frame: 0,
+      moving: false,
+    };
+    ref.current = reset;
+    targetRef.current = null;
+    setState(reset);
+  }, [interior]);
+
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    let frameAcc = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const cur = ref.current;
+      let { x, y, dir, frame } = cur;
+      let moving = false;
+      const target = targetRef.current;
+      if (target) {
+        const dx = target.x - x;
+        const dy = target.y - y;
+        const dist = Math.hypot(dx, dy);
+        const step = WALK_SPEED_PX_PER_SEC * dt;
+        if (dist <= step || dist < 1) {
+          x = target.x;
+          y = target.y;
+          targetRef.current = null;
+        } else {
+          x += (dx / dist) * step;
+          y += (dy / dist) * step;
+          moving = true;
+          dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
+        }
+      }
+      if (moving) {
+        frameAcc += dt;
+        if (frameAcc >= WALK_FRAME_INTERVAL_SEC) {
+          frameAcc = 0;
+          frame = (frame + 1) % 3;
+        }
+      } else {
+        frame = 0;
+      }
+      const next = { x, y, dir, frame, moving };
+      ref.current = next;
+      setState(next);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [interior]);
+
+  const walkTo = (sx: number, sy: number) => {
+    targetRef.current = {
+      x: Math.min(interior.source.width - AVATAR_INSET, Math.max(AVATAR_INSET, sx)),
+      y: Math.min(interior.source.height - AVATAR_INSET, Math.max(AVATAR_INSET, sy)),
+    };
+  };
+
+  return { state, walkTo };
+}
+
+function InteriorAvatar({
+  state,
+  characterName,
+  interior,
+}: {
+  state: WalkState;
+  characterName?: string;
+  interior: VenueInteriorMapData;
+}) {
+  const character =
+    characters.find((c) => c.name === characterName) ?? characters[0];
+  if (!character) return null;
+
+  // 复用 Character.tsx 的 base 前缀替换，使立绘在 /ai-town 与根域名下都能加载。
+  const basePrefix = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const textureUrl = character.textureUrl.replace('/ai-town', basePrefix);
+
+  const cell = character.spritesheetData.frames[frameKey(state.dir, state.frame)]?.frame;
+  const col = cell ? cell.x / 64 : 0;
+  const row = cell ? cell.y / 64 : 0;
+
+  return (
+    <div
+      className="pointer-events-none absolute z-10"
+      style={{
+        left: percent(state.x, interior.source.width),
+        top: percent(state.y, interior.source.height),
+        width: percent(AVATAR_SOURCE_SIZE, interior.source.width),
+        height: percent(AVATAR_SOURCE_SIZE, interior.source.height),
+        transform: 'translate(-50%, -68%)',
+      }}
+    >
+      <span
+        className="absolute left-1/2 top-[88%] h-[14%] w-[58%] -translate-x-1/2 rounded-[50%] bg-black/35 blur-[2px]"
+      />
+      <span
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url("${textureUrl}")`,
+          backgroundSize: `${SHEET_COLS * 100}% ${SHEET_ROWS * 100}%`,
+          backgroundPosition: `${(col / (SHEET_COLS - 1)) * 100}% ${(row / (SHEET_ROWS - 1)) * 100}%`,
+          backgroundRepeat: 'no-repeat',
+          imageRendering: 'auto',
+          filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.35))',
+        }}
+      />
+    </div>
+  );
+}
 
 const RECT_STYLES: Record<InteriorRect['kind'], { background: string; border: string }> = {
   aisle: { background: 'rgba(219, 197, 151, 0.16)', border: 'rgba(255,255,255,0.08)' },
@@ -163,12 +324,22 @@ function SceneBackdrop({ scene }: { scene: VenueInteriorMapData['scene'] }) {
 
 export default function VenueInteriorMap({
   interior = BIRD_RESTAURANT_INTERIOR,
+  characterName,
   onOpenPhotoMemory,
   onExit,
 }: Props) {
   const scene = interior.scene ?? 'restaurant';
   const heading = scene === 'restaurant' ? `${interior.venue}内场` : interior.venue;
   const subtitle = interior.subtitle ?? '夜市棚 · 餐桌 · 摊位 · 演出角';
+
+  const { state, walkTo } = useInteriorWalk(interior);
+  const handleMapPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    walkTo(
+      ((e.clientX - rect.left) / rect.width) * interior.source.width,
+      ((e.clientY - rect.top) / rect.height) * interior.source.height,
+    );
+  };
 
   return (
     <section className="fixed inset-0 z-[70] flex flex-col bg-[#17110e] text-[#f7ead2]">
@@ -203,7 +374,8 @@ export default function VenueInteriorMap({
 
       <div className="relative min-h-0 flex-1 overflow-hidden bg-[#241812] p-3 sm:p-5">
         <div
-          className="relative mx-auto overflow-hidden border-2 border-[#6b5038] bg-[#6f563a] shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
+          onPointerDown={handleMapPointer}
+          className="relative mx-auto cursor-pointer overflow-hidden border-2 border-[#6b5038] bg-[#6f563a] shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
           style={{
             aspectRatio: `${interior.source.width} / ${interior.source.height}`,
             maxHeight: '100%',
@@ -254,6 +426,12 @@ export default function VenueInteriorMap({
               top: percent(interior.entrance.interiorSource[1], interior.source.height),
             }}
           />
+
+          <InteriorAvatar state={state} characterName={characterName} interior={interior} />
+
+          <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] font-semibold text-[#ffe7bc] sm:text-xs">
+            点击地图任意处走动
+          </div>
         </div>
       </div>
     </section>
