@@ -1220,10 +1220,12 @@ function StateTab({
         <span className="h-px flex-1 bg-gradient-to-r from-[#cbb287] to-transparent" />
       </div>
       <div>
-        {players
-          .filter((p) => !p.human)
+        {/* 真人玩家排在前，AI 居民其后；真人加「真人」标签。 */}
+        {[...players]
+          .sort((a, b) => Number(!!b.human) - Number(!!a.human))
           .map((p) => {
             const talking = inConvo.has(p.id as string);
+            const isHuman = !!p.human;
             return (
               <button
                 key={p.id}
@@ -1235,19 +1237,29 @@ function StateTab({
               >
                 <span
                   className={
-                    'h-2 w-2 shrink-0 rounded-full ' + (talking ? 'bg-[#c0654a]' : 'bg-[#b3a489]')
+                    'h-2 w-2 shrink-0 rounded-full ' +
+                    (isHuman ? 'bg-[#1da76e]' : talking ? 'bg-[#c0654a]' : 'bg-[#b3a489]')
                   }
-                  style={talking ? { boxShadow: '0 0 0 3px rgba(192,101,74,0.14)' } : undefined}
+                  style={
+                    isHuman
+                      ? { boxShadow: '0 0 0 3px rgba(29,167,110,0.16)' }
+                      : talking
+                        ? { boxShadow: '0 0 0 3px rgba(192,101,74,0.14)' }
+                        : undefined
+                  }
                 />
                 <span className="truncate text-[15px] font-medium text-[#2a1c14]">
                   {nameOf(p.id as string)}
                 </span>
+                {isHuman && (
+                  <span className="shrink-0 rounded bg-[#1da76e] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    真人
+                  </span>
+                )}
                 <span
                   className={
                     'ml-auto shrink-0 text-xs ' +
-                    (talking
-                      ? 'font-semibold text-[#9c4b34]'
-                      : 'italic text-[#9c7e5e]')
+                    (talking ? 'font-semibold text-[#9c4b34]' : 'italic text-[#9c7e5e]')
                   }
                 >
                   {talking ? '交谈中' : '漫步'}

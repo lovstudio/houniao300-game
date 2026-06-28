@@ -181,6 +181,7 @@ export default function Game({
           <BroadcastHud
             worldId={worldId}
             userId={userId}
+            game={game}
             onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
           />
           {calibrating && <CalibrationPanel />}
