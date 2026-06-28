@@ -38,7 +38,7 @@ import MaterialControls from './MaterialControls';
 type Tab = 'state' | 'spaces' | 'works' | 'schedule';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'state', label: '状态' },
+  { id: 'state', label: '系统' },
   { id: 'spaces', label: '空间' },
   { id: 'works', label: '作品' },
   { id: 'schedule', label: '活动' },
