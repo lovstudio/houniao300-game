@@ -16,11 +16,12 @@ const ROLE_PERK: Record<GrantRole, string> = {
   admin: '拥有全部权限：编辑/删除任意作品、改派角色、分发邀请码',
 };
 
+// 正式站点域名（固定，不取 window.location，避免管理员在预览/本地时发错链接）。
+const SITE_URL = 'https://houniao300-game.lovstudio.ai/';
+
 // 复制时给目标用户一段能看懂的完整邀请文案：是什么、去哪、怎么填、有什么用。
 function inviteMessage(code: string, role: GrantRole): string {
   const label = ROLE_LABEL[role];
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : '候鸟沙城';
   return [
     `【候鸟沙城 · ${label}邀请】`,
     `邀请你以「${label}」身份加入候鸟沙城。`,
@@ -28,7 +29,7 @@ function inviteMessage(code: string, role: GrantRole): string {
     `邀请码：${code}`,
     ``,
     `如何使用：`,
-    `1) 打开 ${origin}`,
+    `1) 打开 ${SITE_URL}`,
     `2) 在登记页选择「${label}」身份`,
     `3) 填入上面的邀请码，完成登记`,
     ``,
