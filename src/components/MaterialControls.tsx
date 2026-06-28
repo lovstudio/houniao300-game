@@ -45,6 +45,7 @@ export default function MaterialControls({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'upload' | 'gen' | null>(null);
   const [showJson, setShowJson] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const status = doc?.status ?? 'idle';
   const badge = STATUS_LABEL[status];
@@ -89,13 +90,39 @@ export default function MaterialControls({
     }
   }
 
+  // 折叠态：与详情页其它操作一致，点击后才展开生成面板，避免一进来就铺满。
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-4 flex w-full items-center gap-2 rounded-lg border-2 border-[#cbb287] bg-[#f3e7cb] px-3 py-2.5 text-left text-sm font-bold text-[#5b4632] transition hover:border-clay-500 hover:bg-[#efe0c0]"
+      >
+        <SparkIcon />
+        <span className="min-w-0 flex-1 truncate">{genLabel}</span>
+        {!loading && status !== 'idle' && (
+          <span className={'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ' + badge.cls}>
+            {badge.text}
+          </span>
+        )}
+        <ChevronIcon dir="down" />
+      </button>
+    );
+  }
+
   return (
-    <div className="mt-4 rounded-lg border border-[#dcc89f] bg-[#efe0c0] p-3">
+    <div className="mt-4 rounded-xl border border-[#dcc89f] bg-[#efe0c0] p-3">
       <div className="flex items-center gap-2">
         <span className="font-display text-base text-[#2a1c14]">原始输入图 · Scale 生成</span>
         <span className={'ml-auto rounded px-1.5 py-0.5 text-[10px] font-bold ' + badge.cls}>
           {loading ? '载入中' : badge.text}
         </span>
+        <button
+          onClick={() => setOpen(false)}
+          aria-label="收起"
+          className="shrink-0 rounded p-0.5 text-[#9c7e5e] transition hover:text-[#2a1c14]"
+        >
+          <ChevronIcon dir="up" />
+        </button>
       </div>
 
       <div className="mt-2.5 flex gap-3">
@@ -136,14 +163,14 @@ export default function MaterialControls({
         <button
           onClick={() => fileRef.current?.click()}
           disabled={busy !== null}
-          className="rounded border-2 border-[#cbb487] px-2.5 py-1.5 text-xs font-semibold text-[#5b4632] hover:border-clay-500 disabled:opacity-50"
+          className="rounded-lg border-2 border-[#cbb287] bg-[#f3e7cb] px-3 py-1.5 text-xs font-semibold text-[#5b4632] transition hover:border-clay-500 disabled:opacity-50"
         >
           {busy === 'upload' ? '上传中…' : sourceUrl ? '替换源图' : '上传源图'}
         </button>
         <button
           onClick={onRegenerate}
           disabled={busy !== null || !sourceUrl}
-          className="rounded bg-clay-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-clay-500 disabled:opacity-40"
+          className="rounded-lg bg-clay-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-clay-500 disabled:opacity-40"
           title={sourceUrl ? '' : '先上传源图'}
         >
           {busy === 'gen' ? '生成中…' : genLabel}
@@ -173,4 +200,43 @@ function prettyJson(s: string) {
   } catch {
     return s;
   }
+}
+
+function SparkIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0 text-clay-500"
+      aria-hidden
+    >
+      <path d="M12 3l1.9 4.8L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.7Z" />
+      <path d="M19 14v4M21 16h-4" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ dir }: { dir: 'up' | 'down' }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0"
+      aria-hidden
+    >
+      {dir === 'down' ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}
+    </svg>
+  );
 }

@@ -669,32 +669,44 @@ function InstallationDetail({
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        <img
-          src={imgSrc}
-          alt={artwork.title}
-          loading="lazy"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-          className="mb-3 w-full rounded-lg border border-[#dcc89f] bg-[#e8d6b0] object-cover"
-        />
-        <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{artwork.title}</h3>
-        <div className="mt-3 space-y-2 text-sm text-[#5b4632]">
-          <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-[#9c7e5e]">艺术家</span>
-            <span className="min-w-0 flex-1">{artwork.artistName}</span>
+        {/* 卡片：左海报 + 右基本信息，避免竖图过高 */}
+        <div className="flex gap-3 rounded-xl border border-[#dcc89f] bg-[#f3e7cb] p-2.5">
+          <div className="h-32 w-24 shrink-0 overflow-hidden rounded-lg border border-[#dcc89f] bg-[#e8d6b0]">
+            <img
+              src={imgSrc}
+              alt={artwork.title}
+              loading="lazy"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+              }}
+              className="h-full w-full object-cover"
+            />
           </div>
-          <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-[#9c7e5e]">区域</span>
-            <span>{artwork.zone}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-[#9c7e5e]">类型</span>
-            <span>{artwork.kind === 'space' ? '可进入空间' : '仅供观看'}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-[#9c7e5e]">归属</span>
-            <span>{artwork.ownerUserId ? (mine ? '你（已认领）' : '已被艺术家认领') : '尚未认领'}</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h3 className="line-clamp-2 font-display text-xl leading-tight text-[#2a1c14]">
+              {artwork.title}
+            </h3>
+            <p className="mt-1 truncate text-sm text-[#5b4632]">{artwork.artistName}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="rounded bg-[#e3d2ad] px-1.5 py-0.5 text-[11px] text-[#6b5238]">
+                {artwork.zone}
+              </span>
+              <span className="rounded bg-[#e3d2ad] px-1.5 py-0.5 text-[11px] text-[#6b5238]">
+                {artwork.kind === 'space' ? '可进入空间' : '仅供观看'}
+              </span>
+            </div>
+            <span
+              className={
+                'mt-auto inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[11px] font-semibold ' +
+                (artwork.ownerUserId
+                  ? mine
+                    ? 'bg-[#1da76e]/15 text-[#1a7d54]'
+                    : 'bg-[#d8cdb8] text-[#6b5238]'
+                  : 'bg-[#dcc89f] text-[#5b4632]')
+              }
+            >
+              {artwork.ownerUserId ? (mine ? '你已认领' : '已被认领') : '尚未认领'}
+            </span>
           </div>
         </div>
         {artwork.note && (
@@ -740,12 +752,15 @@ function InstallationDetail({
           在地图上定位
         </button>
 
-        <MaterialControls
-          kind="work"
-          refId={artwork.slug}
-          title={`${artwork.slug} · ${artwork.title}`}
-          genLabel="生成游戏资产"
-        />
+        {/* 生成游戏资产仅对作品归属者本人或管理员开放 */}
+        {canManage && (
+          <MaterialControls
+            kind="work"
+            refId={artwork.slug}
+            title={`${artwork.slug} · ${artwork.title}`}
+            genLabel="生成游戏资产"
+          />
+        )}
 
         {canManage && (
           <button
