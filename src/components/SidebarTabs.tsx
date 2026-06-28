@@ -31,7 +31,7 @@ import { enterActivity, activityFromSchedule, activityFromInstallation } from '.
 import { setPanelTabHandler } from '../lib/panelBus';
 import { openPhotoMemory } from '../lib/photoMemoryBus';
 import { toast } from 'react-toastify';
-import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior';
+import { VENUE_INTERIOR_MAPS, artworkInteriorId } from '../../data/birdRestaurantInterior';
 import MaterialControls from './MaterialControls';
 
 type Tab = 'state' | 'spaces' | 'works' | 'schedule';
@@ -723,9 +723,32 @@ function InstallationDetail({
             {busy ? '申领中…' : '申领这件作品'}
           </button>
         )}
+        {artwork.kind === 'space' && (
+          <button
+            onClick={() => {
+              if (artwork.ownerUserId && artwork.ownerUserId !== userId) {
+                void record({
+                  worldId,
+                  artworkId: artwork._id,
+                  kind: 'artwork_entered',
+                  actorUserId: userId,
+                  actorName: myName,
+                });
+              }
+              enterVenueInterior(artworkInteriorId(artwork.slug));
+            }}
+            className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
+          >
+            走进这座建筑
+          </button>
+        )}
         <button
           onClick={() => enterActivity(activityFromInstallation(installation))}
-          className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500"
+          className={
+            artwork.kind === 'space'
+              ? 'mt-2 w-full rounded border border-clay-700 px-3 py-2.5 text-base font-semibold text-clay-700 hover:bg-clay-700/10'
+              : 'mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500'
+          }
         >
           进入这个作品的专属体验
         </button>

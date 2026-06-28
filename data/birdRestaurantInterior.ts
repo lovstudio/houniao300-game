@@ -200,3 +200,50 @@ export type VenueInteriorId = (typeof VENUE_INTERIOR_MAPS)[number]['id'];
 export function getVenueInterior(id: string) {
   return VENUE_INTERIOR_MAPS.find((interior) => interior.id === id);
 }
+
+// 「作品即建筑」可进入空间的 interiorId 约定：'artwork:<slug>'。
+export const ARTWORK_INTERIOR_PREFIX = 'artwork:';
+export function artworkInteriorId(slug: string) {
+  return `${ARTWORK_INTERIOR_PREFIX}${slug}`;
+}
+
+// 通用默认内场：一个四面围墙、底部中央开门的素房间（源 1280×720 → 80×45 格）。
+// 任何标记为 kind='space' 的作品都可立刻走进它；若某栋建筑后续手工编排了专属内场
+// （在 VENUE_INTERIOR_MAPS 里放一张 id 为 'artwork:<slug>' 的地图），resolveInterior 会优先用专属的。
+export const DEFAULT_BUILDING_INTERIOR: VenueInteriorMap = {
+  id: 'default-building-interior',
+  venue: '内部空间',
+  subtitle: '可走动的建筑内部',
+  source: { imageName: '', width: 1280, height: 720, capturedAt: '' },
+  mapWidth: 40,
+  mapHeight: 23,
+  entrance: {
+    exteriorSource: [640, 690],
+    interiorSource: [640, 600],
+    radiusTiles: 6,
+  },
+  labels: [
+    { id: 'label-title', label: '内部空间', x: 640, y: 110 },
+    { id: 'label-entry', label: '入口', x: 640, y: 600 },
+  ],
+  rects: [
+    { id: 'wall-top', x: 0, y: 0, width: 1280, height: 56, kind: 'wall' },
+    { id: 'wall-left', x: 0, y: 0, width: 56, height: 720, kind: 'wall' },
+    { id: 'wall-right', x: 1224, y: 0, width: 56, height: 720, kind: 'wall' },
+    { id: 'wall-bottom-left', x: 0, y: 664, width: 520, height: 56, kind: 'wall' },
+    { id: 'wall-bottom-right', x: 760, y: 664, width: 520, height: 56, kind: 'wall' },
+    { id: 'entry-field', x: 540, y: 560, width: 200, height: 160, kind: 'entry', walkable: true },
+  ],
+  circles: [{ id: 'entry-light', x: 640, y: 620, radius: 36, kind: 'light', walkable: true }],
+};
+
+// 解析 interiorId → 内场地图：手工编排的优先（含 venue 与作品专属覆盖），
+// 'artwork:<slug>' 类一律回退到通用默认房间，保证「作品即建筑」永远可进入。
+export function resolveInterior(id: string): VenueInteriorMap | undefined {
+  const authored = getVenueInterior(id);
+  if (authored) return authored;
+  if (id.startsWith(ARTWORK_INTERIOR_PREFIX)) {
+    return { ...DEFAULT_BUILDING_INTERIOR, id };
+  }
+  return undefined;
+}

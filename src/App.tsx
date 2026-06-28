@@ -7,7 +7,7 @@ import {
   activityFromSchedule,
   type ActivityDescriptor,
 } from './lib/activityEnter.ts';
-import { getVenueInterior } from '../data/birdRestaurantInterior.ts';
+import { resolveInterior } from '../data/birdRestaurantInterior.ts';
 import { SCHEDULE, VENUE_COORDS, VENUES } from '../data/schedule.ts';
 import { getAnonUserId } from './lib/identity.ts';
 
@@ -101,7 +101,7 @@ export default function Home() {
   const activeWorldId = interiorWorld?.worldId ?? defaultWorldId;
   const activeEngineId = interiorWorld?.engineId ?? defaultEngineId;
   const activeInteriorId = interiorWorld?.interiorId;
-  const activeInterior = activeInteriorId ? getVenueInterior(activeInteriorId) : undefined;
+  const activeInterior = activeInteriorId ? resolveInterior(activeInteriorId) : undefined;
 
   const game = useServerGame(activeWorldId);
   const humanTokenIdentifier = useQuery(
