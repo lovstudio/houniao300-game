@@ -81,8 +81,17 @@ export async function retrieveKb(
 ): Promise<{ title: string; source: string; text: string }[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
+  const { embedding } = await fetchEmbedding(trimmed);
+  return retrieveKbByEmbedding(ctx, embedding, k);
+}
+
+// 已有问题向量时直接检索（与角色记忆检索复用同一次 embedding）。
+export async function retrieveKbByEmbedding(
+  ctx: ActionCtx,
+  embedding: number[],
+  k = 4,
+): Promise<{ title: string; source: string; text: string }[]> {
   try {
-    const { embedding } = await fetchEmbedding(trimmed);
     const hits = await ctx.vectorSearch('kbChunks', 'embedding', { vector: embedding, limit: k });
     if (!hits.length) return [];
     return await ctx.runQuery(internal.kb.fetchChunks, { ids: hits.map((h) => h._id) });
