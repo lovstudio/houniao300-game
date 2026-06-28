@@ -127,7 +127,7 @@ const INSTALLATION_COLORS: Record<string, number> = {
 };
 
 // 地图标记的最小数据形（兼容静态 Installation 与 DB artwork）。
-export type MapMarker = { id: string; x: number; y: number; kind?: 'view' | 'space' };
+export type MapMarker = { id: string; x: number; y: number; kind?: 'view' | 'space'; label?: string };
 
 function addInstallationMarker(container: PIXI.Container, project: Projector, installation: MapMarker) {
   const accent = INSTALLATION_COLORS[installation.id.slice(0, 1)] ?? 0xcc785c;
