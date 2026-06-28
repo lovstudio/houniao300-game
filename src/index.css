@@ -947,6 +947,38 @@ body {
 }
 .landing-cta { animation: ctaPulse 2.8s ease-in-out infinite; }
 
+/* 落地页「开启旅程」按钮：暖砂学术风发丝描边 + 轻压印 + 微光掠过 */
+@keyframes ctaBreath {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 20px -16px rgba(48,30,16,0.45); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), 0 9px 26px -14px rgba(48,30,16,0.6); }
+}
+.landing-enter {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(12px, 1.6vh, 16px) clamp(36px, 5vw, 56px);
+  border: 1px solid rgba(44, 38, 32, 0.26);
+  border-radius: 3px;
+  background: rgba(255, 251, 243, 0.4);
+  animation: ctaBreath 3.6s ease-in-out infinite;
+  transition: border-color 0.5s ease, background 0.5s ease, letter-spacing 0.5s ease;
+}
+.landing-enter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 238, 208, 0.55), transparent);
+  transform: translateX(-130%);
+  transition: transform 0.9s ease;
+}
+.landing-enter:hover {
+  border-color: rgba(44, 38, 32, 0.5);
+  background: rgba(255, 248, 236, 0.65);
+}
+.landing-enter:hover::before { transform: translateX(130%); }
+@media (prefers-reduced-motion: reduce) {
+  .landing-enter { animation: none; }
+}
+
 @keyframes landingRise {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
