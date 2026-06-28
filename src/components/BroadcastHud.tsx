@@ -53,16 +53,16 @@ export default function BroadcastHud({
       items.push({ kind: 'broadcast', id: m.id, t: m.t, author: m.author, authorName: m.authorName, text: m.text });
     for (const n of notes ?? [])
       items.push({ kind: 'notify', id: n._id, t: n.createdAt, text: n.text, read: n.read });
-    items.sort((a, b) => b.t - a.t);
+    items.sort((a, b) => a.t - b.t); // 正序：旧→新
     return items;
   }, [msgs, notes]);
 
-  // 展开后滚到顶部（最新）。
+  // 展开后滚到底部（最新）。
   useEffect(() => {
-    if (expanded && scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [expanded]);
+    if (expanded && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [expanded, feed.length]);
 
-  const preview = feed.slice(0, 1);
+  const preview = feed.slice(-1); // 折叠态显示最新一条
 
   return (
     <div className="pointer-events-auto absolute right-2 top-2 z-30 w-60 select-none text-brown-200 sm:w-72">
