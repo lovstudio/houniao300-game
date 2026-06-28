@@ -30,14 +30,16 @@ import {
 import { enterActivity, activityFromSchedule } from '../lib/activityEnter';
 import { setPanelTabHandler } from '../lib/panelBus';
 import { toast } from 'react-toastify';
+import MaterialsPanel from './MaterialsPanel';
 
-type Tab = 'state' | 'chat' | 'schedule' | 'works';
+type Tab = 'state' | 'chat' | 'schedule' | 'works' | 'materials';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'state', label: '状态' },
   { id: 'chat', label: '广播' },
   { id: 'schedule', label: '节目单' },
   { id: 'works', label: '作品' },
+  { id: 'materials', label: '物料' },
 ];
 
 const TODAY_DAY = (() => {
@@ -157,6 +159,7 @@ export default function SidebarTabs({
         )}
         {tab === 'schedule' && <ScheduleTab venueFocus={venueFocus} />}
         {tab === 'works' && <WorksTab installationFocus={installationFocus} />}
+        {tab === 'materials' && <MaterialsPanel />}
       </div>
     </div>
   );
