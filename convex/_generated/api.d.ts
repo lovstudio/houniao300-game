@@ -45,6 +45,7 @@ import type * as music from "../music.js";
 import type * as notifications from "../notifications.js";
 import type * as photoMemories from "../photoMemories.js";
 import type * as profile from "../profile.js";
+import type * as roles from "../roles.js";
 import type * as testing from "../testing.js";
 import type * as util_FastIntegerCompression from "../util/FastIntegerCompression.js";
 import type * as util_assertNever from "../util/assertNever.js";
@@ -107,6 +108,7 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   photoMemories: typeof photoMemories;
   profile: typeof profile;
+  roles: typeof roles;
   testing: typeof testing;
   "util/FastIntegerCompression": typeof util_FastIntegerCompression;
   "util/assertNever": typeof util_assertNever;

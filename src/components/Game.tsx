@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import PixiGame from './PixiGame.tsx';
+import Joystick from './Joystick.tsx';
 import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
+import { selectInstallationOnMap } from '../lib/mapFocus.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
 
-import { useElementSize } from 'usehooks-ts';
+import { useElementSize, useMediaQuery } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import SettingsMenu from './SettingsMenu';
@@ -13,7 +15,6 @@ import SidebarTabs from './SidebarTabs.tsx';
 import BroadcastHud from './BroadcastHud.tsx';
 import Composer, { type Character } from './Composer.tsx';
 import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
-import SignalHud from './SignalHud.tsx';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
 import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
@@ -74,6 +75,13 @@ export default function Game({
   );
   // 玩家走近空间入口或作品时的「按空格查看详情」提示。
   const [nearbyPrompt, setNearbyPrompt] = useState<NearbyPrompt | null>(null);
+  // 触屏设备：显示虚拟摇杆，并把「按空格」提示变为可点按钮（手机无空格键）。
+  const isTouch = useMediaQuery('(pointer: coarse)');
+
+  const triggerNearby = (prompt: NearbyPrompt) => {
+    if (prompt.kind === 'venue') onEnterVenueInterior?.(prompt.interiorId);
+    else selectInstallationOnMap(prompt.id);
+  };
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -128,7 +136,6 @@ export default function Game({
           className="absolute inset-0 overflow-hidden bg-brown-900 md:relative md:inset-auto md:min-h-0 md:min-w-0"
           ref={gameWrapperRef}
         >
-          <SignalHud />
           <BroadcastHud
             worldId={worldId}
             userId={userId}
@@ -162,8 +169,8 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 走近空间/作品时的交互提示（不拦截指针）；抬高避让底部传话器 */}
-          {nearbyPrompt && (
+          {/* 桌面端：走近空间/作品时的「按空格」提示（底部居中，抬高避让传话器） */}
+          {nearbyPrompt && !isTouch && (
             <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center px-4">
               <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
                 <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
@@ -175,8 +182,43 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </div>
             </div>
           )}
-          {/* 主视图底部居中的传话器：语音/文字 + @ 居民，话语落入通知系统 */}
-          <Composer worldId={worldId} userId={userId} characters={characters} />
+
+          {/* 移动端控制层：左下摇杆移动 + 右下动作键交互（经典双拇指布局）。面板展开时隐藏。 */}
+          {isTouch && !panelOpen && (
+            <>
+              {controlMode === 'player' && <Joystick />}
+              {nearbyPrompt && (
+                <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom,0px)+2.25rem)] right-[calc(env(safe-area-inset-right,0px)+1.5rem)] z-40 flex flex-col items-center gap-1.5">
+                  <button
+                    onClick={() => triggerNearby(nearbyPrompt)}
+                    aria-label={`${nearbyPrompt.kind === 'venue' ? '进入' : '查看'}${nearbyPrompt.label}`}
+                    className="pointer-events-auto relative grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full border-2 border-white/60 bg-[#cc785c] text-white shadow-xl transition-transform active:scale-90"
+                  >
+                    <span className="absolute inset-0 animate-ping rounded-full bg-[#cc785c]/40" />
+                    {nearbyPrompt.kind === 'venue' ? (
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                        <polyline points="10 17 15 12 10 7" />
+                        <line x1="15" y1="12" x2="3" y2="12" />
+                      </svg>
+                    ) : (
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="max-w-[6rem] truncate rounded-full bg-brown-900/85 px-2.5 py-0.5 text-center text-xs text-brown-100 shadow">
+                    {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}·{nearbyPrompt.label}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+          {/* 主视图底部居中的传话器：语音/文字 + @ 居民，话语落入通知系统。移动端控制层展开时让位。 */}
+          {!(isTouch && !panelOpen) && (
+            <Composer worldId={worldId} userId={userId} characters={characters} />
+          )}
           {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
             <button

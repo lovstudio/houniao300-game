@@ -1,7 +1,8 @@
 import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
-import { Doc, Id } from './_generated/dataModel';
+import { Doc } from './_generated/dataModel';
 import { INSTALLATIONS } from '../data/installations';
+import { canClaimArtwork, canCreateArtwork, isAdmin, type Role } from './roles';
 
 const kindValidator = v.union(v.literal('view'), v.literal('space'));
 
@@ -75,11 +76,14 @@ export const seedArtworks = mutation({
   },
 });
 
-// 艺术家申领既有作品：把作品与其 userId 关联。仅未被申领（或已属于本人）时允许。
+// 申领既有作品：把作品与其 userId 关联。仅艺术家/管理员、且未被申领（或已属于本人）时允许。
 export const claimArtwork = mutation({
   args: { artworkId: v.id('artworks'), userId: v.string() },
   handler: async (ctx, { artworkId, userId }) => {
-    const profile = await requireArtist(ctx, userId);
+    const profile = await requireProfile(ctx, userId);
+    if (!canClaimArtwork(profile.role as Role)) {
+      throw new ConvexError('仅艺术家或管理员可申领作品');
+    }
     const artwork = await ctx.db.get(artworkId);
     if (!artwork) throw new ConvexError('作品不存在');
     if (artwork.ownerUserId && artwork.ownerUserId !== userId) {
@@ -90,7 +94,7 @@ export const claimArtwork = mutation({
   },
 });
 
-// 艺术家自助新建作品并摆放。坐标为源图坐标系（与既有作品一致）。
+// 新建作品并摆放。艺术家/志愿者/管理员可用（志愿者可代他人创建）。坐标为源图坐标系。
 export const createArtwork = mutation({
   args: {
     worldId: v.id('worlds'),
@@ -104,7 +108,10 @@ export const createArtwork = mutation({
     imageStorageId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const profile = await requireArtist(ctx, args.userId);
+    const profile = await requireProfile(ctx, args.userId);
+    if (!canCreateArtwork(profile.role as Role)) {
+      throw new ConvexError('仅艺术家、志愿者或管理员可创建作品');
+    }
     const slug = 'u_' + Math.random().toString(36).slice(2, 10);
     return await ctx.db.insert('artworks', {
       worldId: args.worldId,
@@ -175,16 +182,62 @@ export const recordInteraction = mutation({
   },
 });
 
-// 公共校验：调用者必须是已注册的艺术家。
-async function requireArtist(
-  ctx: { db: { query: any } },
-  userId: string,
-): Promise<Doc<'profiles'>> {
+// 管理员或作品归属者可编辑作品（标题/区域/类型/坐标/说明）。
+export const updateArtwork = mutation({
+  args: {
+    artworkId: v.id('artworks'),
+    userId: v.string(),
+    title: v.optional(v.string()),
+    zone: v.optional(v.string()),
+    kind: v.optional(kindValidator),
+    note: v.optional(v.string()),
+    x: v.optional(v.number()),
+    y: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { artworkId, userId, ...fields } = args;
+    const artwork = await requireManageArtwork(ctx, artworkId, userId);
+    const patch: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(fields)) {
+      if (val !== undefined) patch[k] = val;
+    }
+    await ctx.db.patch(artwork._id, patch);
+    return artworkId;
+  },
+});
+
+// 管理员或归属者可删除作品。
+export const deleteArtwork = mutation({
+  args: { artworkId: v.id('artworks'), userId: v.string() },
+  handler: async (ctx, { artworkId, userId }) => {
+    const artwork = await requireManageArtwork(ctx, artworkId, userId);
+    await ctx.db.delete(artwork._id);
+    return true;
+  },
+});
+
+// 公共校验：取已登记的 profile（缺失即拒）。
+async function requireProfile(ctx: { db: { query: any } }, userId: string): Promise<Doc<'profiles'>> {
   const profile = await ctx.db
     .query('profiles')
     .withIndex('userId', (q: any) => q.eq('userId', userId))
     .first();
   if (!profile) throw new ConvexError('请先完成登记');
-  if (profile.role !== 'artist') throw new ConvexError('仅艺术家身份可执行此操作');
   return profile as Doc<'profiles'>;
+}
+
+// 编辑/删除作品的权限：管理员，或作品归属者本人。
+async function requireManageArtwork(
+  ctx: { db: { query: any; get: any } },
+  artworkId: Doc<'artworks'>['_id'],
+  userId: string,
+): Promise<Doc<'artworks'>> {
+  const profile = await requireProfile(ctx, userId);
+  const artwork = await ctx.db.get(artworkId);
+  if (!artwork) throw new ConvexError('作品不存在');
+  const owns = artwork.ownerUserId === userId;
+  if (!owns && !isAdmin(profile.role as Role)) {
+    throw new ConvexError('仅管理员或作品归属者可执行此操作');
+  }
+  return artwork as Doc<'artworks'>;
 }

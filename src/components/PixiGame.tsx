@@ -31,12 +31,15 @@ import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
 import { Location, playerLocation } from '../../convex/aiTown/location.ts';
+import { setJoystickHandler } from '../lib/joystickBus.ts';
 
 const MAP_SOURCE_WIDTH = 1703;
 const MAP_SOURCE_HEIGHT = 1279;
 // 走近作品多少格内开始提示「按空格查看详情」。
 const INSTALLATION_PROMPT_RADIUS_TILES = 2.5;
 const KEYBOARD_MOVE_REPEAT_MS = 180;
+// 双指捏合/缩放后的极短冷却：期间抬指不触发单击导航，避免缩放结束后角色乱跑。
+const PINCH_SUPPRESS_MS = 250;
 // 必须与服务器 data/characters.ts 的 movementSpeed 数值一致（同为 tiles/秒），否则点击移动的乐观
 // 预测速率与服务器不符，角色会先慢爬再被拽正。此前 main 误以为服务器是 0.75（实为 8），慢了 5.3x。
 const LOCAL_PLAYER_SPEED_TILES_PER_SECOND = 8;
@@ -45,6 +48,9 @@ const SERVER_SNAP_DISTANCE_TILES = 1.5;
 const SERVER_SETTLE_DISTANCE_TILES = 0.1;
 const SERVER_SETTLE_LERP = 0.08;
 const SERVER_CATCHUP_GRACE_MS = 2500;
+// 撞墙反馈：朝被挡方向顶出一小段再弹回（单峰正弦），让「往墙里走」有触觉反馈。
+const WALL_BUMP_DURATION_MS = 180;
+const WALL_BUMP_AMPLITUDE_TILES = 0.16;
 const MOVEMENT_KEYS = new Set([
   'arrowleft',
   'arrowright',
@@ -232,6 +238,10 @@ export const PixiGame = (props: {
   const moveTo = useSendInput(props.engineId, 'moveTo');
   const activeMovementKeyRef = useRef<string | null>(null);
   const keysDownRef = useRef(new Set<string>());
+  // 移动端虚拟摇杆当前方向（已量化为 4-邻接，null 表示松手），与 keysDownRef 并列驱动移动循环。
+  const joystickVectorRef = useRef<{ dx: number; dy: number } | null>(null);
+  // 多指触控跟踪：用于捏合缩放时抑制单击导航。
+  const lastMultiTouchAtRef = useRef(0);
   const lastKeyboardMoveAtRef = useRef(0);
   const keyboardMoveTimerRef = useRef<number>();
   const optimisticPathRef = useRef<GridDestination[]>([]);
@@ -239,6 +249,8 @@ export const PixiGame = (props: {
   const optimisticFrameRef = useRef<number>();
   const lastOptimisticFrameAtRef = useRef<number>();
   const lastSentDestinationRef = useRef<SentDestination | null>(null);
+  // 撞墙 bump 动画状态：方向 + 起始时间（performance.now() 域，与 rAF 一致）。
+  const wallBumpRef = useRef<{ dx: number; dy: number; start: number } | null>(null);
   const latestGameStateRef = useRef<RuntimeGameState>();
   // 当前可按空格交互的最近目标（空间入口或作品），供键盘处理读取。
   const nearbyTargetRef = useRef<NearbyPrompt | null>(null);
@@ -261,6 +273,11 @@ export const PixiGame = (props: {
   } | null>(null);
   const [optimisticHumanLocation, setOptimisticHumanLocation] = useState<Location>();
   const onMapPointerUp = async (e: any) => {
+    // 双指捏合/缩放刚发生：抑制本次单击导航（缩放抬指不应触发「点哪走哪」）。
+    if (Date.now() - lastMultiTouchAtRef.current < PINCH_SUPPRESS_MS) {
+      dragStart.current = null;
+      return;
+    }
     if (dragStart.current) {
       const { screenX, screenY } = dragStart.current;
       dragStart.current = null;
@@ -503,6 +520,11 @@ export const PixiGame = (props: {
         return;
       }
       if (isDestinationBlocked(destination)) {
+        // 撞墙：不发移动，改成朝墙顶一下的 bump 反馈。上一段 bump 没放完就不打断，
+        // 保证按住墙时呈节奏性轻顶而非乱抖。
+        if (!wallBumpRef.current) {
+          wallBumpRef.current = { dx, dy, start: performance.now() };
+        }
         return;
       }
 
@@ -526,6 +548,8 @@ export const PixiGame = (props: {
         });
     };
     const currentMovementVector = () => {
+      // 摇杆优先于键盘：移动端主输入。
+      if (joystickVectorRef.current) return joystickVectorRef.current;
       const activeKey = activeMovementKeyRef.current;
       if (activeKey && keysDownRef.current.has(activeKey)) {
         return movementVector(activeKey);
@@ -594,7 +618,9 @@ export const PixiGame = (props: {
         if (
           optimisticLocationRef.current === undefined &&
           optimisticPathRef.current.length === 0 &&
-          !lastSentDestinationRef.current
+          !lastSentDestinationRef.current &&
+          // bump 进行中要继续出帧（基于 serverLocation 叠加偏移），否则站桩撞墙没有反馈。
+          !wallBumpRef.current
         ) {
           publishOptimisticLocation(undefined);
           lastOptimisticFrameAtRef.current = performanceNow;
@@ -637,6 +663,26 @@ export const PixiGame = (props: {
         }
       }
 
+      // 撞墙 bump：在最终位置上叠加一个朝墙方向的单峰正弦偏移（顶出再弹回），
+      // 并把朝向转向墙，给玩家「撞上了」的触觉反馈。
+      const bump = wallBumpRef.current;
+      if (bump) {
+        const bumpElapsed = performanceNow - bump.start;
+        if (bumpElapsed >= WALL_BUMP_DURATION_MS) {
+          wallBumpRef.current = null;
+        } else {
+          const offset =
+            Math.sin((bumpElapsed / WALL_BUMP_DURATION_MS) * Math.PI) * WALL_BUMP_AMPLITUDE_TILES;
+          nextLocation = {
+            ...nextLocation,
+            x: nextLocation.x + bump.dx * offset,
+            y: nextLocation.y + bump.dy * offset,
+            dx: bump.dx,
+            dy: bump.dy,
+          };
+        }
+      }
+
       lastOptimisticFrameAtRef.current = performanceNow;
       publishOptimisticLocation(nextLocation);
       followLocation(nextLocation);
@@ -660,7 +706,12 @@ export const PixiGame = (props: {
       keyboardMoveTimerRef.current = window.setInterval(tickHeldMovement, KEYBOARD_MOVE_REPEAT_MS);
     };
     const stopHeldMovementLoopIfIdle = () => {
-      if (keysDownRef.current.size > 0 || keyboardMoveTimerRef.current === undefined) return;
+      if (
+        keysDownRef.current.size > 0 ||
+        joystickVectorRef.current !== null ||
+        keyboardMoveTimerRef.current === undefined
+      )
+        return;
 
       window.clearInterval(keyboardMoveTimerRef.current);
       keyboardMoveTimerRef.current = undefined;
@@ -775,12 +826,49 @@ export const PixiGame = (props: {
       stopHeldMovementLoopIfIdle();
     };
 
+    // 虚拟摇杆：复用键盘的「持续方向移动」循环。方向已在组件侧量化为 4-邻接。
+    const onJoystick = (vector: { dx: number; dy: number } | null) => {
+      if (!vector || (vector.dx === 0 && vector.dy === 0)) {
+        joystickVectorRef.current = null;
+        stopHeldMovementLoopIfIdle();
+        return;
+      }
+      const state = currentState();
+      if (state?.controlMode !== 'player') return;
+      const wasIdle = joystickVectorRef.current === null && keysDownRef.current.size === 0;
+      joystickVectorRef.current = vector;
+      if (wasIdle) {
+        lastKeyboardMoveAtRef.current = 0; // 立即响应首格，不等节流间隔
+        state.onSetCameraFollow(true); // 摇杆移动时让相机跟随，避免角色走出视野
+      }
+      startHeldMovementLoop();
+      tickHeldMovement();
+    };
+    setJoystickHandler(onJoystick);
+
+    // 多指触控跟踪：捏合缩放期间刷新时间戳，供 onMapPointerUp 抑制误导航。
+    const onTouchMulti = (event: TouchEvent) => {
+      if (event.touches.length >= 2) lastMultiTouchAtRef.current = Date.now();
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      // 捏合中途抬起一指后，剩余手指抬起也要落在抑制窗口内。
+      if (event.touches.length >= 1) lastMultiTouchAtRef.current = Date.now();
+    };
+
     optimisticFrameRef.current = window.requestAnimationFrame(tickOptimisticPlayer);
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('keyup', onKeyUp, true);
+    window.addEventListener('touchstart', onTouchMulti, { passive: true });
+    window.addEventListener('touchmove', onTouchMulti, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
       document.removeEventListener('keyup', onKeyUp, true);
+      setJoystickHandler(null);
+      joystickVectorRef.current = null;
+      window.removeEventListener('touchstart', onTouchMulti);
+      window.removeEventListener('touchmove', onTouchMulti);
+      window.removeEventListener('touchend', onTouchEnd);
       if (keyboardMoveTimerRef.current !== undefined) {
         window.clearInterval(keyboardMoveTimerRef.current);
         keyboardMoveTimerRef.current = undefined;
@@ -792,6 +880,7 @@ export const PixiGame = (props: {
       keysDownRef.current.clear();
       optimisticPathRef.current = [];
       lastSentDestinationRef.current = null;
+      wallBumpRef.current = null;
     };
   }, [convex]);
 

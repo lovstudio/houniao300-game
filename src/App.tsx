@@ -157,11 +157,7 @@ export default function Home() {
     }
   };
   const toggleControlMode = () =>
-    setControlMode((currentMode) => {
-      const nextMode = currentMode === 'player' ? 'camera' : 'player';
-      setCameraFollow(nextMode === 'player');
-      return nextMode;
-    });
+    setControlMode((currentMode) => (currentMode === 'player' ? 'camera' : 'player'));
   const toggleCameraFollow = () =>
     setCameraFollow((currentFollow) => {
       const nextFollow = !currentFollow;
@@ -272,11 +268,28 @@ export default function Home() {
     return <EndingsWall />;
   }
 
-  // 身份门：加载中显示占位，未录入则强制 onboarding。
+  // 身份门：加载中显示占位（暖砂风，与 Landing/Onboarding 一致），未录入则强制 onboarding。
   if (profile === undefined) {
     return (
-      <main className="flex screen-h items-center justify-center bg-brown-900 text-brown-300">
-        加载中…
+      <main
+        className="flex screen-h items-center justify-center"
+        style={{
+          background:
+            'radial-gradient(120% 80% at 50% 4%, #f8f4ec 0%, #efe9dc 52%, #e4dccb 100%)',
+        }}
+      >
+        <div
+          className="splash-fade"
+          style={{
+            fontFamily: '"Noto Serif SC","Songti SC",serif',
+            fontSize: 'clamp(11px,1.4vw,13px)',
+            letterSpacing: '0.42em',
+            textIndent: '0.42em',
+            color: '#7a7063',
+          }}
+        >
+          正 在 抵 达 沙 城…
+        </div>
       </main>
     );
   }

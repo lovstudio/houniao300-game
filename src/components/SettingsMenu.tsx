@@ -19,6 +19,7 @@ import {
   ShrinkIcon,
 } from './buttons/DeckIcons';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
+import SignalPanel from './SignalHud';
 
 export default function SettingsMenu({
   controlMode,
@@ -144,6 +145,8 @@ export default function SettingsMenu({
             onHelp();
           }}
         />
+
+        <SignalPanel />
 
         {SHOW_DEV_TOOLS && (
           <>
