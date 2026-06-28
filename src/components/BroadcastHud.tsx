@@ -62,7 +62,7 @@ export default function BroadcastHud({
     if (expanded && scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [expanded]);
 
-  const preview = feed.slice(0, 3);
+  const preview = feed.slice(0, 1);
 
   return (
     <div className="pointer-events-auto absolute right-2 top-2 z-30 w-60 select-none text-brown-200 sm:w-72">
