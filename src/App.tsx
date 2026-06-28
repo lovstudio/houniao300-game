@@ -157,11 +157,7 @@ export default function Home() {
     }
   };
   const toggleControlMode = () =>
-    setControlMode((currentMode) => {
-      const nextMode = currentMode === 'player' ? 'camera' : 'player';
-      setCameraFollow(nextMode === 'player');
-      return nextMode;
-    });
+    setControlMode((currentMode) => (currentMode === 'player' ? 'camera' : 'player'));
   const toggleCameraFollow = () =>
     setCameraFollow((currentFollow) => {
       const nextFollow = !currentFollow;
