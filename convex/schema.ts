@@ -59,13 +59,14 @@ export default defineSchema({
 
   // ---- 通知：作品被申领/被观看/被进入时，提醒归属艺术家 ----
   notifications: defineTable({
-    userId: v.string(), // 收件人 = 作品归属艺术家
+    userId: v.string(), // 收件人 = 作品归属艺术家 / 传话者本人
     worldId: v.id('worlds'),
-    kind: v.string(), // 'artwork_viewed' | 'artwork_entered' | 'artwork_claimed'
-    artworkId: v.id('artworks'),
-    artworkTitle: v.string(),
+    kind: v.string(), // 'artwork_viewed' | 'artwork_entered' | 'artwork_claimed' | 'user_said'
+    artworkId: v.optional(v.id('artworks')),
+    artworkTitle: v.optional(v.string()),
     actorUserId: v.optional(v.string()),
     actorName: v.optional(v.string()),
+    targetName: v.optional(v.string()), // user_said：@ 的角色名
     text: v.string(),
     read: v.boolean(),
     createdAt: v.number(),

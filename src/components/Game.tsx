@@ -13,6 +13,7 @@ import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import SettingsMenu from './SettingsMenu';
 import SidebarTabs from './SidebarTabs.tsx';
 import BroadcastHud from './BroadcastHud.tsx';
+import Composer, { type Character } from './Composer.tsx';
 import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
@@ -115,6 +116,14 @@ export default function Game({
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
+  // 传话器的 @ 候选：场上所有 AI 居民。
+  const characters: Character[] = useMemo(() => {
+    if (!game) return [];
+    return [...game.world.players.values()]
+      .filter((p) => !p.human)
+      .map((p) => ({ id: p.id as string, name: game.playerDescriptions.get(p.id)?.name ?? '居民' }));
+  }, [game]);
+
   if (!worldId || !engineId || !game) {
     return null;
   }
@@ -160,9 +169,9 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 桌面端：走近空间/作品时的「按空格」提示（底部居中，不拦截指针） */}
+          {/* 桌面端：走近空间/作品时的「按空格」提示（底部居中，抬高避让传话器） */}
           {nearbyPrompt && !isTouch && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center px-4">
               <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
                 <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
                   空格
@@ -205,6 +214,10 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                 </div>
               )}
             </>
+          )}
+          {/* 主视图底部居中的传话器：语音/文字 + @ 居民，话语落入通知系统。移动端控制层展开时让位。 */}
+          {!(isTouch && !panelOpen) && (
+            <Composer worldId={worldId} userId={userId} characters={characters} />
           )}
           {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
