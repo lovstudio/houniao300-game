@@ -808,7 +808,7 @@ export const PixiGame = (props: {
     });
   }, [humanPlayerId]);
 
-  // Let the bottom Timeline focus the camera on a venue and drop a ping marker.
+  // Let external UI focus the camera on a venue and drop a ping marker.
   useEffect(() => {
     setMapFocusHandler((sourceX, sourceY) => {
       const viewport = viewportRef.current;

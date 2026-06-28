@@ -2,6 +2,8 @@ import { v } from 'convex/values';
 import { query, mutation, action, internalMutation, internalQuery } from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc } from './_generated/dataModel';
+import { chatCompletion } from './util/llm';
+import { newRequestId } from './util/generation';
 
 const kindValidator = v.union(v.literal('venue'), v.literal('work'));
 
@@ -71,16 +73,22 @@ export const attachSource = mutation({
 
 // ---- 内部 mutation：供 action 回写状态/结果 ----
 export const setStatus = internalMutation({
-  args: { key: v.string(), status: kindStatus(), error: v.optional(v.string()) },
-  handler: async (ctx, { key, status, error }) => {
-    await upsert(ctx, key, { status, error: error ?? undefined });
+  args: {
+    key: v.string(),
+    status: kindStatus(),
+    error: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    trace: v.optional(v.string()),
+  },
+  handler: async (ctx, { key, status, error, errorCode, trace }) => {
+    await upsert(ctx, key, { status, error: error ?? undefined, errorCode: errorCode ?? undefined, trace });
   },
 });
 
 export const setResult = internalMutation({
-  args: { key: v.string(), generated: v.string() },
-  handler: async (ctx, { key, generated }) => {
-    await upsert(ctx, key, { status: 'ready', generated, error: undefined });
+  args: { key: v.string(), generated: v.string(), trace: v.optional(v.string()) },
+  handler: async (ctx, { key, generated, trace }) => {
+    await upsert(ctx, key, { status: 'ready', generated, error: undefined, errorCode: undefined, trace });
   },
 });
 
@@ -122,44 +130,46 @@ const WORK_SYSTEM = `你是艺术展陈布展助手。给你一件公共艺术�
 只输出一个 JSON 对象，不要任何解释或 markdown 代码块，结构如下：
 { "caption": "80字以内的作品视觉描述", "materials": ["主要材质/媒介"], "palette": ["主色1", "主色2"], "scale": "体量感（如：人体尺度/巨型/小型）" }`;
 
-async function visionJSON(systemPrompt: string, imageUrl: string, userHint: string): Promise<string> {
-  const url = (process.env.LLM_API_URL ?? process.env.OPENAI_API_BASE ?? '').replace(/\/$/, '');
-  if (!url) throw new Error('未配置 LLM_API_URL');
-  const apiKey = process.env.LLM_API_KEY ?? process.env.OPENAI_API_KEY;
+type VisionTrace = { requestId: string; model: string; durationMs: number; retries: number };
+
+// 复用 llm.ts 的 chatCompletion（含 retryWithBackoff + 结构化日志），不再自己 fetch / 无 retry。
+async function visionJSON(
+  systemPrompt: string,
+  imageUrl: string,
+  userHint: string,
+  requestId: string,
+): Promise<{ generated: string; trace: VisionTrace }> {
   const model = process.env.MATERIALS_VISION_MODEL ?? 'anthropic/claude-sonnet-4.6';
-  const resp = await fetch(url + '/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { Authorization: 'Bearer ' + apiKey } : {}),
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: userHint },
-            { type: 'image_url', image_url: { url: imageUrl } },
-          ],
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.2,
-    }),
+  const { content, retries, ms } = await chatCompletion({
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: userHint },
+          { type: 'image_url', image_url: { url: imageUrl } },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+    temperature: 0.2,
   });
-  if (!resp.ok) {
-    throw new Error(`vision 生成失败 ${resp.status}: ${await resp.text()}`);
-  }
-  const json = (await resp.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = json.choices?.[0]?.message?.content;
   if (!content) throw new Error('vision 返回为空');
-  // 容错：去掉可能的 ```json 包裹
+  // 容错：去掉可能的 ```json 包裹，并校验是 JSON（解析失败 → SyntaxError → 归类 bad_json）。
   const cleaned = content.replace(/```json\s*|\s*```/g, '').trim();
-  // 校验是 JSON
   JSON.parse(cleaned);
-  return cleaned;
+  return { generated: cleaned, trace: { requestId, model, durationMs: ms, retries } };
+}
+
+// 失败归类：errorCode + 截断短消息（明细看日志），避免把整串 error 塞进 DB。
+function classifyError(e: unknown): { errorCode: string; message: string } {
+  const msg = e instanceof Error ? e.message : String(e);
+  let errorCode = 'unknown';
+  if (e instanceof SyntaxError) errorCode = 'bad_json';
+  else if (/code (4\d\d|5\d\d)/.test(msg)) errorCode = 'llm_http';
+  else if (msg.includes('返回为空')) errorCode = 'empty';
+  return { errorCode, message: msg.length > 200 ? msg.slice(0, 199) + '…' : msg };
 }
 
 export const regenerate = action({
@@ -169,16 +179,24 @@ export const regenerate = action({
     if (!doc) return { ok: false, error: '物料记录不存在，请先上传源图' };
     if (!doc.sourceUrl) return { ok: false, error: '尚未上传源图' };
     await ctx.runMutation(internal.materials.setStatus, { key, status: 'generating' });
+    const requestId = newRequestId();
     try {
       const systemPrompt = doc.kind === 'venue' ? VENUE_SYSTEM : WORK_SYSTEM;
       const userHint = `物料：${doc.title}${hint ? `。补充：${hint}` : ''}`;
-      const generated = await visionJSON(systemPrompt, doc.sourceUrl, userHint);
-      await ctx.runMutation(internal.materials.setResult, { key, generated });
+      const { generated, trace } = await visionJSON(systemPrompt, doc.sourceUrl, userHint, requestId);
+      await ctx.runMutation(internal.materials.setResult, { key, generated, trace: JSON.stringify(trace) });
       return { ok: true };
-    } catch (e: any) {
-      const error = e?.message ?? String(e);
-      await ctx.runMutation(internal.materials.setStatus, { key, status: 'error', error });
-      return { ok: false, error };
+    } catch (e) {
+      const { errorCode, message } = classifyError(e);
+      console.error(`[materials] requestId=${requestId} key=${key} errorCode=${errorCode}`, e);
+      await ctx.runMutation(internal.materials.setStatus, {
+        key,
+        status: 'error',
+        error: message,
+        errorCode,
+        trace: JSON.stringify({ requestId }),
+      });
+      return { ok: false, error: message };
     }
   },
 });

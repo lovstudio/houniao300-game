@@ -115,6 +115,23 @@ export function getLLMConfig(): LLMConfig {
   };
 }
 
+// llm.ts 刻意零依赖（EMBEDDING_DIMENSION 在 schema 评估期被引用），故内联一个轻量 requestId，
+// 不从 util/generation.ts 引入（那会把 _generated/server 拉进 schema 评估链路）。
+function llmRequestId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// 只统计提示词字符数（含 vision 多模态里的 text 片段），默认日志不打明文，避免泄露用户 prompt。
+function promptChars(messages: LLMMessage[]): number {
+  let n = 0;
+  for (const m of messages) {
+    if (typeof m.content === 'string') n += m.content.length;
+    else if (Array.isArray(m.content))
+      for (const part of m.content) if (part.type === 'text') n += part.text.length;
+  }
+  return n;
+}
+
 const AuthHeaders = (): Record<string, string> =>
   getLLMConfig().apiKey
     ? {
@@ -147,7 +164,10 @@ export async function chatCompletion(
   body.model = body.model ?? config.chatModel;
   const stopWords = body.stop ? (typeof body.stop === 'string' ? [body.stop] : body.stop) : [];
   if (config.stopWords) stopWords.push(...config.stopWords);
-  console.log(body);
+  // 默认只打结构化元数据（无明文）；明文请求/响应仅在 LLM_DEBUG 开启时打。
+  const requestId = llmRequestId();
+  const debug = !!process.env.LLM_DEBUG;
+  if (debug) console.log(`[llm] requestId=${requestId} body=${JSON.stringify(body)}`);
   const {
     result: content,
     retries,
@@ -164,7 +184,8 @@ export async function chatCompletion(
     });
     if (!result.ok) {
       const error = await result.text();
-      console.error({ error });
+      console.error(`[llm] requestId=${requestId} api error code=${result.status}`);
+      if (debug) console.error(`[llm] requestId=${requestId} error body=${error}`);
       if (result.status === 404 && config.provider === 'ollama') {
         await tryPullOllama(body.model!, error);
       }
@@ -181,10 +202,14 @@ export async function chatCompletion(
       if (content === undefined) {
         throw new Error('Unexpected result from OpenAI: ' + JSON.stringify(json));
       }
-      console.log(content);
       return content;
     }
   });
+
+  console.log(
+    `[llm] requestId=${requestId} model=${body.model} promptChars=${promptChars(body.messages)} durationMs=${ms} retries=${retries}`,
+  );
+  if (debug && typeof content === 'string') console.log(`[llm] requestId=${requestId} response=${content}`);
 
   return {
     content,
@@ -306,10 +331,7 @@ export async function retryWithBackoff<T>(
       const retryError = e as RetryError;
       if (i < RETRY_BACKOFF.length) {
         if (retryError.retry) {
-          console.log(
-            `Attempt ${i + 1} failed, waiting ${RETRY_BACKOFF[i]}ms to retry...`,
-            Date.now(),
-          );
+          console.log(`[llm] retry attempt=${i + 1} backoffMs=${RETRY_BACKOFF[i]}`);
           await new Promise((resolve) =>
             setTimeout(resolve, RETRY_BACKOFF[i] + RETRY_JITTER * Math.random()),
           );
@@ -324,12 +346,18 @@ export async function retryWithBackoff<T>(
 }
 
 // Lifted from openai's package
+// Vision/多模态消息片段（OpenAI 兼容）：文字 + 图片 URL。
+export type LLMContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 export interface LLMMessage {
   /**
    * The contents of the message. `content` is required for all messages, and may be
-   * null for assistant messages with function calls.
+   * null for assistant messages with function calls. May be an array of parts for
+   * vision/multimodal requests (text + image_url).
    */
-  content: string | null;
+  content: string | null | LLMContentPart[];
 
   /**
    * The role of the messages author. One of `system`, `user`, `assistant`, or
