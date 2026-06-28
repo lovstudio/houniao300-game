@@ -35,15 +35,13 @@ import { toast } from 'react-toastify';
 import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior';
 import MaterialControls from './MaterialControls';
 
-type Tab = 'state' | 'chat' | 'spaces' | 'works' | 'schedule' | 'notify';
+type Tab = 'state' | 'spaces' | 'works' | 'schedule';
 
 const TABS: { id: Tab; label: string; short: string }[] = [
   { id: 'state', label: '状态', short: '状' },
-  { id: 'chat', label: '广播', short: '广' },
   { id: 'spaces', label: '空间', short: '空' },
   { id: 'works', label: '作品', short: '作' },
   { id: 'schedule', label: '活动', short: '动' },
-  { id: 'notify', label: '通知', short: '讯' },
 ];
 
 // DB 作品行（含解析后的实拍图 URL）。
@@ -67,18 +65,6 @@ const TODAY_DAY = (() => {
   return n.getMonth() === 5 ? String(n.getDate()) : '';
 })();
 
-function authorHue(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
-  return h;
-}
-function timeAgo(t: number) {
-  const s = Math.max(0, (Date.now() - t) / 1000);
-  if (s < 60) return '刚刚';
-  if (s < 3600) return `${Math.floor(s / 60)}分钟前`;
-  if (s < 86400) return `${Math.floor(s / 3600)}小时前`;
-  return `${Math.floor(s / 86400)}天前`;
-}
 
 export default function SidebarTabs({
   worldId,
@@ -156,8 +142,6 @@ export default function SidebarTabs({
               }
             >
               {t.short}
-              {t.id === 'chat' && <ChatDot worldId={worldId} />}
-              {t.id === 'notify' && <NotifyDot userId={userId} />}
             </button>
           );
         })}
@@ -182,12 +166,6 @@ export default function SidebarTabs({
             setSelectedElement={setSelectedElement}
           />
         )}
-        {tab === 'chat' && (
-          <GlobalChat
-            worldId={worldId}
-            onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
-          />
-        )}
         {tab === 'spaces' && (
           <SpacesTab
             onViewVenueSchedule={(venue) => {
@@ -200,75 +178,6 @@ export default function SidebarTabs({
         {tab === 'works' && (
           <WorksTab worldId={worldId} userId={userId} installationFocus={installationFocus} />
         )}
-        {tab === 'notify' && <NotifyTab userId={userId} />}
-      </div>
-    </div>
-  );
-}
-
-function ChatDot({ worldId }: { worldId: Id<'worlds'> }) {
-  const msgs = useQuery(api.messages.listRecentMessages, { worldId, limit: 1 });
-  const fresh = msgs?.[0] && Date.now() - msgs[0].t < 60_000;
-  if (!fresh) return null;
-  return (
-    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-[#c0654a]" />
-  );
-}
-
-function GlobalChat({
-  worldId,
-  onSelectAgent,
-}: {
-  worldId: Id<'worlds'>;
-  onSelectAgent: (id: GameId<'players'>) => void;
-}) {
-  const msgs = useQuery(api.messages.listRecentMessages, { worldId, limit: 80 });
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs?.length]);
-
-  if (!msgs) return <Centered>正在接入对话流…</Centered>;
-  if (!msgs.length)
-    return <Centered>沙城刚刚醒来，居民们还没开口。稍候片刻，或上前搭话。</Centered>;
-
-  return (
-    <div className="flex h-full flex-col">
-      <p className="shrink-0 px-4 pb-2 pt-4 text-xs text-[#6b5238]">
-        全城广播 · 记录每位 AI 居民的公开发言（最近 {msgs.length} 条）
-      </p>
-      <div ref={ref} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
-        {msgs.map((m) => {
-          const hue = authorHue(m.author);
-          return (
-            <div key={m.id} className="flex gap-2.5">
-              <button
-                onClick={() => onSelectAgent(m.author as GameId<'players'>)}
-                className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white transition hover:ring-2 hover:ring-white/40"
-                style={{ background: `hsl(${hue} 45% 42%)` }}
-                title={`查看 ${m.authorName}`}
-              >
-                {m.authorName.slice(0, 1)}
-              </button>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <button
-                    onClick={() => onSelectAgent(m.author as GameId<'players'>)}
-                    className="truncate text-sm font-semibold text-[#2a1c14] hover:underline"
-                    style={{ color: `hsl(${hue} 60% 36%)` }}
-                  >
-                    {m.authorName}
-                  </button>
-                  <span className="shrink-0 text-[10px] text-[#9c7e5e]">{timeAgo(m.t)}</span>
-                </div>
-                <div className="mt-0.5 break-words rounded-lg rounded-tl-sm bg-[#e3d2ad] px-2.5 py-1.5 text-sm leading-snug text-[#2a1c14]">
-                  {m.text}
-                </div>
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -980,53 +889,6 @@ function CreateArtworkForm({
         >
           {saving ? '创建中…' : '创建并摆放'}
         </button>
-      </div>
-    </div>
-  );
-}
-
-function NotifyDot({ userId }: { userId: string }) {
-  const count = useQuery(api.notifications.unreadCount, { userId }) ?? 0;
-  if (!count) return null;
-  return (
-    <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-clay-600 px-0.5 text-[9px] font-bold text-white">
-      {count > 9 ? '9+' : count}
-    </span>
-  );
-}
-
-function NotifyTab({ userId }: { userId: string }) {
-  const list = useQuery(api.notifications.listMine, { userId });
-  const markAllRead = useMutation(api.notifications.markAllRead);
-
-  useEffect(() => {
-    if (list && list.some((n) => !n.read)) {
-      void markAllRead({ userId });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list?.length]);
-
-  if (!list) return <Centered>正在载入通知…</Centered>;
-  if (!list.length)
-    return <Centered>还没有通知。申领或创建作品后，别人来看你的作品会在这里提醒你。</Centered>;
-
-  return (
-    <div className="h-full overflow-y-auto px-3 py-3">
-      <div className="space-y-1.5">
-        {list.map((n) => (
-          <div
-            key={n._id}
-            className={
-              'rounded border px-3 py-2 text-sm ' +
-              (n.read
-                ? 'border-[#cbb287] bg-[#efe1c2] text-[#6b5238]'
-                : 'border-clay-600/50 bg-[#f3ead8] text-[#2a1c14]')
-            }
-          >
-            <div className="leading-snug">{n.text}</div>
-            <div className="mt-1 text-[11px] text-[#9c7e5e]">{timeAgo(n.createdAt)}</div>
-          </div>
-        ))}
       </div>
     </div>
   );

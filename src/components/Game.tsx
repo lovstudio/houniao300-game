@@ -10,6 +10,7 @@ import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import SettingsMenu from './SettingsMenu';
 import SidebarTabs from './SidebarTabs.tsx';
+import BroadcastHud from './BroadcastHud.tsx';
 import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
 import SignalHud from './SignalHud.tsx';
 import { api } from '../../convex/_generated/api';
@@ -119,6 +120,11 @@ export default function Game({
           ref={gameWrapperRef}
         >
           <SignalHud />
+          <BroadcastHud
+            worldId={worldId}
+            userId={userId}
+            onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
+          />
           {calibrating && <CalibrationPanel />}
           <div className="absolute inset-0">
             <Stage width={width} height={height} options={{ backgroundColor: 0x181425 }}>
@@ -165,7 +171,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
             <button
               className="sand-handle md:hidden"
               onClick={() => setPanelOpen(true)}
-              title="展开沙城手卷（状态 / 广播 / 节目单 / 作品 / 设置）"
+              title="展开沙城手卷（状态 / 空间 / 作品 / 活动 / 设置）"
               aria-label="展开沙城手卷"
             >
               <span className="seal">卷</span>
