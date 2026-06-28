@@ -488,7 +488,7 @@ function WorksTab({
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b border-[#cbb287] px-3 py-3">
         <div className="flex items-baseline gap-2">
-          <h3 className="font-display text-xl leading-none text-[#2a1c14]">作品点位</h3>
+          <h3 className="font-display text-xl leading-none text-[#2a1c14]">作品集</h3>
           <span className="text-xs text-[#9c7e5e]">{artworks?.length ?? 0} 件</span>
           {canCreate && (
             <button
@@ -547,7 +547,7 @@ function WorksTab({
             ))}
           </div>
         ) : (
-          <Centered>没有匹配的作品点位。</Centered>
+          <Centered>没有匹配的作品集。</Centered>
         )}
       </div>
     </div>
