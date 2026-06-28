@@ -4,7 +4,7 @@ import PixiGame from './PixiGame.tsx';
 import Joystick from './Joystick.tsx';
 import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
-import { selectInstallationOnMap } from '../lib/mapFocus.ts';
+import { type NearbyTarget, actOnNearbyTarget } from '../lib/nearby.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
 import type { VenueInteriorMap } from '../../data/birdRestaurantInterior.ts';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -27,10 +27,43 @@ import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 
 export type ControlMode = 'player' | 'camera';
 
-// 玩家走近一个「空间」入口或一件「作品」时，提示其可按空格查看详情/进入。
-export type NearbyPrompt =
-  | { kind: 'venue'; interiorId: string; label: string }
-  | { kind: 'installation'; id: string; label: string };
+// 附近目标列表（按距离排序）：空格=第一项，数字键 1-4=第 N 项，点击=任意项。
+function NearbyList({
+  targets,
+  touch,
+  onPick,
+}: {
+  targets: NearbyTarget[];
+  touch: boolean;
+  onPick: (t: NearbyTarget) => void;
+}) {
+  return (
+    <div className="absolute inset-x-0 bottom-24 z-40 flex flex-col items-center gap-1.5 px-4">
+      {targets.map((t, i) => (
+        <button
+          key={t.key}
+          onClick={() => onPick(t)}
+          aria-label={`${t.kind === 'venue' || t.ready ? '进入' : '查看'}${t.label}`}
+          className={clsx(
+            'pointer-events-auto flex items-center gap-2 rounded-full border px-4 py-2 text-sm shadow-xl transition active:scale-95',
+            i === 0
+              ? 'border-white/40 bg-[#cc785c] text-white'
+              : 'border-white/15 bg-brown-900/90 text-brown-100',
+          )}
+        >
+          {!touch && (
+            <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
+              {i === 0 ? '空格' : String(i + 1)}
+            </kbd>
+          )}
+          <span className="max-w-[12rem] truncate">
+            {t.kind === 'venue' || t.ready ? '进入' : '查看'}「{t.label}」
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function Game({
   userId,
@@ -85,15 +118,13 @@ export default function Game({
   const [panelOpen, setPanelOpen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 1024,
   );
-  // 玩家走近空间入口或作品时的「按空格查看详情」提示。
-  const [nearbyPrompt, setNearbyPrompt] = useState<NearbyPrompt | null>(null);
-  // 触屏设备：显示虚拟摇杆，并把「按空格」提示变为可点按钮（手机无空格键）。
+  // 玩家走近时的附近目标列表（按距离排序，封顶 4）。
+  const [nearbyTargets, setNearbyTargets] = useState<NearbyTarget[]>([]);
+  // 触屏设备：显示虚拟摇杆，并把附近列表变为可点（手机无键盘）。
   const isTouch = useMediaQuery('(pointer: coarse)');
 
-  const triggerNearby = (prompt: NearbyPrompt) => {
-    if (prompt.kind === 'venue') onEnterVenueInterior?.(prompt.interiorId);
-    else selectInstallationOnMap(prompt.id);
-  };
+  const triggerNearby = (t: NearbyTarget) =>
+    actOnNearbyTarget(t, (id) => onEnterVenueInterior?.(id));
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -117,9 +148,12 @@ export default function Game({
   // 作品（DB 唯一真相源）：地图标记与侧栏列表共用同一数据。
   const artworks = useQuery(api.artworks.list, worldId ? { worldId } : 'skip');
   const markers: MapMarker[] | undefined = useMemo(
-    () => artworks?.map((a) => ({ id: a.slug, x: a.x, y: a.y, kind: a.kind })),
+    () => artworks?.map((a) => ({ id: a.slug, x: a.x, y: a.y, kind: a.kind, label: a.title })),
     [artworks],
   );
+  // 内景已就绪的物料 key（判断走近的作品能否直接进入）。
+  const readyKeys = useQuery(api.materials.readyKeys, {});
+  const readyInteriorKeys = useMemo(() => readyKeys ?? [], [readyKeys]);
 
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
@@ -189,55 +223,24 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                   showCollisionOverlay={showCollisionOverlay}
                   historicalTime={historicalTime}
                   setSelectedElement={setSelectedElement}
-                  setNearbyPrompt={setNearbyPrompt}
+                  setNearbyTargets={setNearbyTargets}
                   markers={markers}
+                  readyInteriorKeys={readyInteriorKeys}
                 />
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 桌面端：走近空间/作品时的「按空格」提示（底部居中，抬高避让传话器） */}
-          {nearbyPrompt && !isTouch && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center px-4">
-              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
-                <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
-                  空格
-                </kbd>
-                <span>
-                  {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}「{nearbyPrompt.label}」
-                </span>
-              </div>
-            </div>
+          {/* 桌面端：走近的附近目标列表（空格=最近，数字键 1-4=第 N 项，点击=任意项） */}
+          {!isTouch && nearbyTargets.length > 0 && (
+            <NearbyList targets={nearbyTargets} touch={false} onPick={triggerNearby} />
           )}
 
-          {/* 移动端控制层：左下摇杆移动 + 右下动作键交互（经典双拇指布局）。面板展开时隐藏。 */}
+          {/* 移动端控制层：左下摇杆移动 + 附近目标可点列表（面板展开时隐藏） */}
           {isTouch && !panelOpen && (
             <>
               {controlMode === 'player' && <Joystick />}
-              {nearbyPrompt && (
-                <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom,0px)+2.25rem)] right-[calc(env(safe-area-inset-right,0px)+1.5rem)] z-40 flex flex-col items-center gap-1.5">
-                  <button
-                    onClick={() => triggerNearby(nearbyPrompt)}
-                    aria-label={`${nearbyPrompt.kind === 'venue' ? '进入' : '查看'}${nearbyPrompt.label}`}
-                    className="pointer-events-auto relative grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full border-2 border-white/60 bg-[#cc785c] text-white shadow-xl transition-transform active:scale-90"
-                  >
-                    <span className="absolute inset-0 animate-ping rounded-full bg-[#cc785c]/40" />
-                    {nearbyPrompt.kind === 'venue' ? (
-                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                        <polyline points="10 17 15 12 10 7" />
-                        <line x1="15" y1="12" x2="3" y2="12" />
-                      </svg>
-                    ) : (
-                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
-                  </button>
-                  <span className="max-w-[6rem] truncate rounded-full bg-brown-900/85 px-2.5 py-0.5 text-center text-xs text-brown-100 shadow">
-                    {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}·{nearbyPrompt.label}
-                  </span>
-                </div>
+              {nearbyTargets.length > 0 && (
+                <NearbyList targets={nearbyTargets} touch onPick={triggerNearby} />
               )}
             </>
           )}

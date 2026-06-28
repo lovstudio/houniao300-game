@@ -18,9 +18,7 @@ import {
   setMapFocusTileHandler,
   isMapTapCaptureActive,
   captureMapTap,
-  selectInstallationOnMap,
 } from '../lib/mapFocus.ts';
-import { INSTALLATIONS } from '../../data/installations.ts';
 import {
   sandCityGeometryControlsCollision,
   tilePositionBlockedBySolidGeometry,
@@ -29,7 +27,8 @@ import {
   VENUE_INTERIOR_MAPS,
   type VenueInteriorMap,
 } from '../../data/birdRestaurantInterior.ts';
-import type { ControlMode, NearbyPrompt } from './Game.tsx';
+import type { ControlMode } from './Game.tsx';
+import { type NearbyTarget, actOnNearbyTarget } from '../lib/nearby.ts';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
@@ -222,8 +221,10 @@ export const PixiGame = (props: {
   onEnterVenueInterior?: (interiorId: string) => void;
   showCollisionOverlay: boolean;
   setSelectedElement: SelectElement;
-  setNearbyPrompt: (prompt: NearbyPrompt | null) => void;
+  setNearbyTargets: (targets: NearbyTarget[]) => void;
   markers?: MapMarker[];
+  // 内景已就绪的物料 key 集合（用于判断走近的作品能否直接进入）。
+  readyInteriorKeys?: string[];
   // 当前处于某内场世界时传入其布局数据；为空表示在外部小镇。
   interior?: VenueInteriorMap;
 }) => {
@@ -257,8 +258,8 @@ export const PixiGame = (props: {
   // 撞墙 bump 动画状态：方向 + 起始时间（performance.now() 域，与 rAF 一致）。
   const wallBumpRef = useRef<{ dx: number; dy: number; start: number } | null>(null);
   const latestGameStateRef = useRef<RuntimeGameState>();
-  // 当前可按空格交互的最近目标（空间入口或作品），供键盘处理读取。
-  const nearbyTargetRef = useRef<NearbyPrompt | null>(null);
+  // 当前可交互的附近目标列表（按距离排序），供键盘（空格=第一项，数字=第 N 项）读取。
+  const nearbyListRef = useRef<NearbyTarget[]>([]);
   const nearbyKeyRef = useRef<string | null>(null);
   // 让 keydown 一次性监听器始终拿到最新的进入回调（props 每次渲染都会变）。
   const onEnterVenueInteriorRef = useRef(props.onEnterVenueInterior);
@@ -361,60 +362,79 @@ export const PixiGame = (props: {
     worldWidthPx,
   };
 
-  // 走近一个「空间」入口或一件「作品」时，发布提示让玩家可按空格查看详情/进入。
-  // 取最近的单个目标，避免同时弹多个提示。
+  // 走近空间入口 / 作品·建筑时，收集半径内的所有目标（按距离排序、封顶 4 个），
+  // 让玩家可按空格（最近一项）或数字键 1-4（第 N 项）或点击列表项进入/查看，妥善处理多目标重叠。
   useEffect(() => {
-    const publish = (next: NearbyPrompt | null) => {
-      const key = next ? `${next.kind}:${next.kind === 'venue' ? next.interiorId : next.id}` : null;
+    const publish = (next: NearbyTarget[]) => {
+      const key = next.map((t) => t.key).join('|') || null;
       if (key === nearbyKeyRef.current) return;
       nearbyKeyRef.current = key;
-      nearbyTargetRef.current = next;
-      props.setNearbyPrompt(next);
+      nearbyListRef.current = next;
+      props.setNearbyTargets(next);
     };
 
     // 已在内场世界里：不做「走近入口/作品」检测（坐标系不同，且不支持内场套内场）。
     if (props.interior) {
-      publish(null);
+      publish([]);
       return;
     }
-
     if (!humanPlayerId) {
-      publish(null);
+      publish([]);
       return;
     }
     const humanPlayer = props.game.world.players.get(humanPlayerId);
     if (!humanPlayer) {
-      publish(null);
+      publish([]);
       return;
     }
 
     const { width: mapWidth, height: mapHeight } = props.game.worldMap;
     const location = optimisticHumanLocation ?? playerLocation(humanPlayer);
-    let nearest: NearbyPrompt | null = null;
-    let nearestDistance = Infinity;
+    const ready = new Set(props.readyInteriorKeys ?? []);
+    const found: { distance: number; target: NearbyTarget }[] = [];
 
     for (const interior of VENUE_INTERIOR_MAPS) {
       const [sourceX, sourceY] = interior.entrance.exteriorSource;
       const entryX = (sourceX / MAP_SOURCE_WIDTH) * mapWidth;
       const entryY = (sourceY / MAP_SOURCE_HEIGHT) * mapHeight;
       const distance = Math.hypot(location.x - entryX, location.y - entryY);
-      if (distance <= interior.entrance.radiusTiles && distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = { kind: 'venue', interiorId: interior.id, label: interior.venue };
+      if (distance <= interior.entrance.radiusTiles) {
+        found.push({
+          distance,
+          target: {
+            key: `venue:${interior.id}`,
+            kind: 'venue',
+            id: interior.id,
+            label: interior.venue,
+            interiorId: interior.id,
+            ready: true,
+          },
+        });
       }
     }
 
-    for (const installation of INSTALLATIONS) {
-      const tileX = (installation.x / MAP_SOURCE_WIDTH) * mapWidth;
-      const tileY = (installation.y / MAP_SOURCE_HEIGHT) * mapHeight;
+    for (const marker of props.markers ?? []) {
+      const tileX = (marker.x / MAP_SOURCE_WIDTH) * mapWidth;
+      const tileY = (marker.y / MAP_SOURCE_HEIGHT) * mapHeight;
       const distance = Math.hypot(location.x - tileX, location.y - tileY);
-      if (distance <= INSTALLATION_PROMPT_RADIUS_TILES && distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = { kind: 'installation', id: installation.id, label: installation.title };
+      if (distance <= INSTALLATION_PROMPT_RADIUS_TILES) {
+        const interiorId = `work:${marker.id}`;
+        found.push({
+          distance,
+          target: {
+            key: interiorId,
+            kind: 'work',
+            id: marker.id,
+            label: marker.label ?? marker.id,
+            interiorId,
+            ready: ready.has(interiorId),
+          },
+        });
       }
     }
 
-    publish(nearest);
+    found.sort((a, b) => a.distance - b.distance);
+    publish(found.slice(0, 4).map((f) => f.target));
   }, [
     humanPlayerId,
     optimisticHumanLocation,
@@ -422,13 +442,15 @@ export const PixiGame = (props: {
     props.game.worldMap.height,
     props.game.worldMap.width,
     props.interior,
-    props.setNearbyPrompt,
+    props.markers,
+    props.readyInteriorKeys,
+    props.setNearbyTargets,
   ]);
 
   // 卸载时清除提示。
   useEffect(() => {
-    return () => props.setNearbyPrompt(null);
-  }, [props.setNearbyPrompt]);
+    return () => props.setNearbyTargets([]);
+  }, [props.setNearbyTargets]);
 
   useEffect(() => {
     const currentState = () => latestGameStateRef.current;
@@ -771,14 +793,21 @@ export const PixiGame = (props: {
       }
 
       if (key === ' ' || event.code === 'Space') {
-        const target = nearbyTargetRef.current;
-        if (target) {
+        const list = nearbyListRef.current;
+        if (list.length) {
           event.preventDefault();
-          if (target.kind === 'venue') {
-            onEnterVenueInteriorRef.current?.(target.interiorId);
-          } else {
-            selectInstallationOnMap(target.id);
-          }
+          actOnNearbyTarget(list[0], (id) => onEnterVenueInteriorRef.current?.(id));
+        }
+        return;
+      }
+
+      // 数字键 1-4：直接选附近列表的第 N 项（多目标重叠时无需挪位即可精确挑选）。
+      if (/^[1-4]$/.test(key)) {
+        const list = nearbyListRef.current;
+        const idx = Number(key) - 1;
+        if (idx < list.length) {
+          event.preventDefault();
+          actOnNearbyTarget(list[idx], (id) => onEnterVenueInteriorRef.current?.(id));
         }
         return;
       }

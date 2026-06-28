@@ -26,6 +26,15 @@ export const list = query({
   },
 });
 
+// 轻量查询：所有「内景已就绪」的物料 key（供地图走近探测判断作品是否可进入）。
+export const readyKeys = query({
+  args: {},
+  handler: async (ctx): Promise<string[]> => {
+    const docs = await ctx.db.query('materials').collect();
+    return docs.filter((d) => d.status === 'ready').map((d) => d.key);
+  },
+});
+
 // ---- 浏览器直传：拿一个一次性上传 URL ----
 export const generateUploadUrl = mutation({
   args: {},
