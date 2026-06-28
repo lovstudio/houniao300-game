@@ -141,7 +141,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           {/* 走近空间/作品时的交互提示（不拦截指针） */}
           {nearbyPrompt && (
             <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
-              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/85 px-4 py-2 text-sm text-brown-100 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
                 <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
                   空格
                 </kbd>
