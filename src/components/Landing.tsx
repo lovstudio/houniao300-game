@@ -137,23 +137,27 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             }}
           />
 
-          {/* 呼吸式 CTA：单行「开启旅程」，居视觉中心 */}
-          <button
-            type="button"
-            onClick={start}
-            className="landing-cta splash-fade mt-[clamp(14px,3vh,30px)] w-fit"
-            style={{
-              fontFamily: serif,
-              fontWeight: 500,
-              fontSize: 'clamp(16px,2vw,19px)',
-              letterSpacing: '0.5em',
-              textIndent: '0.5em',
-              color: INK,
-              animationDelay: '2.6s',
-            }}
+          {/* CTA：单行「开启旅程」描边按钮，居视觉中心 */}
+          <div
+            className="splash-fade mt-[clamp(14px,3vh,30px)]"
+            style={{ animationDelay: '2.6s' }}
           >
-            开 启 旅 程
-          </button>
+            <button
+              type="button"
+              onClick={start}
+              className="landing-enter w-fit"
+              style={{
+                fontFamily: serif,
+                fontWeight: 500,
+                fontSize: 'clamp(16px,2vw,19px)',
+                letterSpacing: '0.5em',
+                textIndent: '0.5em',
+                color: INK,
+              }}
+            >
+              开 启 旅 程
+            </button>
+          </div>
 
           {/* 题词 footer：底部居中，沙中逐行缓现缓隐 */}
           <div
