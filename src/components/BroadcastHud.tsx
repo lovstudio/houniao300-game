@@ -53,21 +53,24 @@ export default function BroadcastHud({
       items.push({ kind: 'broadcast', id: m.id, t: m.t, author: m.author, authorName: m.authorName, text: m.text });
     for (const n of notes ?? [])
       items.push({ kind: 'notify', id: n._id, t: n.createdAt, text: n.text, read: n.read });
-    items.sort((a, b) => b.t - a.t);
+    items.sort((a, b) => a.t - b.t); // 正序：旧→新
     return items;
   }, [msgs, notes]);
 
-  // 展开后滚到顶部（最新）。
+  // 展开后滚到底部（最新）。
   useEffect(() => {
-    if (expanded && scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [expanded]);
+    if (expanded && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [expanded, feed.length]);
 
-  const preview = feed.slice(0, 3);
+  const preview = feed.slice(-1); // 折叠态显示最新一条
 
   return (
     <div className="pointer-events-auto absolute right-2 top-2 z-30 w-60 select-none text-brown-200 sm:w-72">
-      <div className="overflow-hidden rounded-md border border-brown-700/70 bg-brown-900/85 shadow-lg backdrop-blur-sm">
-        {/* 头部：标题 + 未读红点 + 展开/收起 */}
+      <div
+        className="overflow-hidden rounded-md border border-brown-700 shadow-xl"
+        style={{ background: 'rgba(28,20,18,0.96)' }}
+      >
+        {/* 折叠态：标题与最新一条合并为一行；展开态：仅标题 */}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -75,28 +78,24 @@ export default function BroadcastHud({
           title="广播 · 通知"
         >
           <BellIcon />
-          <span className="text-[11px] font-semibold tracking-wide leading-none">动态</span>
+          {expanded ? (
+            <span className="text-[11px] font-semibold leading-none tracking-wide">通知系统</span>
+          ) : (
+            <span className="min-w-0 flex-1">
+              {preview.length ? (
+                <PreviewLine it={preview[0]} />
+              ) : (
+                <span className="text-[11px] leading-snug text-brown-200/50">暂无动态</span>
+              )}
+            </span>
+          )}
           {unread > 0 && (
-            <span className="grid h-3.5 min-w-3.5 place-items-center rounded-full bg-clay-600 px-0.5 text-[9px] font-bold leading-none text-white">
+            <span className="grid h-3.5 min-w-3.5 shrink-0 place-items-center rounded-full bg-clay-600 px-0.5 text-[9px] font-bold leading-none text-white">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
-          <ChevronIcon className="ml-auto" expanded={expanded} />
+          <ChevronIcon className={clsx('shrink-0', expanded && 'ml-auto')} expanded={expanded} />
         </button>
-
-        {!expanded && (
-          <div className="border-t border-brown-700/50 px-2.5 py-1.5">
-            {preview.length ? (
-              <div className="space-y-1">
-                {preview.map((it) => (
-                  <PreviewLine key={it.kind + it.id} it={it} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] leading-snug text-brown-200/50">沙城刚刚醒来，还没有动态。</p>
-            )}
-          </div>
-        )}
 
         {expanded && (
           <div

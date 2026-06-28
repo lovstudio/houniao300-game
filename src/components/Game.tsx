@@ -14,7 +14,6 @@ import SettingsMenu from './SettingsMenu';
 import SidebarTabs from './SidebarTabs.tsx';
 import BroadcastHud from './BroadcastHud.tsx';
 import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
-import SignalHud from './SignalHud.tsx';
 import { api } from '../../convex/_generated/api';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
 import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
@@ -128,7 +127,6 @@ export default function Game({
           className="absolute inset-0 overflow-hidden bg-brown-900 md:relative md:inset-auto md:min-h-0 md:min-w-0"
           ref={gameWrapperRef}
         >
-          <SignalHud />
           <BroadcastHud
             worldId={worldId}
             userId={userId}
