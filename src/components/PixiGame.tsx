@@ -48,6 +48,9 @@ const SERVER_SNAP_DISTANCE_TILES = 1.5;
 const SERVER_SETTLE_DISTANCE_TILES = 0.1;
 const SERVER_SETTLE_LERP = 0.08;
 const SERVER_CATCHUP_GRACE_MS = 2500;
+// 撞墙反馈：朝被挡方向顶出一小段再弹回（单峰正弦），让「往墙里走」有触觉反馈。
+const WALL_BUMP_DURATION_MS = 180;
+const WALL_BUMP_AMPLITUDE_TILES = 0.16;
 const MOVEMENT_KEYS = new Set([
   'arrowleft',
   'arrowright',
@@ -246,6 +249,8 @@ export const PixiGame = (props: {
   const optimisticFrameRef = useRef<number>();
   const lastOptimisticFrameAtRef = useRef<number>();
   const lastSentDestinationRef = useRef<SentDestination | null>(null);
+  // 撞墙 bump 动画状态：方向 + 起始时间（performance.now() 域，与 rAF 一致）。
+  const wallBumpRef = useRef<{ dx: number; dy: number; start: number } | null>(null);
   const latestGameStateRef = useRef<RuntimeGameState>();
   // 当前可按空格交互的最近目标（空间入口或作品），供键盘处理读取。
   const nearbyTargetRef = useRef<NearbyPrompt | null>(null);
@@ -515,6 +520,11 @@ export const PixiGame = (props: {
         return;
       }
       if (isDestinationBlocked(destination)) {
+        // 撞墙：不发移动，改成朝墙顶一下的 bump 反馈。上一段 bump 没放完就不打断，
+        // 保证按住墙时呈节奏性轻顶而非乱抖。
+        if (!wallBumpRef.current) {
+          wallBumpRef.current = { dx, dy, start: performance.now() };
+        }
         return;
       }
 
@@ -608,7 +618,9 @@ export const PixiGame = (props: {
         if (
           optimisticLocationRef.current === undefined &&
           optimisticPathRef.current.length === 0 &&
-          !lastSentDestinationRef.current
+          !lastSentDestinationRef.current &&
+          // bump 进行中要继续出帧（基于 serverLocation 叠加偏移），否则站桩撞墙没有反馈。
+          !wallBumpRef.current
         ) {
           publishOptimisticLocation(undefined);
           lastOptimisticFrameAtRef.current = performanceNow;
@@ -648,6 +660,26 @@ export const PixiGame = (props: {
         } else {
           // 稳定态跟随服务器位置, 连同其速度一起 (此前硬写 0 导致点击移动不播放走路动画)。
           nextLocation = serverLocation;
+        }
+      }
+
+      // 撞墙 bump：在最终位置上叠加一个朝墙方向的单峰正弦偏移（顶出再弹回），
+      // 并把朝向转向墙，给玩家「撞上了」的触觉反馈。
+      const bump = wallBumpRef.current;
+      if (bump) {
+        const bumpElapsed = performanceNow - bump.start;
+        if (bumpElapsed >= WALL_BUMP_DURATION_MS) {
+          wallBumpRef.current = null;
+        } else {
+          const offset =
+            Math.sin((bumpElapsed / WALL_BUMP_DURATION_MS) * Math.PI) * WALL_BUMP_AMPLITUDE_TILES;
+          nextLocation = {
+            ...nextLocation,
+            x: nextLocation.x + bump.dx * offset,
+            y: nextLocation.y + bump.dy * offset,
+            dx: bump.dx,
+            dy: bump.dy,
+          };
         }
       }
 
@@ -848,6 +880,7 @@ export const PixiGame = (props: {
       keysDownRef.current.clear();
       optimisticPathRef.current = [];
       lastSentDestinationRef.current = null;
+      wallBumpRef.current = null;
     };
   }, [convex]);
 
