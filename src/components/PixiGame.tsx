@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 import { useApp } from '@pixi/react';
 import { Player, SelectElement } from './Player.tsx';
 import { useEffect, useRef, useState } from 'react';
-import { PixiStaticMap } from './PixiStaticMap.tsx';
+import { PixiStaticMap, type MapMarker } from './PixiStaticMap.tsx';
 import PixiViewport, { viewportMinScale } from './PixiViewport.tsx';
 import { Viewport } from 'pixi-viewport';
 import { Id } from '../../convex/_generated/dataModel';
@@ -214,6 +214,7 @@ export const PixiGame = (props: {
   showCollisionOverlay: boolean;
   setSelectedElement: SelectElement;
   setNearbyPrompt: (prompt: NearbyPrompt | null) => void;
+  markers?: MapMarker[];
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -873,7 +874,9 @@ export const PixiGame = (props: {
       viewportRef={viewportRef}
     >
       <PixiStaticMap
+        key={`map-${props.markers?.length ?? 0}`}
         map={props.game.worldMap}
+        markers={props.markers}
         onpointerup={onMapPointerUp}
         onpointerdown={onMapPointerDown}
       />

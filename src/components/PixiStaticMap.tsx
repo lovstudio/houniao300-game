@@ -123,17 +123,24 @@ const INSTALLATION_COLORS: Record<string, number> = {
   K: 0x34a069,
 };
 
-function addInstallationMarker(
-  container: PIXI.Container,
-  project: Projector,
-  installation: Installation,
-) {
-  const accent = INSTALLATION_COLORS[installation.id.slice(0, 1)] ?? 0x1da76e;
+// 地图标记的最小数据形（兼容静态 Installation 与 DB artwork）。
+export type MapMarker = { id: string; x: number; y: number; kind?: 'view' | 'space' };
+
+function addInstallationMarker(container: PIXI.Container, project: Projector, installation: MapMarker) {
+  const accent = INSTALLATION_COLORS[installation.id.slice(0, 1)] ?? 0xcc785c;
   const wrapper = new PIXI.Container();
   wrapper.x = project.x(installation.x);
   wrapper.y = project.y(installation.y);
   wrapper.eventMode = 'static';
   wrapper.cursor = 'pointer';
+
+  // 可进入的「空间」额外画一圈外环，与「仅观看」作品区分。
+  if (installation.kind === 'space') {
+    const ring = new PIXI.Graphics();
+    ring.lineStyle(1.5 * project.scale, accent, 0.85);
+    ring.drawCircle(0, 0, 9 * project.scale);
+    wrapper.addChild(ring);
+  }
 
   const dot = new PIXI.Graphics();
   dot.lineStyle(1.5 * project.scale, 0xffffff, 0.95);
@@ -188,9 +195,9 @@ function addInstallationMarker(
   container.addChild(wrapper);
 }
 
-function addInstallationMarkers(container: PIXI.Container, project: Projector) {
-  for (const installation of INSTALLATIONS) {
-    addInstallationMarker(container, project, installation);
+function addInstallationMarkers(container: PIXI.Container, project: Projector, markers: MapMarker[]) {
+  for (const marker of markers) {
+    addInstallationMarker(container, project, marker);
   }
 }
 
@@ -895,6 +902,7 @@ function drawSandCityPlan(
   project: Projector,
   worldWidth: number,
   worldHeight: number,
+  markers: MapMarker[],
 ) {
   const terrain = new PIXI.Graphics();
   terrain.beginFill(0xd8c194);
@@ -1145,16 +1153,17 @@ function drawSandCityPlan(
   addVenueHotspot(container, project, '艺术作品展区', 1415, 295, 125, 190);
   addVenueHotspot(container, project, '300.梯威', 1438, 800, 120, 240);
 
-  addInstallationMarkers(container, project);
+  addInstallationMarkers(container, project, markers);
 }
 
 export function drawSandCityModel(
   container: PIXI.Container,
   worldWidth: number,
   worldHeight: number,
+  markers: MapMarker[],
 ) {
   const project = createProjector(worldWidth, worldHeight);
-  drawSandCityPlan(container, project, worldWidth, worldHeight);
+  drawSandCityPlan(container, project, worldWidth, worldHeight, markers);
 
   const clip = new PIXI.Graphics();
   clip.beginFill(0xffffff);
@@ -1165,15 +1174,18 @@ export function drawSandCityModel(
 }
 
 export const PixiStaticMap = PixiComponent('StaticMap', {
-  create: (props: { map: WorldMap; [k: string]: any }) => {
+  create: (props: { map: WorldMap; markers?: MapMarker[]; [k: string]: any }) => {
     const map = props.map;
     const screenxtiles = map.bgTiles[0].length;
     const screenytiles = map.bgTiles[0][0].length;
     const worldWidth = screenxtiles * TILE;
     const worldHeight = screenytiles * TILE;
 
+    // 优先用 DB 传入的作品标记；缺省回退静态种子。
+    const markers: MapMarker[] = props.markers ?? INSTALLATIONS;
+
     const container = new PIXI.Container();
-    drawSandCityModel(container, worldWidth, worldHeight);
+    drawSandCityModel(container, worldWidth, worldHeight, markers);
 
     container.x = 0;
     container.y = 0;

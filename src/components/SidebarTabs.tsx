@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
+import { Doc, Id } from '../../convex/_generated/dataModel';
 import PlayerDetails from './PlayerDetails';
 import { GameId } from '../../convex/aiTown/ids';
 import { ServerGame } from '../hooks/serverGame';
@@ -35,7 +35,7 @@ import { toast } from 'react-toastify';
 import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior';
 import MaterialControls from './MaterialControls';
 
-type Tab = 'state' | 'chat' | 'spaces' | 'works' | 'schedule';
+type Tab = 'state' | 'chat' | 'spaces' | 'works' | 'schedule' | 'notify';
 
 const TABS: { id: Tab; label: string; short: string }[] = [
   { id: 'state', label: '状态', short: '状' },
@@ -43,7 +43,24 @@ const TABS: { id: Tab; label: string; short: string }[] = [
   { id: 'spaces', label: '空间', short: '空' },
   { id: 'works', label: '作品', short: '作' },
   { id: 'schedule', label: '活动', short: '动' },
+  { id: 'notify', label: '通知', short: '讯' },
 ];
+
+// DB 作品行（含解析后的实拍图 URL）。
+type Artwork = Doc<'artworks'> & { imageUrl: string | null };
+
+// 适配器：把 DB 作品转成既有 Installation 形，复用作品专属体验/拍照/物料等能力。
+function toInstallation(a: Artwork): Installation {
+  return {
+    id: a.slug,
+    artist: a.artistName,
+    title: a.title,
+    zone: a.zone as InstallationZone,
+    x: a.x,
+    y: a.y,
+    note: a.note,
+  };
+}
 
 const TODAY_DAY = (() => {
   const n = new Date();
@@ -140,6 +157,7 @@ export default function SidebarTabs({
             >
               {t.short}
               {t.id === 'chat' && <ChatDot worldId={worldId} />}
+              {t.id === 'notify' && <NotifyDot userId={userId} />}
             </button>
           );
         })}
@@ -179,7 +197,10 @@ export default function SidebarTabs({
           />
         )}
         {tab === 'schedule' && <ScheduleTab venueFocus={venueFocus} />}
-        {tab === 'works' && <WorksTab installationFocus={installationFocus} />}
+        {tab === 'works' && (
+          <WorksTab worldId={worldId} userId={userId} installationFocus={installationFocus} />
+        )}
+        {tab === 'notify' && <NotifyTab userId={userId} />}
       </div>
     </div>
   );
@@ -486,37 +507,64 @@ function SpaceDetail({
   );
 }
 
-function WorksTab({ installationFocus }: { installationFocus: { id: string; n: number } | null }) {
-  const [zone, setZone] = useState<InstallationZone | 'all'>('all');
+function WorksTab({
+  worldId,
+  userId,
+  installationFocus,
+}: {
+  worldId: Id<'worlds'>;
+  userId: string;
+  installationFocus: { id: string; n: number } | null;
+}) {
+  const [zone, setZone] = useState<string>('all');
   const [query, setQuery] = useState('');
-  const [detail, setDetail] = useState<Installation | null>(null);
+  const [detailSlug, setDetailSlug] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const artworks = useQuery(api.artworks.list, { worldId });
+  const profile = useQuery(api.profile.getProfile, { userId });
+  const isArtist = profile?.role === 'artist';
 
   useEffect(() => {
     if (!installationFocus) return;
-    const installation = INSTALLATIONS.find((item) => item.id === installationFocus.id);
-    if (!installation) return;
-    setDetail(installation);
-    setZone(installation.zone);
+    setDetailSlug(installationFocus.id);
+    setCreating(false);
     setQuery('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [installationFocus?.n]);
 
-  if (detail) {
+  if (creating) {
+    return (
+      <CreateArtworkForm
+        worldId={worldId}
+        userId={userId}
+        onBack={() => setCreating(false)}
+        onDone={() => setCreating(false)}
+      />
+    );
+  }
+
+  const detail = artworks?.find((a) => a.slug === detailSlug) ?? null;
+  if (detailSlug && detail) {
     return (
       <InstallationDetail
-        installation={detail}
-        onBack={() => setDetail(null)}
-        onLocate={() => focusInstallationOnMap(detail)}
+        artwork={detail}
+        worldId={worldId}
+        userId={userId}
+        myName={profile?.name}
+        isArtist={isArtist}
+        onBack={() => setDetailSlug(null)}
+        onLocate={() => focusInstallationOnMap(toInstallation(detail))}
       />
     );
   }
 
   const normalizedQuery = query.trim().toLowerCase();
-  const items = INSTALLATIONS.filter((item) => {
+  const items = (artworks ?? []).filter((item) => {
     const zoneMatch = zone === 'all' || item.zone === zone;
     if (!zoneMatch) return false;
     if (!normalizedQuery) return true;
-    return `${item.id} ${item.artist} ${item.title} ${item.zone}`
+    return `${item.slug} ${item.artistName} ${item.title} ${item.zone}`
       .toLowerCase()
       .includes(normalizedQuery);
   });
@@ -526,7 +574,15 @@ function WorksTab({ installationFocus }: { installationFocus: { id: string; n: n
       <div className="shrink-0 border-b border-[#cbb287] px-3 py-3">
         <div className="flex items-baseline gap-2">
           <h3 className="font-display text-xl leading-none text-[#2a1c14]">作品点位</h3>
-          <span className="text-xs text-[#9c7e5e]">{INSTALLATIONS.length} 件</span>
+          <span className="text-xs text-[#9c7e5e]">{artworks?.length ?? 0} 件</span>
+          {isArtist && (
+            <button
+              onClick={() => setCreating(true)}
+              className="ml-auto rounded bg-clay-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-clay-500"
+            >
+              + 新建作品
+            </button>
+          )}
         </div>
         <input
           value={query}
@@ -567,10 +623,12 @@ function WorksTab({ installationFocus }: { installationFocus: { id: string; n: n
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        {items.length ? (
+        {!artworks ? (
+          <Centered>正在载入作品…</Centered>
+        ) : items.length ? (
           <div className="space-y-1.5">
             {items.map((item) => (
-              <InstallationRow key={item.id} item={item} onClick={() => setDetail(item)} />
+              <InstallationRow key={item._id} item={item} onClick={() => setDetailSlug(item.slug)} />
             ))}
           </div>
         ) : (
@@ -581,20 +639,28 @@ function WorksTab({ installationFocus }: { installationFocus: { id: string; n: n
   );
 }
 
-function InstallationRow({ item, onClick }: { item: Installation; onClick: () => void }) {
+function InstallationRow({ item, onClick }: { item: Artwork; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className="group flex w-full gap-2.5 rounded border border-[#cbb287] bg-[#efe1c2] px-2.5 py-2 text-left transition hover:border-clay-600/70 hover:bg-[#e8d6b0]"
     >
       <span className="grid h-7 w-9 shrink-0 place-items-center rounded bg-[#1da76e] text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]">
-        {item.id}
+        {item.slug.startsWith('u_') ? '新' : item.slug}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-[#2a1c14] group-hover:underline">
-          {item.title}
+        <span className="flex items-center gap-1.5">
+          <span className="block truncate text-sm font-semibold text-[#2a1c14] group-hover:underline">
+            {item.title}
+          </span>
+          {item.kind === 'space' && (
+            <span className="shrink-0 rounded bg-clay-700/15 px-1 text-[10px] text-clay-700">空间</span>
+          )}
+          {item.ownerUserId && (
+            <span className="shrink-0 rounded bg-[#d8cdb8] px-1 text-[10px] text-[#6b5238]">已认领</span>
+          )}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-[#6b5238]">{item.artist}</span>
+        <span className="mt-0.5 block truncate text-xs text-[#6b5238]">{item.artistName}</span>
         <span className="mt-1 inline-flex rounded bg-[#e3d2ad] px-1.5 py-0.5 text-[10px] text-[#6b5238]">
           {item.zone}
         </span>
@@ -604,14 +670,57 @@ function InstallationRow({ item, onClick }: { item: Installation; onClick: () =>
 }
 
 function InstallationDetail({
-  installation,
+  artwork,
+  worldId,
+  userId,
+  myName,
+  isArtist,
   onBack,
   onLocate,
 }: {
-  installation: Installation;
+  artwork: Artwork;
+  worldId: Id<'worlds'>;
+  userId: string;
+  myName?: string;
+  isArtist: boolean;
   onBack: () => void;
   onLocate: () => void;
 }) {
+  const installation = toInstallation(artwork);
+  const claim = useMutation(api.artworks.claimArtwork);
+  const record = useMutation(api.artworks.recordInteraction);
+  const [busy, setBusy] = useState(false);
+  const mine = artwork.ownerUserId === userId;
+  const imgSrc =
+    artwork.imageUrl ??
+    `${import.meta.env.BASE_URL.replace(/\/$/, '')}/installations/${artwork.slug}.jpg`;
+
+  // 观看埋点：作品已被他人申领时，通知归属艺术家（后端 30 分钟去重）。
+  useEffect(() => {
+    if (artwork.ownerUserId && artwork.ownerUserId !== userId) {
+      void record({
+        worldId,
+        artworkId: artwork._id,
+        kind: 'artwork_viewed',
+        actorUserId: userId,
+        actorName: myName,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artwork._id]);
+
+  const doClaim = async () => {
+    setBusy(true);
+    try {
+      await claim({ artworkId: artwork._id, userId });
+      toast.success('申领成功，之后这件作品的互动会通知你');
+    } catch (e: any) {
+      toast.error(e?.data ?? e?.message ?? '申领失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
@@ -622,39 +731,51 @@ function InstallationDetail({
           ← 返回
         </button>
         <span className="ml-auto rounded bg-[#1da76e] px-2 py-0.5 text-xs font-black text-white">
-          {installation.id}
+          {artwork.slug.startsWith('u_') ? '新作' : artwork.slug}
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         <img
-          src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/installations/${installation.id}.jpg`}
-          alt={installation.title}
+          src={imgSrc}
+          alt={artwork.title}
           loading="lazy"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = 'none';
           }}
           className="mb-3 w-full rounded-lg border border-[#dcc89f] bg-[#e8d6b0] object-cover"
         />
-        <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{installation.title}</h3>
+        <h3 className="font-display text-2xl leading-tight text-[#2a1c14]">{artwork.title}</h3>
         <div className="mt-3 space-y-2 text-sm text-[#5b4632]">
-
           <div className="flex gap-2">
             <span className="w-12 shrink-0 text-[#9c7e5e]">艺术家</span>
-            <span className="min-w-0 flex-1">{installation.artist}</span>
+            <span className="min-w-0 flex-1">{artwork.artistName}</span>
           </div>
           <div className="flex gap-2">
             <span className="w-12 shrink-0 text-[#9c7e5e]">区域</span>
-            <span>{installation.zone}</span>
+            <span>{artwork.zone}</span>
           </div>
           <div className="flex gap-2">
-            <span className="w-12 shrink-0 text-[#9c7e5e]">来源</span>
-            <span>{INSTALLATION_SOURCE}</span>
+            <span className="w-12 shrink-0 text-[#9c7e5e]">类型</span>
+            <span>{artwork.kind === 'space' ? '可进入空间' : '仅供观看'}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="w-12 shrink-0 text-[#9c7e5e]">归属</span>
+            <span>{artwork.ownerUserId ? (mine ? '你（已认领）' : '已被艺术家认领') : '尚未认领'}</span>
           </div>
         </div>
-        {installation.note && (
+        {artwork.note && (
           <p className="mt-4 rounded-lg bg-[#e8d6b0] p-3 text-sm leading-relaxed text-[#5b4632]">
-            {installation.note}
+            {artwork.note}
           </p>
+        )}
+        {isArtist && !artwork.ownerUserId && (
+          <button
+            onClick={() => void doClaim()}
+            disabled={busy}
+            className="mt-4 w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500 disabled:opacity-50"
+          >
+            {busy ? '申领中…' : '申领这件作品'}
+          </button>
         )}
         <button
           onClick={() => enterActivity(activityFromInstallation(installation))}
@@ -665,13 +786,13 @@ function InstallationDetail({
         <button
           onClick={() =>
             openPhotoMemory({
-              id: `installation:${installation.id}`,
-              label: installation.title,
-              detail: `${installation.artist} · ${installation.zone}`,
-              contextLabel: installation.title,
+              id: `installation:${artwork.slug}`,
+              label: artwork.title,
+              detail: `${artwork.artistName} · ${artwork.zone}`,
+              contextLabel: artwork.title,
               activityKey: activityFromInstallation(installation).activityKey,
-              activityTitle: installation.title,
-              venue: installation.zone,
+              activityTitle: artwork.title,
+              venue: artwork.zone,
             })
           }
           className="mt-2 w-full rounded border-2 border-brown-700 px-3 py-2.5 text-base font-bold text-brown-100 hover:border-clay-500"
@@ -687,10 +808,225 @@ function InstallationDetail({
 
         <MaterialControls
           kind="work"
-          refId={installation.id}
-          title={`${installation.id} · ${installation.title}`}
+          refId={artwork.slug}
+          title={`${artwork.slug} · ${artwork.title}`}
           genLabel="生成游戏资产"
         />
+      </div>
+    </div>
+  );
+}
+
+const ARTWORK_KINDS: { value: 'view' | 'space'; label: string; hint: string }[] = [
+  { value: 'view', label: '仅供观看', hint: '其他人可走近查看' },
+  { value: 'space', label: '可进入空间', hint: '建筑类，可在其中互动' },
+];
+
+function CreateArtworkForm({
+  worldId,
+  userId,
+  onBack,
+  onDone,
+}: {
+  worldId: Id<'worlds'>;
+  userId: string;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const create = useMutation(api.artworks.createArtwork);
+  const genUploadUrl = useMutation(api.artworks.generateUploadUrl);
+  const [title, setTitle] = useState('');
+  const [zone, setZone] = useState<string>(INSTALLATION_ZONES[0]);
+  const [kind, setKind] = useState<'view' | 'space'>('view');
+  const [note, setNote] = useState('');
+  const [x, setX] = useState(850);
+  const [y, setY] = useState(640);
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    try {
+      let imageStorageId: string | undefined;
+      if (file) {
+        const url = await genUploadUrl({});
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        const json = await res.json();
+        imageStorageId = json.storageId;
+      }
+      await create({
+        worldId,
+        userId,
+        title: title.trim(),
+        zone,
+        x,
+        y,
+        kind,
+        note: note.trim() || undefined,
+        imageStorageId,
+      });
+      toast.success('作品已创建并摆放到地图');
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.data ?? e?.message ?? '创建失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls =
+    'w-full rounded border border-[#c2a878] bg-[#f6ecd3] px-3 py-2 text-[#2a1c14] placeholder:text-[#a8906c] focus:border-clay-500 focus:outline-none';
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+        <button
+          onClick={onBack}
+          className="shrink-0 rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#dcc89f]"
+        >
+          ← 返回
+        </button>
+        <span className="font-display text-lg text-[#2a1c14]">新建作品</span>
+      </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4 text-sm">
+        <div>
+          <label className="mb-1 block text-xs text-[#9c7e5e]">作品名</label>
+          <input
+            value={title}
+            maxLength={40}
+            onChange={(e) => setTitle(e.target.value)}
+            className={inputCls}
+            placeholder="给你的作品起个名字"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[#9c7e5e]">所在区域</label>
+          <select value={zone} onChange={(e) => setZone(e.target.value)} className={inputCls}>
+            {INSTALLATION_ZONES.map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[#9c7e5e]">类型</label>
+          <div className="flex gap-2">
+            {ARTWORK_KINDS.map((k) => (
+              <button
+                key={k.value}
+                onClick={() => setKind(k.value)}
+                className={
+                  'flex-1 rounded border px-2 py-1.5 text-left transition ' +
+                  (kind === k.value
+                    ? 'border-clay-600 bg-[#f3ead8] text-[#2a1c14]'
+                    : 'border-[#d8cdb8] text-[#6b5238] hover:border-clay-500')
+                }
+              >
+                <div className="text-xs font-bold">{k.label}</div>
+                <div className="text-[10px] opacity-80">{k.hint}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[#9c7e5e]">摆放坐标（源图 1703×1279）</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={x}
+              onChange={(e) => setX(Number(e.target.value))}
+              className={inputCls}
+              placeholder="X"
+            />
+            <input
+              type="number"
+              value={y}
+              onChange={(e) => setY(Number(e.target.value))}
+              className={inputCls}
+              placeholder="Y"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[#9c7e5e]">实拍效果图（可选）</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="w-full text-xs text-[#6b5238] file:mr-2 file:rounded file:border-0 file:bg-clay-700 file:px-2 file:py-1 file:text-white"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[#9c7e5e]">作品说明（可选）</label>
+          <textarea
+            value={note}
+            maxLength={300}
+            rows={3}
+            onChange={(e) => setNote(e.target.value)}
+            className={inputCls}
+            placeholder="创作主张、材料、想被怎样观看…"
+          />
+        </div>
+        <button
+          onClick={() => void submit()}
+          disabled={!title.trim() || saving}
+          className="w-full rounded bg-clay-700 px-3 py-2.5 text-base font-bold text-white hover:bg-clay-500 disabled:opacity-50"
+        >
+          {saving ? '创建中…' : '创建并摆放'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NotifyDot({ userId }: { userId: string }) {
+  const count = useQuery(api.notifications.unreadCount, { userId }) ?? 0;
+  if (!count) return null;
+  return (
+    <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-clay-600 px-0.5 text-[9px] font-bold text-white">
+      {count > 9 ? '9+' : count}
+    </span>
+  );
+}
+
+function NotifyTab({ userId }: { userId: string }) {
+  const list = useQuery(api.notifications.listMine, { userId });
+  const markAllRead = useMutation(api.notifications.markAllRead);
+
+  useEffect(() => {
+    if (list && list.some((n) => !n.read)) {
+      void markAllRead({ userId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list?.length]);
+
+  if (!list) return <Centered>正在载入通知…</Centered>;
+  if (!list.length)
+    return <Centered>还没有通知。申领或创建作品后，别人来看你的作品会在这里提醒你。</Centered>;
+
+  return (
+    <div className="h-full overflow-y-auto px-3 py-3">
+      <div className="space-y-1.5">
+        {list.map((n) => (
+          <div
+            key={n._id}
+            className={
+              'rounded border px-3 py-2 text-sm ' +
+              (n.read
+                ? 'border-[#cbb287] bg-[#efe1c2] text-[#6b5238]'
+                : 'border-clay-600/50 bg-[#f3ead8] text-[#2a1c14]')
+            }
+          >
+            <div className="leading-snug">{n.text}</div>
+            <div className="mt-1 text-[11px] text-[#9c7e5e]">{timeAgo(n.createdAt)}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

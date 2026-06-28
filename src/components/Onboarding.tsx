@@ -17,6 +17,12 @@ const GENDERS: { value: Gender; label: string }[] = [
   { value: 'other', label: '其他' },
 ];
 
+type Role = 'visitor' | 'artist';
+const ROLES: { value: Role; label: string; hint: string }[] = [
+  { value: 'visitor', label: '访客', hint: '逛展、与人和作品互动' },
+  { value: 'artist', label: '艺术家', hint: '可申领既有作品、上传并摆放新作品' },
+];
+
 // 全局身份录入：landing 首次进入强制完成（名字、性别、头像）。
 export default function Onboarding({ userId, onDone }: { userId: string; onDone: () => void }) {
   const save = useMutation(api.profile.saveProfile);
@@ -25,6 +31,8 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
 
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
+  const [role, setRole] = useState<Role>('visitor');
+  const [statement, setStatement] = useState('');
   const [avatar, setAvatar] = useState<AvatarChoice>({ kind: 'preset', preset: DEFAULT_PRESET });
   const [desc, setDesc] = useState('');
   const [photo, setPhoto] = useState<{ storageId: Id<'_storage'>; previewUrl: string } | null>(null);
@@ -74,6 +82,8 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
         userId,
         name: name.trim(),
         gender,
+        role,
+        artistStatement: role === 'artist' && statement.trim() ? statement.trim() : undefined,
         avatarPreset: avatar.kind === 'preset' ? avatar.preset : undefined,
         avatarStorageId: avatar.kind === 'generated' ? avatar.storageId : undefined,
       });
@@ -138,6 +148,37 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
           </button>
         ))}
       </div>
+
+      {/* 身份 —— 访客 / 艺术家 */}
+      <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">身 份</label>
+      <div className="mb-3 flex gap-3">
+        {ROLES.map((r) => (
+          <button
+            key={r.value}
+            onClick={() => setRole(r.value)}
+            className="flex-1 rounded border px-3 py-2 text-left transition-colors"
+            style={{
+              color: role === r.value ? '#2c2620' : '#a89e8d',
+              borderColor: role === r.value ? '#b0563a' : '#d8cdb8',
+              background: role === r.value ? '#f3ead8' : 'transparent',
+            }}
+          >
+            <div className="text-[14px] tracking-[0.08em]">{r.label}</div>
+            <div className="mt-0.5 text-[11px] leading-snug text-[#7a7063]">{r.hint}</div>
+          </button>
+        ))}
+      </div>
+      {role === 'artist' && (
+        <textarea
+          className={clsx(inputCls, 'mb-7 resize-none')}
+          placeholder="一句话艺术家自述（可选）：创作主张、风格、想被怎样认识…"
+          value={statement}
+          maxLength={200}
+          rows={2}
+          onChange={(e) => setStatement(e.target.value)}
+        />
+      )}
+      {role !== 'artist' && <div className="mb-7" />}
 
       {/* 头像：预置 */}
       <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">头 像</label>
