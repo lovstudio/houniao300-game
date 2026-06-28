@@ -6,6 +6,8 @@ import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
 import { selectInstallationOnMap } from '../lib/mapFocus.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
+import { getVenueInterior } from '../../data/birdRestaurantInterior.ts';
+import type { Id } from '../../convex/_generated/dataModel';
 
 import { useElementSize, useMediaQuery } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
@@ -32,6 +34,9 @@ export type NearbyPrompt =
 
 export default function Game({
   userId,
+  worldId,
+  engineId,
+  interiorId,
   controlMode,
   cameraFollow,
   isFullscreen,
@@ -46,8 +51,14 @@ export default function Game({
   onOpenPhotoMemory,
   onHelp,
   onEnterVenueInterior,
+  onExitInterior,
 }: {
   userId: string;
+  // 当前激活世界：外部小镇=默认世界；进入内场时=该内场的独立世界。
+  // 可能为 undefined（默认世界状态加载中）；下方守卫会拦截。
+  worldId?: Id<'worlds'>;
+  engineId?: Id<'engines'>;
+  interiorId?: string;
   controlMode: ControlMode;
   cameraFollow: boolean;
   isFullscreen: boolean;
@@ -62,6 +73,7 @@ export default function Game({
   onOpenPhotoMemory: () => void;
   onHelp: () => void;
   onEnterVenueInterior?: (interiorId: string) => void;
+  onExitInterior?: () => void;
 }) {
   const convex = useConvex();
   const [selectedElement, setSelectedElement] = useState<{
@@ -94,14 +106,12 @@ export default function Game({
     return () => setPanelOpenHandler(null);
   }, []);
 
-  const worldStatus = useQuery(api.world.defaultWorldStatus);
-  const worldId = worldStatus?.worldId;
-  const engineId = worldStatus?.engineId;
+  const interior = interiorId ? getVenueInterior(interiorId) : undefined;
 
   const game = useServerGame(worldId);
 
-  // Send a periodic heartbeat to our world to keep it alive.
-  useWorldHeartbeat();
+  // Send a periodic heartbeat to the active world to keep it alive.
+  useWorldHeartbeat(worldId);
 
   // 打开即自动入场（方案 A）——入场是世界规则，不再是一个按钮。
   useAutoJoinWorld(userId, worldId);
@@ -142,6 +152,23 @@ export default function Game({
             onSelectAgent={(id) => setSelectedElement({ kind: 'player', id })}
           />
           {calibrating && <CalibrationPanel />}
+          {/* 内场模式：左上角显示场馆名 + 离开按钮，切回外部小镇 */}
+          {interior && (
+            <div className="pointer-events-none absolute left-3 top-3 z-40 flex items-center gap-2">
+              <span className="rounded-full border border-[#c99650]/60 bg-brown-900/85 px-3 py-1.5 text-sm font-bold text-[#ffe7bc] shadow-lg">
+                {interior.venue}内场
+              </span>
+              {onExitInterior && (
+                <button
+                  type="button"
+                  onClick={onExitInterior}
+                  className="pointer-events-auto rounded-full border border-[#c99650] bg-[#3a251b] px-3 py-1.5 text-sm font-bold text-[#ffe7bc] shadow-lg transition hover:bg-[#5a3425]"
+                >
+                  离开内场
+                </button>
+              )}
+            </div>
+          )}
           <div className="absolute inset-0">
             <Stage width={width} height={height} options={{ backgroundColor: 0x181425 }}>
               {/* Re-propagate context because contexts are not shared between renderers.
@@ -160,6 +187,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                   onToggleCameraFollow={onToggleCameraFollow}
                   onSetCameraFollow={onSetCameraFollow}
                   onEnterVenueInterior={onEnterVenueInterior}
+                  interior={interior}
                   showCollisionOverlay={showCollisionOverlay}
                   historicalTime={historicalTime}
                   setSelectedElement={setSelectedElement}

@@ -2,16 +2,12 @@ import Game, { type ControlMode } from './components/Game.tsx';
 import Experience from './components/Experience.tsx';
 import EndingsWall from './components/EndingsWall.tsx';
 import Landing from './components/Landing.tsx';
-import VenueInteriorMap from './components/VenueInteriorMap.tsx';
 import {
   setActivityEnterHandler,
   activityFromSchedule,
   type ActivityDescriptor,
 } from './lib/activityEnter.ts';
-import {
-  getVenueInterior,
-  type VenueInteriorMap as VenueInteriorMapData,
-} from '../data/birdRestaurantInterior.ts';
+import { getVenueInterior } from '../data/birdRestaurantInterior.ts';
 import { SCHEDULE, VENUE_COORDS, VENUES } from '../data/schedule.ts';
 import { getAnonUserId } from './lib/identity.ts';
 
@@ -19,8 +15,9 @@ import { ToastContainer } from 'react-toastify';
 // import { UserButton } from '@clerk/clerk-react';
 // import { Authenticated, Unauthenticated } from 'convex/react';
 // import LoginButton from './components/buttons/LoginButton.tsx';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { toast } from 'react-toastify';
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import ReactModal from 'react-modal';
@@ -62,7 +59,13 @@ export default function Home() {
   const [calibrating, setCalibrating] = useState(false);
   // 当前正在体验的活动（从节目单点进），null = 在小镇里。
   const [activeActivity, setActiveActivity] = useState<ActivityDescriptor | null>(null);
-  const [activeInterior, setActiveInterior] = useState<VenueInteriorMapData | null>(null);
+  // 当前进入的内场世界（独立 world）；null = 在外部小镇。
+  const [interiorWorld, setInteriorWorld] = useState<{
+    interiorId: string;
+    worldId: Id<'worlds'>;
+    engineId: Id<'engines'>;
+  } | null>(null);
+  const getOrCreateInteriorWorld = useMutation(api.interiors.getOrCreateInteriorWorld);
   const [photoMemoryOpen, setPhotoMemoryOpen] = useState(false);
   // 深层入口（如作品详情）请求打开照片记忆时携带的预选地点；顶栏等通用入口为 null。
   const [photoMemoryOverride, setPhotoMemoryOverride] = useState<PhotoMemoryLocationOption | null>(
@@ -91,12 +94,35 @@ export default function Home() {
   const userId = useMemo(getAnonUserId, []);
   const profile = useQuery(api.profile.getProfile, { userId });
   const worldStatus = useQuery(api.world.defaultWorldStatus);
-  const worldId = worldStatus?.worldId;
-  const game = useServerGame(worldId);
+  const defaultWorldId = worldStatus?.worldId;
+  const defaultEngineId = worldStatus?.engineId;
+
+  // 激活世界：进入内场时切到该内场的独立 world，否则用默认（外部小镇）世界。
+  const activeWorldId = interiorWorld?.worldId ?? defaultWorldId;
+  const activeEngineId = interiorWorld?.engineId ?? defaultEngineId;
+  const activeInteriorId = interiorWorld?.interiorId;
+  const activeInterior = activeInteriorId ? getVenueInterior(activeInteriorId) : undefined;
+
+  const game = useServerGame(activeWorldId);
   const humanTokenIdentifier = useQuery(
     api.world.userStatus,
-    worldId ? { worldId, userId } : 'skip',
+    activeWorldId ? { worldId: activeWorldId, userId } : 'skip',
   ) ?? null;
+
+  // 进入内场：取/建该内场的独立世界（含自有地图与 AI 居民），然后把客户端切过去。
+  const enterInterior = useCallback(
+    async (interiorId: string) => {
+      try {
+        const res = await getOrCreateInteriorWorld({ interiorId });
+        setInteriorWorld({ interiorId, worldId: res.worldId, engineId: res.engineId });
+      } catch (e) {
+        console.error(e);
+        toast.error('进入内场失败，请重试');
+      }
+    },
+    [getOrCreateInteriorWorld],
+  );
+  const exitInterior = useCallback(() => setInteriorWorld(null), []);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -122,12 +148,9 @@ export default function Home() {
 
   // 空间集「进入内景」按钮：与走近入口按空格走同一出口。
   useEffect(() => {
-    setEnterInteriorHandler((interiorId) => {
-      const interior = getVenueInterior(interiorId);
-      if (interior) setActiveInterior(interior);
-    });
+    setEnterInteriorHandler((interiorId) => void enterInterior(interiorId));
     return () => setEnterInteriorHandler(null);
-  }, []);
+  }, [enterInterior]);
 
   // 扫码深链：?exp=<activityKey> 落地后自动打开对应活动的连环画体验。
   // 等身份就绪（新用户会先停在 onboarding），完成后再自动进入。
@@ -166,16 +189,6 @@ export default function Home() {
       }
       return nextFollow;
     });
-
-  // 真人玩家在沙城里使用的角色立绘；进入内场时让走动的角色与外部地图保持一致。
-  const humanCharacterName = useMemo(() => {
-    if (!game || !humanTokenIdentifier) return undefined;
-    const humanPlayer = [...game.world.players.values()].find(
-      (p) => p.human === humanTokenIdentifier,
-    );
-    if (!humanPlayer) return undefined;
-    return game.playerDescriptions.get(humanPlayer.id)?.character;
-  }, [game, humanTokenIdentifier]);
 
   const currentPlayerLocationOption = useMemo<PhotoMemoryLocationOption | null>(() => {
     if (!game || !humanTokenIdentifier) return null;
@@ -355,6 +368,10 @@ export default function Home() {
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <Game
           userId={userId}
+          worldId={activeWorldId}
+          engineId={activeEngineId}
+          interiorId={activeInteriorId}
+          onExitInterior={exitInterior}
           controlMode={controlMode}
           cameraFollow={cameraFollow}
           isFullscreen={isFullscreen}
@@ -368,10 +385,7 @@ export default function Home() {
           onToggleCalibrating={() => setCalibrating((on) => !on)}
           onOpenPhotoMemory={openPhotoMemoryGeneric}
           onHelp={() => setHelpModalOpen(true)}
-          onEnterVenueInterior={(interiorId) => {
-            const interior = getVenueInterior(interiorId);
-            if (interior) setActiveInterior(interior);
-          }}
+          onEnterVenueInterior={(interiorId) => void enterInterior(interiorId)}
         />
 
         <PhotoMemoryNotifications userId={userId} />
@@ -394,15 +408,6 @@ export default function Home() {
             onExit={() => setActiveActivity(null)}
           />
         </div>
-      )}
-
-      {activeInterior && (
-        <VenueInteriorMap
-          interior={activeInterior}
-          characterName={humanCharacterName}
-          onOpenPhotoMemory={openPhotoMemoryGeneric}
-          onExit={() => setActiveInterior(null)}
-        />
       )}
 
       <PhotoMemoryModal

@@ -18,6 +18,9 @@ import {
 import {
   BIRD_RESTAURANT_INTERIOR,
   I3_BRIDGE_FIELD_INTERIOR,
+  type InteriorCircle,
+  type InteriorRect,
+  type VenueInteriorMap,
 } from '../../data/birdRestaurantInterior';
 import { INSTALLATIONS, type Installation } from '../../data/installations';
 import { selectInstallationOnMap, selectVenueOnMap } from '../lib/mapFocus';
@@ -1173,8 +1176,94 @@ export function drawSandCityModel(
   container.mask = clip;
 }
 
+// 内场各 kind 的填充色（Pixi 数值色），与 VenueInteriorMap.tsx 的配色大致对齐。
+const INTERIOR_FILL: Record<InteriorRect['kind'], number> = {
+  wall: 0xb39b72,
+  sand: 0xc58f5d,
+  sea: 0x8ba39d,
+  mound: 0xc9a06f,
+  bridge: 0xb9794b,
+  shadow: 0x2d2520,
+  path: 0xaa6c3e,
+  stall: 0xb84a37,
+  counter: 0xd4944b,
+  stage: 0x46392f,
+  speaker: 0x201f1d,
+  table: 0xead6aa,
+  seat: 0x312821,
+  sofa: 0xd8c9a8,
+  aisle: 0xcdb488,
+  entry: 0xf5c15f,
+  light: 0xffde97,
+};
+
+// 内场矢量渲染：把 source 坐标系（如 1280×720）的矩形/圆形铺到世界像素空间。
+// 视觉与 data 里的布局一致；碰撞由 objectTiles 提供（见 data/interiorWorldMap.ts）。
+export function drawInteriorModel(
+  container: PIXI.Container,
+  worldWidth: number,
+  worldHeight: number,
+  interior: VenueInteriorMap,
+) {
+  const sx = worldWidth / interior.source.width;
+  const sy = worldHeight / interior.source.height;
+
+  // 地面底色。
+  const floor = new PIXI.Graphics();
+  floor.beginFill(interior.scene === 'bridge' ? 0x9f633c : 0x7c5d3e);
+  floor.drawRect(0, 0, worldWidth, worldHeight);
+  floor.endFill();
+  container.addChild(floor);
+
+  const g = new PIXI.Graphics();
+  for (const rect of interior.rects as InteriorRect[]) {
+    g.beginFill(INTERIOR_FILL[rect.kind], rect.walkable ? 0.45 : 1);
+    const x = rect.x * sx;
+    const y = rect.y * sy;
+    const w = rect.width * sx;
+    const h = rect.height * sy;
+    if (rect.kind === 'mound') {
+      g.drawEllipse(x + w / 2, y + h / 2, w / 2, h / 2);
+    } else if (rect.radius) {
+      g.drawRoundedRect(x, y, w, h, Math.min(rect.radius * sx, Math.min(w, h) / 2));
+    } else {
+      g.drawRect(x, y, w, h);
+    }
+    g.endFill();
+  }
+  for (const circle of interior.circles as InteriorCircle[]) {
+    g.beginFill(INTERIOR_FILL[circle.kind], circle.walkable ? 0.45 : 1);
+    g.drawCircle(circle.x * sx, circle.y * sy, circle.radius * Math.min(sx, sy));
+    g.endFill();
+  }
+  container.addChild(g);
+
+  // 入口光环。
+  const [ex, ey] = interior.entrance.interiorSource;
+  const ring = new PIXI.Graphics();
+  ring.lineStyle(3, 0xf5c15f, 0.9);
+  ring.drawCircle(ex * sx, ey * sy, 1.4 * TILE);
+  container.addChild(ring);
+
+  // 区域文字标签，帮助辨认（与侧栏一致）。
+  for (const label of interior.labels) {
+    const text = new PIXI.Text(label.label, {
+      fontSize: 13,
+      fill: 0xffe3a8,
+      fontWeight: 'bold',
+      stroke: 0x2a1b13,
+      strokeThickness: 3,
+      align: 'center',
+    });
+    text.anchor.set(0.5);
+    text.x = label.x * sx;
+    text.y = label.y * sy;
+    container.addChild(text);
+  }
+}
+
 export const PixiStaticMap = PixiComponent('StaticMap', {
-  create: (props: { map: WorldMap; markers?: MapMarker[]; [k: string]: any }) => {
+  create: (props: { map: WorldMap; markers?: MapMarker[]; interior?: VenueInteriorMap; [k: string]: any }) => {
     const map = props.map;
     const screenxtiles = map.bgTiles[0].length;
     const screenytiles = map.bgTiles[0][0].length;
@@ -1185,7 +1274,11 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
     const markers: MapMarker[] = props.markers ?? INSTALLATIONS;
 
     const container = new PIXI.Container();
-    drawSandCityModel(container, worldWidth, worldHeight, markers);
+    if (props.interior) {
+      drawInteriorModel(container, worldWidth, worldHeight, props.interior);
+    } else {
+      drawSandCityModel(container, worldWidth, worldHeight, markers);
+    }
 
     container.x = 0;
     container.y = 0;

@@ -25,7 +25,10 @@ import {
   sandCityGeometryControlsCollision,
   tilePositionBlockedBySolidGeometry,
 } from '../../data/sandCityGeometry.ts';
-import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior.ts';
+import {
+  VENUE_INTERIOR_MAPS,
+  type VenueInteriorMap,
+} from '../../data/birdRestaurantInterior.ts';
 import type { ControlMode, NearbyPrompt } from './Game.tsx';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
@@ -221,6 +224,8 @@ export const PixiGame = (props: {
   setSelectedElement: SelectElement;
   setNearbyPrompt: (prompt: NearbyPrompt | null) => void;
   markers?: MapMarker[];
+  // 当前处于某内场世界时传入其布局数据；为空表示在外部小镇。
+  interior?: VenueInteriorMap;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -367,6 +372,12 @@ export const PixiGame = (props: {
       props.setNearbyPrompt(next);
     };
 
+    // 已在内场世界里：不做「走近入口/作品」检测（坐标系不同，且不支持内场套内场）。
+    if (props.interior) {
+      publish(null);
+      return;
+    }
+
     if (!humanPlayerId) {
       publish(null);
       return;
@@ -410,6 +421,7 @@ export const PixiGame = (props: {
     props.game,
     props.game.worldMap.height,
     props.game.worldMap.width,
+    props.interior,
     props.setNearbyPrompt,
   ]);
 
@@ -963,9 +975,10 @@ export const PixiGame = (props: {
       viewportRef={viewportRef}
     >
       <PixiStaticMap
-        key={`map-${props.markers?.length ?? 0}`}
+        key={`map-${props.interior?.id ?? 'world'}-${props.markers?.length ?? 0}`}
         map={props.game.worldMap}
         markers={props.markers}
+        interior={props.interior}
         onpointerup={onMapPointerUp}
         onpointerdown={onMapPointerDown}
       />
