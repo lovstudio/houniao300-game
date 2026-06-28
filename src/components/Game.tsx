@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import PixiGame from './PixiGame.tsx';
+import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
 
@@ -95,6 +96,13 @@ export default function Game({
   // 打开即自动入场（方案 A）——入场是世界规则，不再是一个按钮。
   useAutoJoinWorld(userId, worldId);
 
+  // 作品（DB 唯一真相源）：地图标记与侧栏列表共用同一数据。
+  const artworks = useQuery(api.artworks.list, worldId ? { worldId } : 'skip');
+  const markers: MapMarker[] | undefined = useMemo(
+    () => artworks?.map((a) => ({ id: a.slug, x: a.x, y: a.y, kind: a.kind })),
+    [artworks],
+  );
+
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
@@ -134,6 +142,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                   historicalTime={historicalTime}
                   setSelectedElement={setSelectedElement}
                   setNearbyPrompt={setNearbyPrompt}
+                  markers={markers}
                 />
               </ConvexProvider>
             </Stage>

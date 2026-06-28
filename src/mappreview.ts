@@ -2,6 +2,7 @@
 // Renders drawSandCityModel at the real source resolution (1703x1279).
 import * as PIXI from 'pixi.js';
 import { drawSandCityModel } from './components/PixiStaticMap';
+import { INSTALLATIONS } from '../data/installations';
 
 const WIDTH = 1703;
 const HEIGHT = 1279;
@@ -17,5 +18,5 @@ const app = new PIXI.Application({
 document.getElementById('wrap')!.appendChild(app.view as HTMLCanvasElement);
 
 const container = new PIXI.Container();
-drawSandCityModel(container, WIDTH, HEIGHT);
+drawSandCityModel(container, WIDTH, HEIGHT, INSTALLATIONS);
 app.stage.addChild(container);

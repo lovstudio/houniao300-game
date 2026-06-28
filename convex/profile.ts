@@ -23,6 +23,8 @@ export const getProfile = query({
   },
 });
 
+const roleValidator = v.union(v.literal('visitor'), v.literal('artist'));
+
 export const saveProfile = mutation({
   args: {
     userId: v.string(),
@@ -30,6 +32,8 @@ export const saveProfile = mutation({
     gender: genderValidator,
     avatarPreset: v.optional(v.string()),
     avatarStorageId: v.optional(v.string()),
+    role: v.optional(roleValidator),
+    artistStatement: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -41,6 +45,8 @@ export const saveProfile = mutation({
       gender: args.gender,
       avatarPreset: args.avatarPreset,
       avatarStorageId: args.avatarStorageId,
+      role: args.role,
+      artistStatement: args.artistStatement,
       updatedAt: Date.now(),
     };
     if (existing) {

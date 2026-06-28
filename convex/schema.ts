@@ -19,8 +19,51 @@ export default defineSchema({
     gender: v.union(v.literal('male'), v.literal('female'), v.literal('other')),
     avatarPreset: v.optional(v.string()), // 选预置头像时记预置 id
     avatarStorageId: v.optional(v.string()), // AI 生成头像时记 storage id
+    // 注册时选择的身份角色：访客（仅观看互动）/ 艺术家（可申领、创建作品）。
+    role: v.optional(v.union(v.literal('visitor'), v.literal('artist'))),
+    // 艺术家自述（对应 AI Town 角色的「出厂设置」identity）。
+    artistStatement: v.optional(v.string()),
     updatedAt: v.number(),
   }).index('userId', ['userId']),
+
+  // ---- 艺术家作品（沙之书核心实体）----
+  // 真相源：既有作品由 data/installations.ts 迁移为种子（origin='seed'），
+  // 用户自助新建的作品 origin='user'。坐标沿用 1703x1279 源图坐标系。
+  artworks: defineTable({
+    worldId: v.id('worlds'),
+    slug: v.string(), // 'A1'..（种子）或生成的 'u_xxxx'（用户新建），世界内唯一
+    title: v.string(),
+    artistName: v.string(),
+    zone: v.string(),
+    note: v.optional(v.string()),
+    x: v.number(), // 源图坐标 X
+    y: v.number(), // 源图坐标 Y
+    // 'view' = 仅供观看；'space' = 可进入的空间/建筑。
+    kind: v.union(v.literal('view'), v.literal('space')),
+    ownerUserId: v.optional(v.string()), // 归属艺术家 userId；undefined = 未申领
+    imageStorageId: v.optional(v.string()), // 实拍效果图（Convex storage）
+    origin: v.union(v.literal('seed'), v.literal('user')),
+    createdAt: v.number(),
+  })
+    .index('worldId', ['worldId'])
+    .index('slug', ['worldId', 'slug'])
+    .index('owner', ['ownerUserId']),
+
+  // ---- 通知：作品被申领/被观看/被进入时，提醒归属艺术家 ----
+  notifications: defineTable({
+    userId: v.string(), // 收件人 = 作品归属艺术家
+    worldId: v.id('worlds'),
+    kind: v.string(), // 'artwork_viewed' | 'artwork_entered' | 'artwork_claimed'
+    artworkId: v.id('artworks'),
+    artworkTitle: v.string(),
+    actorUserId: v.optional(v.string()),
+    actorName: v.optional(v.string()),
+    text: v.string(),
+    read: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index('userId', ['userId', 'read'])
+    .index('recent', ['userId', 'createdAt']),
 
   // 一个活动 = 节目单里的一项，每个活动有自己独立的游戏。
   // activityKey 由节目单条目唯一标识（date+time+venue+title），首次进入时按 key 懒创建。
