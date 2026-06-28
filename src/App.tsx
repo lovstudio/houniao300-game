@@ -171,6 +171,16 @@ export default function Home() {
       return nextFollow;
     });
 
+  // 真人玩家在沙城里使用的角色立绘；进入内场时让走动的角色与外部地图保持一致。
+  const humanCharacterName = useMemo(() => {
+    if (!game || !humanTokenIdentifier) return undefined;
+    const humanPlayer = [...game.world.players.values()].find(
+      (p) => p.human === humanTokenIdentifier,
+    );
+    if (!humanPlayer) return undefined;
+    return game.playerDescriptions.get(humanPlayer.id)?.character;
+  }, [game, humanTokenIdentifier]);
+
   const currentPlayerLocationOption = useMemo<PhotoMemoryLocationOption | null>(() => {
     if (!game || !humanTokenIdentifier) return null;
     const humanPlayer = [...game.world.players.values()].find(
@@ -376,6 +386,7 @@ export default function Home() {
       {activeInterior && (
         <VenueInteriorMap
           interior={activeInterior}
+          characterName={humanCharacterName}
           onOpenPhotoMemory={openPhotoMemoryGeneric}
           onExit={() => setActiveInterior(null)}
         />
