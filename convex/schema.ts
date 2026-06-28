@@ -19,8 +19,16 @@ export default defineSchema({
     gender: v.union(v.literal('male'), v.literal('female'), v.literal('other')),
     avatarPreset: v.optional(v.string()), // 选预置头像时记预置 id
     avatarStorageId: v.optional(v.string()), // AI 生成头像时记 storage id
-    // 注册时选择的身份角色：访客（仅观看互动）/ 艺术家（可申领、创建作品）。
-    role: v.optional(v.union(v.literal('visitor'), v.literal('artist'))),
+    // 身份角色：游客（只看/互动）/ 艺术家（申领+创建自己作品）/ 志愿者（可代他人创建、协助引导）/ 管理员（全权）。
+    // 游客可自选；其余三种注册时需邀请码。
+    role: v.optional(
+      v.union(
+        v.literal('visitor'),
+        v.literal('artist'),
+        v.literal('volunteer'),
+        v.literal('admin'),
+      ),
+    ),
     // 艺术家自述（对应 AI Town 角色的「出厂设置」identity）。
     artistStatement: v.optional(v.string()),
     updatedAt: v.number(),

@@ -523,7 +523,11 @@ function WorksTab({
 
   const artworks = useQuery(api.artworks.list, { worldId });
   const profile = useQuery(api.profile.getProfile, { userId });
-  const isArtist = profile?.role === 'artist';
+  const role = profile?.role;
+  // 能力分工：创建=艺术家/志愿者/管理员；申领=艺术家/管理员；管理(删/编)=管理员或归属者。
+  const canCreate = role === 'artist' || role === 'volunteer' || role === 'admin';
+  const canClaim = role === 'artist' || role === 'admin';
+  const isAdmin = role === 'admin';
 
   useEffect(() => {
     if (!installationFocus) return;
@@ -552,8 +556,10 @@ function WorksTab({
         worldId={worldId}
         userId={userId}
         myName={profile?.name}
-        isArtist={isArtist}
+        canClaim={canClaim}
+        isAdmin={isAdmin}
         onBack={() => setDetailSlug(null)}
+        onDeleted={() => setDetailSlug(null)}
         onLocate={() => focusInstallationOnMap(toInstallation(detail))}
       />
     );
@@ -575,7 +581,7 @@ function WorksTab({
         <div className="flex items-baseline gap-2">
           <h3 className="font-display text-xl leading-none text-[#2a1c14]">作品点位</h3>
           <span className="text-xs text-[#9c7e5e]">{artworks?.length ?? 0} 件</span>
-          {isArtist && (
+          {canCreate && (
             <button
               onClick={() => setCreating(true)}
               className="ml-auto rounded bg-clay-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-clay-500"
@@ -674,23 +680,29 @@ function InstallationDetail({
   worldId,
   userId,
   myName,
-  isArtist,
+  canClaim,
+  isAdmin,
   onBack,
+  onDeleted,
   onLocate,
 }: {
   artwork: Artwork;
   worldId: Id<'worlds'>;
   userId: string;
   myName?: string;
-  isArtist: boolean;
+  canClaim: boolean;
+  isAdmin: boolean;
   onBack: () => void;
+  onDeleted: () => void;
   onLocate: () => void;
 }) {
   const installation = toInstallation(artwork);
   const claim = useMutation(api.artworks.claimArtwork);
   const record = useMutation(api.artworks.recordInteraction);
+  const remove = useMutation(api.artworks.deleteArtwork);
   const [busy, setBusy] = useState(false);
   const mine = artwork.ownerUserId === userId;
+  const canManage = isAdmin || mine;
   const imgSrc =
     artwork.imageUrl ??
     `${import.meta.env.BASE_URL.replace(/\/$/, '')}/installations/${artwork.slug}.jpg`;
@@ -716,6 +728,20 @@ function InstallationDetail({
       toast.success('申领成功，之后这件作品的互动会通知你');
     } catch (e: any) {
       toast.error(e?.data ?? e?.message ?? '申领失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    if (!window.confirm(`确定删除作品《${artwork.title}》？此操作不可撤销。`)) return;
+    setBusy(true);
+    try {
+      await remove({ artworkId: artwork._id, userId });
+      toast.success('作品已删除');
+      onDeleted();
+    } catch (e: any) {
+      toast.error(e?.data ?? e?.message ?? '删除失败');
     } finally {
       setBusy(false);
     }
@@ -768,7 +794,7 @@ function InstallationDetail({
             {artwork.note}
           </p>
         )}
-        {isArtist && !artwork.ownerUserId && (
+        {canClaim && !artwork.ownerUserId && (
           <button
             onClick={() => void doClaim()}
             disabled={busy}
@@ -812,6 +838,16 @@ function InstallationDetail({
           title={`${artwork.slug} · ${artwork.title}`}
           genLabel="生成游戏资产"
         />
+
+        {canManage && (
+          <button
+            onClick={() => void doDelete()}
+            disabled={busy}
+            className="mt-4 w-full rounded border-2 border-[#b0563a] px-3 py-2.5 text-base font-bold text-[#b0563a] hover:bg-[#b0563a]/10 disabled:opacity-50"
+          >
+            删除作品{isAdmin && !mine ? '（管理员）' : ''}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 import { query, mutation, action } from './_generated/server';
 import { Doc } from './_generated/dataModel';
 import { generateImage } from './util/image';
+import { roleValidator, inviteCodeValidFor, isAdmin, type Role } from './roles';
 
 const genderValidator = v.union(v.literal('male'), v.literal('female'), v.literal('other'));
 
@@ -23,8 +24,6 @@ export const getProfile = query({
   },
 });
 
-const roleValidator = v.union(v.literal('visitor'), v.literal('artist'));
-
 export const saveProfile = mutation({
   args: {
     userId: v.string(),
@@ -34,8 +33,14 @@ export const saveProfile = mutation({
     avatarStorageId: v.optional(v.string()),
     role: v.optional(roleValidator),
     artistStatement: v.optional(v.string()),
+    inviteCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const role: Role = args.role ?? 'visitor';
+    // 游客可自选；艺术家/志愿者/管理员必须凭有效邀请码。
+    if (!inviteCodeValidFor(role, args.inviteCode)) {
+      throw new ConvexError('邀请码无效，无法以该身份登记');
+    }
     const existing = await ctx.db
       .query('profiles')
       .withIndex('userId', (q) => q.eq('userId', args.userId))
@@ -45,7 +50,7 @@ export const saveProfile = mutation({
       gender: args.gender,
       avatarPreset: args.avatarPreset,
       avatarStorageId: args.avatarStorageId,
-      role: args.role,
+      role,
       artistStatement: args.artistStatement,
       updatedAt: Date.now(),
     };
@@ -54,6 +59,25 @@ export const saveProfile = mutation({
       return existing._id;
     }
     return await ctx.db.insert('profiles', { userId: args.userId, ...patch });
+  },
+});
+
+// 管理员改派他人角色（无需邀请码，凭管理员身份）。
+export const setUserRole = mutation({
+  args: { actorUserId: v.string(), targetUserId: v.string(), role: roleValidator },
+  handler: async (ctx, args) => {
+    const actor = await ctx.db
+      .query('profiles')
+      .withIndex('userId', (q) => q.eq('userId', args.actorUserId))
+      .first();
+    if (!isAdmin(actor?.role as Role)) throw new ConvexError('仅管理员可改派角色');
+    const target = await ctx.db
+      .query('profiles')
+      .withIndex('userId', (q) => q.eq('userId', args.targetUserId))
+      .first();
+    if (!target) throw new ConvexError('目标用户不存在');
+    await ctx.db.patch(target._id, { role: args.role, updatedAt: Date.now() });
+    return target._id;
   },
 });
 
