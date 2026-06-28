@@ -13,6 +13,7 @@ type ReplyContext = {
   plan: string;
   ambient: string[]; // 全城最近的公开发言
   dialogue: { role: 'user' | 'assistant'; text: string }[]; // 玩家与该角色的来往
+  facts: string[]; // 沙城实时数据（作品数、居民数…），用于回答数量/事实类问题
 };
 
 // 收集回复所需的全部上下文；若 targetName 不是世界里的 AI 角色则返回 null。
@@ -63,12 +64,29 @@ export const gatherContext = internalQuery({
       .slice(-8)
       .map((n) => ({ role: n.kind === 'user_said' ? ('user' as const) : ('assistant' as const), text: n.text }));
 
+    // 沙城实时数据：作品点位数、各区分布、AI 居民数。回答数量/事实类问题以此为准。
+    const artworks = await ctx.db
+      .query('artworks')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId))
+      .collect();
+    const zoneCounts: Record<string, number> = {};
+    for (const a of artworks) zoneCounts[a.zone] = (zoneCounts[a.zone] ?? 0) + 1;
+    const zoneBrief = Object.entries(zoneCounts)
+      .map(([z, n]) => `${z} ${n} 件`)
+      .join('、');
+    const aiResidents = world.agents.length;
+    const facts = [
+      `沙城目前共有 ${artworks.length} 件艺术作品（点位）${zoneBrief ? `，分布：${zoneBrief}` : ''}`,
+      `沙城目前有 ${aiResidents} 位 AI 居民`,
+    ];
+
     return {
       name: desc.name,
       identity: agentDescription.identity,
       plan: agentDescription.plan,
       ambient,
       dialogue,
+      facts,
     };
   },
 });
@@ -108,9 +126,13 @@ export const replyAsCharacter = internalAction({
       `你的身份：${c.identity}\n` +
       `你当下的计划：${c.plan}\n` +
       (c.ambient.length ? `此刻城里的人们在说：${c.ambient.join('；')}\n` : '') +
+      `\n沙城实时数据（凡涉及数量/统计，必须严格引用以下数字，绝不可自行编造）：\n` +
+      c.facts.map((f) => `· ${f}`).join('\n') +
+      `\n` +
       kbBlock +
       `有人正隔空向你传话。请以「${c.name}」的第一人称、自然口语地回应，1-3 句，` +
-      `贴合你的身份与语气，结合上面候鸟300的资料作答，不要复述对方的话，不要加引号或旁白。`;
+      `贴合你的身份与语气。数量问题用上面的实时数据，背景问题结合候鸟300资料；` +
+      `资料与数据都未涵盖时坦诚说不清楚，不要复述对方的话，不要加引号或旁白。`;
 
     const messages: LLMMessage[] = [{ role: 'system', content: system }];
     for (const turn of c.dialogue) messages.push({ role: turn.role, content: turn.text });

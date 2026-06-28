@@ -121,14 +121,10 @@ export default function BroadcastHud({
             className="max-h-[60vh] min-h-0 overflow-y-auto border-t border-brown-700/50 px-2.5 py-2"
           >
             {feed.length ? (
-              <div className="space-y-2">
-                {feed.map((it) =>
-                  it.kind === 'broadcast' ? (
-                    <BroadcastRow key={'b' + it.id} it={it} onSelectAgent={onSelectAgent} />
-                  ) : (
-                    <NotifyRow key={'n' + it.id} it={it} />
-                  ),
-                )}
+              <div className="space-y-0.5">
+                {feed.map((it) => (
+                  <FeedRow key={it.kind + it.id} it={it} onSelectAgent={onSelectAgent} />
+                ))}
               </div>
             ) : (
               <p className="px-1 py-4 text-center text-[11px] leading-relaxed text-brown-200/50">
@@ -180,91 +176,113 @@ function PreviewLine({ it }: { it: FeedItem }) {
   );
 }
 
-function BroadcastRow({
+// 单一卡片模板：广播/你的传话/角色回应/系统通知共用同一布局，仅靠头像色与标签区分。
+function FeedRow({
   it,
   onSelectAgent,
 }: {
-  it: Extract<FeedItem, { kind: 'broadcast' }>;
+  it: FeedItem;
   onSelectAgent: (id: GameId<'players'>) => void;
 }) {
-  const hue = authorHue(it.author);
+  let avatarText: string;
+  let avatarBg: string;
+  let name: string;
+  let nameColor: string;
+  let tag: string | undefined;
+  let onAvatar: (() => void) | undefined;
+  let unread = false;
+
+  if (it.kind === 'broadcast') {
+    const h = authorHue(it.author);
+    avatarText = it.authorName.slice(0, 1);
+    avatarBg = `hsl(${h} 45% 42%)`;
+    name = it.authorName;
+    nameColor = `hsl(${h} 55% 70%)`;
+    onAvatar = () => onSelectAgent(it.author as GameId<'players'>);
+  } else if (it.noteKind === 'ai_reply') {
+    avatarText = (it.actorName ?? '居').slice(0, 1);
+    avatarBg = 'hsl(35 58% 46%)';
+    name = it.actorName ?? '居民';
+    nameColor = '#f0c890';
+    tag = '回应';
+    unread = !it.read;
+  } else if (it.noteKind === 'user_said') {
+    avatarText = '你';
+    avatarBg = 'var(--sand-clay)';
+    name = '你';
+    nameColor = '#e7b6a4';
+    tag = it.targetName ? `@${it.targetName}` : undefined;
+  } else {
+    avatarText = '讯';
+    avatarBg = '#6b5238';
+    name = '通知';
+    nameColor = '#cbb39a';
+    unread = !it.read;
+  }
+
   return (
-    <div className="flex gap-2">
-      <button
-        onClick={() => onSelectAgent(it.author as GameId<'players'>)}
-        className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white transition hover:ring-2 hover:ring-white/30"
-        style={{ background: `hsl(${hue} 45% 42%)` }}
-        title={`查看 ${it.authorName}`}
-      >
-        {it.authorName.slice(0, 1)}
-      </button>
+    <div className={clsx('flex gap-2 rounded-md px-1.5 py-1.5', unread && 'bg-amber-400/[0.07]')}>
+      <Avatar text={avatarText} bg={avatarBg} onClick={onAvatar} name={name} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5">
-          <button
-            onClick={() => onSelectAgent(it.author as GameId<'players'>)}
-            className="truncate text-[12px] font-semibold hover:underline"
-            style={{ color: `hsl(${hue} 55% 70%)` }}
-          >
-            {it.authorName}
-          </button>
-          <span className="shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
+          {onAvatar ? (
+            <button
+              onClick={onAvatar}
+              className="truncate text-[12px] font-semibold hover:underline"
+              style={{ color: nameColor }}
+            >
+              {name}
+            </button>
+          ) : (
+            <span className="truncate text-[12px] font-semibold" style={{ color: nameColor }}>
+              {name}
+            </span>
+          )}
+          {tag && (
+            <span className="shrink-0 rounded bg-white/10 px-1 text-[9px] leading-[1.4] text-brown-200/70">
+              {tag}
+            </span>
+          )}
+          {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />}
+          <span className="ml-auto shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
         </div>
-        <p className="mt-0.5 break-words text-[12px] leading-snug text-brown-200/90">{it.text}</p>
+        <p className="mt-0.5 line-clamp-6 break-words text-[12px] leading-snug text-brown-200/90">
+          {it.text}
+        </p>
       </div>
     </div>
   );
 }
 
-function NotifyRow({ it }: { it: Extract<FeedItem, { kind: 'notify' }> }) {
-  // 你的传话：靠右的陶土气泡。
-  if (it.noteKind === 'user_said') {
+function Avatar({
+  text,
+  bg,
+  onClick,
+  name,
+}: {
+  text: string;
+  bg: string;
+  onClick?: () => void;
+  name: string;
+}) {
+  const cls =
+    'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white';
+  if (onClick) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[88%] rounded-lg rounded-br-sm border border-clay-600/50 bg-clay-900/25 px-2 py-1.5">
-          <div className="flex items-baseline justify-end gap-1.5">
-            <span className="shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
-            <span className="shrink-0 text-[10px] text-clay-300">
-              你{it.targetName ? ` → @${it.targetName}` : ''}
-            </span>
-          </div>
-          <p className="mt-0.5 break-words text-[12px] leading-snug text-brown-200/90">{it.text}</p>
-        </div>
-      </div>
-    );
-  }
-  // 角色回应：左侧琥珀气泡，未读高亮。
-  if (it.noteKind === 'ai_reply') {
-    return (
-      <div
-        className={clsx(
-          'rounded-lg rounded-tl-sm border px-2 py-1.5',
-          it.read ? 'border-brown-700/50 bg-brown-800/40' : 'border-amber-500/40 bg-amber-900/15',
-        )}
+      <button
+        onClick={onClick}
+        className={cls + ' transition hover:ring-2 hover:ring-white/30'}
+        style={{ background: bg }}
+        title={`查看 ${name}`}
       >
-        <div className="flex items-baseline gap-1.5">
-          <span className="shrink-0 text-[10px] font-semibold text-amber-300/90">
-            {it.actorName ?? '居民'} 回应
-          </span>
-          <span className="shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
-        </div>
-        <p className="mt-0.5 break-words text-[12px] leading-snug text-brown-200/95">{it.text}</p>
-      </div>
+        {text}
+      </button>
     );
   }
-  // 默认（作品互动等系统通知）。
   return (
-    <div
-      className={clsx(
-        'rounded border px-2 py-1.5',
-        it.read ? 'border-brown-700/50 bg-brown-800/40' : 'border-clay-600/50 bg-clay-900/20',
-      )}
-    >
-      <div className="flex items-baseline gap-1.5">
-        <span className={clsx('shrink-0 text-[10px]', it.read ? 'text-brown-200/40' : 'text-clay-400')}>通知</span>
-        <span className="shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
-      </div>
-      <p className="mt-0.5 break-words text-[12px] leading-snug text-brown-200/90">{it.text}</p>
-    </div>
+    <span className={cls} style={{ background: bg }}>
+      {text}
+    </span>
   );
 }
 
