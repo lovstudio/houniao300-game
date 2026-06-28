@@ -79,7 +79,7 @@ export default function BroadcastHud({
         >
           <BellIcon />
           {expanded ? (
-            <span className="text-[11px] font-semibold leading-none tracking-wide">动态</span>
+            <span className="text-[11px] font-semibold leading-none tracking-wide">通知系统</span>
           ) : (
             <span className="min-w-0 flex-1">
               {preview.length ? (
