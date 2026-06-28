@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import PixiGame from './PixiGame.tsx';
+import Joystick from './Joystick.tsx';
 import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
+import { selectInstallationOnMap } from '../lib/mapFocus.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
 
-import { useElementSize } from 'usehooks-ts';
+import { useElementSize, useMediaQuery } from 'usehooks-ts';
 import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import SettingsMenu from './SettingsMenu';
@@ -72,6 +74,13 @@ export default function Game({
   );
   // 玩家走近空间入口或作品时的「按空格查看详情」提示。
   const [nearbyPrompt, setNearbyPrompt] = useState<NearbyPrompt | null>(null);
+  // 触屏设备：显示虚拟摇杆，并把「按空格」提示变为可点按钮（手机无空格键）。
+  const isTouch = useMediaQuery('(pointer: coarse)');
+
+  const triggerNearby = (prompt: NearbyPrompt) => {
+    if (prompt.kind === 'venue') onEnterVenueInterior?.(prompt.interiorId);
+    else selectInstallationOnMap(prompt.id);
+  };
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -147,19 +156,34 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 走近空间/作品时的交互提示（不拦截指针） */}
-          {nearbyPrompt && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
-              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
-                <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
-                  空格
-                </kbd>
-                <span>
-                  {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}「{nearbyPrompt.label}」
-                </span>
+          {/* 走近空间/作品时的交互提示：触屏端为可点按钮，桌面端为「按空格」提示 */}
+          {nearbyPrompt &&
+            (isTouch ? (
+              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+                <button
+                  className="pointer-events-auto flex items-center gap-2 rounded-full border border-[#cc785c]/60 bg-brown-900/90 px-5 py-2.5 text-sm text-brown-100 shadow-xl active:scale-95"
+                  onClick={() => triggerNearby(nearbyPrompt)}
+                >
+                  <span>
+                    {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}「{nearbyPrompt.label}」
+                  </span>
+                </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+                <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
+                  <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
+                    空格
+                  </kbd>
+                  <span>
+                    {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}「{nearbyPrompt.label}」
+                  </span>
+                </div>
+              </div>
+            ))}
+
+          {/* 移动端虚拟摇杆：取代「点哪走哪」。仅触屏 + 角色模式 + 面板未展开时显示。 */}
+          {isTouch && controlMode === 'player' && !panelOpen && <Joystick />}
           {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
             <button
