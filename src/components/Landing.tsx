@@ -125,21 +125,9 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             className="h-[clamp(160px,34vh,380px)] w-[min(92vw,760px)]"
           />
 
-          {/* 标题—CTA 桥接：暖色发丝分隔线，色用沙粒同源，过渡沙质与衬线 */}
+          {/* CTA：单行「开启旅程」，活版墨字 + 朱砂下划线，居视觉中心 */}
           <div
-            className="splash-fade"
-            style={{
-              width: 'clamp(72px,9vw,118px)',
-              height: '1px',
-              marginTop: 'clamp(14px,3vh,30px)',
-              background: 'linear-gradient(90deg, transparent, #b8a079, transparent)',
-              animationDelay: '2.2s',
-            }}
-          />
-
-          {/* CTA：单行「开启旅程」描边按钮，居视觉中心 */}
-          <div
-            className="splash-fade mt-[clamp(14px,3vh,30px)]"
+            className="splash-fade mt-[clamp(26px,6vh,56px)]"
             style={{ animationDelay: '2.6s' }}
           >
             <button
@@ -159,11 +147,15 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             </button>
           </div>
 
-          {/* 题词 footer：底部居中，沙中逐行缓现缓隐 */}
+          {/* 题词 footer：底部居中，朱砂点呼应上方 CTA，沙中逐行缓现缓隐 */}
           <div
-            className="splash-fade absolute inset-x-0 bottom-[max(6vh,34px)] flex justify-center"
+            className="splash-fade absolute inset-x-0 bottom-[max(9vh,52px)] flex flex-col items-center"
             style={{ animationDelay: '2.4s' }}
           >
+            <span
+              className="mb-3 block h-[5px] w-[5px] rounded-full"
+              style={{ background: '#b0563a', opacity: 0.7 }}
+            />
             <SandText
               ref={lyricRef}
               text={LYRIC[lyric]}
