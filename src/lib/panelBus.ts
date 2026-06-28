@@ -1,7 +1,7 @@
 // 模块级总线：移动端点「节目单」时，打开 Game 里的侧边栏抽屉
 // 并切到指定 tab。仿照 mapFocus / activityEnter 的做法，避免跨组件 prop 透传。
 
-export type PanelTab = 'state' | 'chat' | 'schedule' | 'works';
+export type PanelTab = 'state' | 'schedule' | 'works';
 
 let openHandler: (() => void) | null = null;
 let tabHandler: ((tab: PanelTab) => void) | null = null;
