@@ -113,54 +113,23 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
       {phase === 'title' ? (
         /* ── ① 标题屏 ── */
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center transition-opacity duration-700 ease-out"
-          style={{ opacity: leaving ? 0 : 1 }}
+          className="absolute inset-0 flex flex-col items-center px-8 text-center transition-opacity duration-700 ease-out"
+          style={{ opacity: leaving ? 0 : 1, paddingTop: 'clamp(12vh,16vh,20vh)' }}
         >
-          <div
-            className="splash-fade"
-            style={{
-              fontFamily: serif,
-              letterSpacing: '0.5em',
-              textIndent: '0.5em',
-              fontSize: 'clamp(10px,1.4vw,13px)',
-              color: INK_SOFT,
-              animationDelay: '0.3s',
-            }}
-          >
-            候鸟300 · 正在发生
-          </div>
-
           <h1 className="sr-only">沙之书 · 候鸟沙城</h1>
           <SandText
             ref={titleRef}
             text="沙之书"
             tracking={0.16}
             settleMs={2600}
-            className="my-6 h-[clamp(180px,40vh,420px)] w-[min(92vw,760px)]"
+            className="h-[clamp(170px,36vh,400px)] w-[min(92vw,760px)]"
           />
 
-          {/* 题词：沙中逐行缓现缓隐，安放右下角，不抢「开始」CTA */}
-          <div
-            className="splash-fade absolute bottom-[max(17vh,120px)] right-[max(4vw,18px)] flex flex-col items-end"
-            style={{ animationDelay: '2.4s' }}
-          >
-            <SandText
-              ref={lyricRef}
-              text={LYRIC[lyric]}
-              weight={600}
-              fontScale={0.82}
-              tracking={0.18}
-              settleMs={1100}
-              color="#574f43"
-              className="h-[40px] w-[320px]"
-            />
-          </div>
-
-          {/* 呼吸式「开始」 */}
+          {/* 呼吸式「开始」：紧随主标题，靠近视觉中心 */}
           <button
             type="button"
             onClick={start}
-            className="landing-cta splash-fade absolute inset-x-0 bottom-[max(8vh,48px)] mx-auto w-fit"
+            className="landing-cta splash-fade mt-[clamp(8px,2vh,28px)] w-fit"
             style={{
               fontFamily: serif,
               fontSize: 'clamp(13px,1.6vw,15px)',
@@ -184,6 +153,23 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
               点 击 进 入
             </span>
           </button>
+
+          {/* 题词 footer：底部居中，沙中逐行缓现缓隐 */}
+          <div
+            className="splash-fade absolute inset-x-0 bottom-[max(5vh,28px)] flex justify-center"
+            style={{ animationDelay: '2.4s' }}
+          >
+            <SandText
+              ref={lyricRef}
+              text={LYRIC[lyric]}
+              weight={600}
+              fontScale={0.82}
+              tracking={0.18}
+              settleMs={1100}
+              color="#574f43"
+              className="h-[40px] w-[320px]"
+            />
+          </div>
         </div>
       ) : (
         /* ── ② 双列登记 ── */
