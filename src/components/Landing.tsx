@@ -137,40 +137,23 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             }}
           />
 
-          {/* 呼吸式「开始」：放大、加分量，居视觉中心 */}
-          <div
-            className="splash-fade mt-[clamp(14px,3vh,30px)] flex flex-col items-center"
-            style={{ animationDelay: '2.6s' }}
+          {/* 呼吸式 CTA：单行「开启旅程」，居视觉中心 */}
+          <button
+            type="button"
+            onClick={start}
+            className="landing-cta splash-fade mt-[clamp(14px,3vh,30px)] w-fit"
+            style={{
+              fontFamily: serif,
+              fontWeight: 500,
+              fontSize: 'clamp(16px,2vw,19px)',
+              letterSpacing: '0.5em',
+              textIndent: '0.5em',
+              color: INK,
+              animationDelay: '2.6s',
+            }}
           >
-            <button
-              type="button"
-              onClick={start}
-              className="landing-cta w-fit"
-              style={{
-                fontFamily: serif,
-                fontWeight: 500,
-                fontSize: 'clamp(16px,2vw,19px)',
-                letterSpacing: '0.62em',
-                textIndent: '0.62em',
-                color: INK,
-              }}
-            >
-              开 始
-            </button>
-            <span
-              className="mt-3 block"
-              style={{
-                fontFamily: serif,
-                fontSize: '10px',
-                letterSpacing: '0.34em',
-                textIndent: '0.34em',
-                color: INK_SOFT,
-                opacity: 0.66,
-              }}
-            >
-              点 击 进 入
-            </span>
-          </div>
+            开 启 旅 程
+          </button>
 
           {/* 题词 footer：底部居中，沙中逐行缓现缓隐 */}
           <div
