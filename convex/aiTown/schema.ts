@@ -31,6 +31,13 @@ export const aiTownTables = {
     ...serializedWorldMap,
   }).index('worldId', ['worldId']),
 
+  // 场馆内场作为独立 world 存在；这张表把内场 id 映射到其 worldId，
+  // 供「进入内场」时取/建对应世界（每个内场自己的地图、引擎与 AI 居民）。
+  interiorWorlds: defineTable({
+    interiorId: v.string(),
+    worldId: v.id('worlds'),
+  }).index('interiorId', ['interiorId']),
+
   // Human readable text describing players and agents that's stored in separate tables, just like `maps`.
   playerDescriptions: defineTable({
     worldId: v.id('worlds'),
