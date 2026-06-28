@@ -8,7 +8,6 @@ import { ServerGame } from '../hooks/serverGame';
 import { SelectElement } from './Player';
 import {
   SCHEDULE,
-  VENUES,
   VENUE_COORDS,
   CATEGORY_COLORS,
   DATES,
@@ -931,15 +930,13 @@ function CreateArtworkForm({
 }
 
 function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } | null }) {
-  const [view, setView] = useState<'byDate' | 'byVenue'>('byDate');
   const [date, setDate] = useState(DATES.includes(TODAY_DAY) ? TODAY_DAY : DATES[0]);
   const [venue, setVenue] = useState<string | null>(null);
   const [detail, setDetail] = useState<SchedItem | null>(null);
 
-  // map venue marker click -> jump straight to that venue's schedule
+  // map venue marker click / 空间集「这里的活动」 -> jump straight to that venue's schedule
   useEffect(() => {
     if (!venueFocus) return;
-    setView('byVenue');
     setVenue(venueFocus.venue);
     setDetail(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -952,7 +949,6 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
         item={detail}
         onBack={() => setDetail(null)}
         onVenue={(v) => {
-          setView('byVenue');
           setVenue(v);
           setDetail(null);
         }}
@@ -960,8 +956,8 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
     );
   }
 
-  // a single venue's full schedule
-  if (view === 'byVenue' && venue) {
+  // a single venue's full schedule (entered from a map marker or the 空间 tab)
+  if (venue) {
     const items = SCHEDULE.filter((s) => s.venue === venue).sort((a, b) =>
       a.date === b.date ? a.min - b.min : Number(a.date) - Number(b.date),
     );
@@ -973,7 +969,7 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
             onClick={() => setVenue(null)}
             className="shrink-0 rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#dcc89f]"
           >
-            ← 场地
+            ← 日程
           </button>
           <span className="min-w-0 flex-1 truncate font-display text-lg text-[#2a1c14]">
             {venue}
@@ -996,42 +992,11 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
     );
   }
 
-  // venue directory
-  if (view === 'byVenue') {
-    const counts: Record<string, number> = {};
-    SCHEDULE.forEach((s) => (counts[s.venue] = (counts[s.venue] ?? 0) + 1));
-    return (
-      <div className="flex h-full min-h-0 flex-col">
-        <ViewToggle view={view} setView={setView} />
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-          {VENUES.map((v) => {
-            const onmap = !!VENUE_COORDS[v];
-            return (
-              <button
-                key={v}
-                onClick={() => setVenue(v)}
-                className="flex w-full items-center gap-2 border-b border-[#cbb287] py-2 text-left"
-              >
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: onmap ? '#c0654a' : '#9a8a72' }}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm text-[#2a1c14]">{v}</span>
-                <span className="shrink-0 text-[11px] text-[#9c7e5e]">{counts[v] ?? 0} 场</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   // by date (default)
   const items = SCHEDULE.filter((s) => s.date === date).sort((a, b) => a.min - b.min);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ViewToggle view={view} setView={setView} />
-      <div className="flex shrink-0 gap-1 overflow-x-auto px-3 pb-2">
+      <div className="flex shrink-0 gap-1 overflow-x-auto px-3 pb-2 pt-2">
         {DATES.map((d) => (
           <button
             key={d}
@@ -1052,37 +1017,6 @@ function ScheduleTab({ venueFocus }: { venueFocus: { venue: string; n: number } 
           <ScheduleRow key={i} s={s} onClick={() => setDetail(s)} />
         ))}
       </div>
-    </div>
-  );
-}
-
-function ViewToggle({
-  view,
-  setView,
-}: {
-  view: 'byDate' | 'byVenue';
-  setView: (v: 'byDate' | 'byVenue') => void;
-}) {
-  const opts: { id: 'byDate' | 'byVenue'; label: string }[] = [
-    { id: 'byDate', label: '按日期' },
-    { id: 'byVenue', label: '按场地' },
-  ];
-  return (
-    <div className="flex shrink-0 gap-1 px-3 pt-2">
-      {opts.map((o) => (
-        <button
-          key={o.id}
-          onClick={() => setView(o.id)}
-          className={
-            'rounded px-2.5 py-1 text-xs font-semibold transition ' +
-            (view === o.id
-              ? 'bg-[#e3d2ad] text-white'
-              : 'bg-[#dcc89f] text-[#6b5238] hover:bg-[#e3d2ad]')
-          }
-        >
-          {o.label}
-        </button>
-      ))}
     </div>
   );
 }
