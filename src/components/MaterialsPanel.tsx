@@ -52,7 +52,8 @@ const STATUS_LABEL: Record<MaterialDoc['status'], { text: string; cls: string }>
   error: { text: '失败', cls: 'bg-[#b3433a] text-white' },
 };
 
-export default function MaterialsAdmin() {
+// 侧栏「物料」面板：场所/作品分区 + 搜索 + 单列卡片，适配窄侧栏与移动端。
+export default function MaterialsPanel() {
   const docs = useQuery(api.materials.list, {});
   const [section, setSection] = useState<Kind>('venue');
   const [query, setQuery] = useState('');
@@ -72,57 +73,50 @@ export default function MaterialsAdmin() {
   const withSource = catalog.filter((c) => byKey.get(c.key)?.sourceUrl).length;
 
   return (
-    <div className="min-h-screen w-full bg-brown-900 text-brown-100">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <header className="mb-5">
-          <div className="flex items-baseline gap-3">
-            <h1 className="font-display text-3xl text-[#e4b58c]">物料管理</h1>
-            <span className="text-sm text-brown-400">照片 → 生成 · 溯源与重建</span>
-          </div>
-          <p className="mt-1.5 text-sm leading-relaxed text-brown-300">
-            沙城的每个内场地图与作品点位，都由一张原始照片经我们的管线生成。这里集中管理每个单元的源图输入，
-            支持上传/替换并重新跑生成。
-          </p>
-        </header>
-
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-brown-700/40 px-3 py-3">
+        <div className="flex items-baseline gap-2">
+          <h3 className="font-display text-xl leading-none text-brown-100">物料管理</h3>
+          <span className="text-xs text-brown-400">照片 → 生成 · 溯源与重建</span>
+        </div>
+        <div className="mt-3 flex items-center gap-1.5">
           {(['venue', 'work'] as Kind[]).map((k) => (
             <button
               key={k}
               onClick={() => setSection(k)}
               className={
-                'rounded-md px-3 py-1.5 text-sm font-semibold transition ' +
+                'shrink-0 rounded px-2.5 py-1 text-xs font-semibold transition ' +
                 (section === k
                   ? 'bg-clay-700 text-white'
-                  : 'bg-brown-800 text-brown-300 hover:bg-brown-700')
+                  : 'bg-brown-900/40 text-brown-300 hover:bg-brown-700/60')
               }
             >
-              {k === 'venue' ? `场所内场（${VENUE_CATALOG.length}）` : `作品点位（${WORK_CATALOG.length}）`}
+              {k === 'venue' ? '场所内场' : '作品点位'}
             </button>
           ))}
-          <span className="ml-auto text-xs text-brown-400">
-            本类已上传源图 {section === 'venue'
-              ? VENUE_CATALOG.filter((c) => byKey.get(c.key)?.sourceUrl).length
-              : WORK_CATALOG.filter((c) => byKey.get(c.key)?.sourceUrl).length}
-            /{catalog.length}（全站 {withSource}）
+          <span className="ml-auto text-[10px] text-brown-400">
+            源图 {withSource}/{catalog.length}
           </span>
         </div>
-
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索编号、名称、艺术家、区域"
-          className="mb-4 w-full rounded border border-brown-700 bg-brown-800/60 px-3 py-2 text-sm placeholder:text-brown-500 focus:border-clay-500 focus:outline-none"
+          className="mt-3 w-full rounded border border-brown-700/70 bg-brown-900/45 px-3 py-2 text-sm text-brown-100 placeholder:text-brown-400 focus:border-clay-500 focus:outline-none"
         />
+      </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         {docs === undefined ? (
-          <div className="py-20 text-center text-sm text-brown-400">正在载入物料…</div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="py-16 text-center text-sm text-brown-400">正在载入物料…</div>
+        ) : items.length ? (
+          <div className="space-y-2.5">
             {items.map((item) => (
               <MaterialCard key={item.key} item={item} doc={byKey.get(item.key)} />
             ))}
           </div>
+        ) : (
+          <div className="py-16 text-center text-sm text-brown-400">没有匹配的物料。</div>
         )}
       </div>
     </div>
