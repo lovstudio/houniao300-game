@@ -6,7 +6,7 @@ import { createEngine } from './aiTown/main';
 import { insertInput } from './aiTown/insertInput';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { Descriptions } from '../data/characters';
-import { getVenueInterior } from '../data/birdRestaurantInterior';
+import { resolveInterior } from '../data/birdRestaurantInterior';
 import { interiorToWorldMap } from '../data/interiorWorldMap';
 
 // 每个内场世界里安置几名 AI 居民（复用主世界的人物设定）；可后续按场馆定制。
@@ -56,7 +56,7 @@ export const getOrCreateInteriorWorld = mutation({
     const existing = await lookupInteriorWorld(ctx, args.interiorId);
     if (existing) return existing;
 
-    const interior = getVenueInterior(args.interiorId);
+    const interior = resolveInterior(args.interiorId);
     if (!interior) {
       throw new Error(`Unknown interior: ${args.interiorId}`);
     }

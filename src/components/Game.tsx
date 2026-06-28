@@ -6,7 +6,7 @@ import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
 import { selectInstallationOnMap } from '../lib/mapFocus.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
-import { getVenueInterior } from '../../data/birdRestaurantInterior.ts';
+import { resolveInterior } from '../../data/birdRestaurantInterior.ts';
 import type { Id } from '../../convex/_generated/dataModel';
 
 import { useElementSize, useMediaQuery } from 'usehooks-ts';
@@ -106,7 +106,7 @@ export default function Game({
     return () => setPanelOpenHandler(null);
   }, []);
 
-  const interior = interiorId ? getVenueInterior(interiorId) : undefined;
+  const interior = interiorId ? resolveInterior(interiorId) : undefined;
 
   const game = useServerGame(worldId);
 
