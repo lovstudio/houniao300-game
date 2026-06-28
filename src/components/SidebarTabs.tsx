@@ -37,11 +37,11 @@ import MaterialControls from './MaterialControls';
 
 type Tab = 'state' | 'spaces' | 'works' | 'schedule';
 
-const TABS: { id: Tab; label: string; short: string }[] = [
-  { id: 'state', label: '状态', short: '状' },
-  { id: 'spaces', label: '空间', short: '空' },
-  { id: 'works', label: '作品', short: '作' },
-  { id: 'schedule', label: '活动', short: '动' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'state', label: '状态' },
+  { id: 'spaces', label: '空间' },
+  { id: 'works', label: '作品' },
+  { id: 'schedule', label: '活动' },
 ];
 
 // DB 作品行（含解析后的实拍图 URL）。
@@ -126,8 +126,8 @@ export default function SidebarTabs({
 
   return (
     <div className="flex min-h-0 w-full flex-col">
-      {/* tab bar — 居中单字印章卷签 */}
-      <div className="flex shrink-0 justify-center gap-2.5 px-2.5 pt-1">
+      {/* tab bar — 居中印章卷签 */}
+      <div className="flex shrink-0 flex-wrap justify-center gap-1.5 px-2.5 pt-1">
         {TABS.map((t) => {
           const on = tab === t.id;
           return (
@@ -137,11 +137,11 @@ export default function SidebarTabs({
               title={t.label}
               aria-label={t.label}
               className={
-                'sand-tab relative grid h-11 w-11 place-items-center text-xl ' +
+                'sand-tab relative grid h-11 place-items-center whitespace-nowrap px-2.5 text-base ' +
                 (on ? 'sand-tab-on' : '')
               }
             >
-              {t.short}
+              {t.label}
             </button>
           );
         })}
