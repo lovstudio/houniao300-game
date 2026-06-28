@@ -90,8 +90,8 @@ export default function BroadcastHud({
             </span>
           )}
           {unread > 0 && (
-            <span className="grid h-3.5 min-w-3.5 shrink-0 place-items-center rounded-full bg-clay-600 px-0.5 text-[9px] font-bold leading-none text-white">
-              {unread > 9 ? '9+' : unread}
+            <span className="grid h-3.5 min-w-3.5 shrink-0 place-items-center rounded-full bg-clay-600 px-1 text-[9px] font-bold leading-none text-white">
+              {unread > 99 ? '99+' : unread}
             </span>
           )}
           <ChevronIcon className={clsx('shrink-0', expanded && 'ml-auto')} expanded={expanded} />
