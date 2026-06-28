@@ -10,6 +10,32 @@ const ROLE_LABEL: Record<GrantRole, string> = {
   admin: '管理员',
 };
 
+const ROLE_PERK: Record<GrantRole, string> = {
+  artist: '可申领你的既有作品、上传并在地图上摆放新作品；有人观看你的作品时会收到通知',
+  volunteer: '可协助引导观众，并代艺术家创建、摆放作品',
+  admin: '拥有全部权限：编辑/删除任意作品、改派角色、分发邀请码',
+};
+
+// 复制时给目标用户一段能看懂的完整邀请文案：是什么、去哪、怎么填、有什么用。
+function inviteMessage(code: string, role: GrantRole): string {
+  const label = ROLE_LABEL[role];
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : '候鸟沙城';
+  return [
+    `【候鸟沙城 · ${label}邀请】`,
+    `邀请你以「${label}」身份加入候鸟沙城。`,
+    ``,
+    `邀请码：${code}`,
+    ``,
+    `如何使用：`,
+    `1) 打开 ${origin}`,
+    `2) 在登记页选择「${label}」身份`,
+    `3) 填入上面的邀请码，完成登记`,
+    ``,
+    `这个身份能做什么：${ROLE_PERK[role]}。`,
+  ].join('\n');
+}
+
 // 管理员邀请码分发面板：铸码、计次、启停、复制。仅管理员可见（入口在设置里）。
 export default function InviteCodesModal({
   userId,
@@ -38,8 +64,8 @@ export default function InviteCodesModal({
       });
       setLabel('');
       setMaxUses('');
-      await navigator.clipboard?.writeText(code).catch(() => {});
-      toast.success(`已生成 ${code}（已复制）`);
+      await navigator.clipboard?.writeText(inviteMessage(code, role)).catch(() => {});
+      toast.success(`已生成 ${code}，完整邀请文案已复制`);
     } catch (e: any) {
       toast.error(e?.data ?? e?.message ?? '生成失败');
     } finally {
@@ -47,9 +73,10 @@ export default function InviteCodesModal({
     }
   };
 
-  const copy = (code: string) => {
-    navigator.clipboard?.writeText(code).then(
-      () => toast.success(`已复制 ${code}`),
+  // 复制完整邀请文案（含用法说明），而非光秃秃的码。
+  const copy = (code: string, role: GrantRole) => {
+    navigator.clipboard?.writeText(inviteMessage(code, role)).then(
+      () => toast.success('完整邀请文案已复制'),
       () => toast.error('复制失败'),
     );
   };
@@ -132,8 +159,8 @@ export default function InviteCodesModal({
                 >
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => copy(c.code)}
-                      title="复制"
+                      onClick={() => copy(c.code, c.role)}
+                      title="复制完整邀请文案"
                       className="font-mono text-sm font-bold text-[#2a1c14] hover:underline"
                     >
                       {c.code}
