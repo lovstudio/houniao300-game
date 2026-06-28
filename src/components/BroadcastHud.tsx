@@ -18,10 +18,19 @@ function timeAgo(t: number) {
   return `${Math.floor(s / 86400)}天前`;
 }
 
-// 广播（全城 AI 发言）与通知（个人提醒）合并后的统一动态项。
+// 广播（全城 AI 发言）与通知（个人提醒/传话/角色回应）合并后的统一动态项。
 type FeedItem =
   | { kind: 'broadcast'; id: string; t: number; author: string; authorName: string; text: string }
-  | { kind: 'notify'; id: string; t: number; text: string; read: boolean };
+  | {
+      kind: 'notify';
+      id: string;
+      t: number;
+      text: string;
+      read: boolean;
+      noteKind?: string; // 'user_said' | 'ai_reply' | 'artwork_*'
+      actorName?: string;
+      targetName?: string;
+    };
 
 // 主视觉右上角的「动态」浮层：广播 + 通知合一。
 // 默认折叠显示最近 1-3 行，点击展开为可滚动面板。
@@ -52,7 +61,16 @@ export default function BroadcastHud({
     for (const m of msgs ?? [])
       items.push({ kind: 'broadcast', id: m.id, t: m.t, author: m.author, authorName: m.authorName, text: m.text });
     for (const n of notes ?? [])
-      items.push({ kind: 'notify', id: n._id, t: n.createdAt, text: n.text, read: n.read });
+      items.push({
+        kind: 'notify',
+        id: n._id,
+        t: n.createdAt,
+        text: n.text,
+        read: n.read,
+        noteKind: n.kind,
+        actorName: n.actorName,
+        targetName: n.targetName,
+      });
     items.sort((a, b) => a.t - b.t); // 正序：旧→新
     return items;
   }, [msgs, notes]);
@@ -137,6 +155,23 @@ function PreviewLine({ it }: { it: FeedItem }) {
       </p>
     );
   }
+  if (it.noteKind === 'ai_reply') {
+    return (
+      <p className={clsx('truncate text-[11px] leading-snug', it.read ? 'text-brown-200/70' : 'text-amber-300')}>
+        <span className="font-semibold">{it.actorName ?? '居民'}</span>
+        <span className="opacity-60"> 回应：</span>
+        {it.text}
+      </p>
+    );
+  }
+  if (it.noteKind === 'user_said') {
+    return (
+      <p className="truncate text-[11px] leading-snug text-brown-200/75">
+        <span className="text-clay-300">你{it.targetName ? ` → @${it.targetName}` : ''}：</span>
+        {it.text}
+      </p>
+    );
+  }
   return (
     <p className={clsx('truncate text-[11px] leading-snug', it.read ? 'text-brown-200/60' : 'text-clay-300')}>
       <span className="mr-1 text-clay-400">●</span>
@@ -181,6 +216,42 @@ function BroadcastRow({
 }
 
 function NotifyRow({ it }: { it: Extract<FeedItem, { kind: 'notify' }> }) {
+  // 你的传话：靠右的陶土气泡。
+  if (it.noteKind === 'user_said') {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[88%] rounded-lg rounded-br-sm border border-clay-600/50 bg-clay-900/25 px-2 py-1.5">
+          <div className="flex items-baseline justify-end gap-1.5">
+            <span className="shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
+            <span className="shrink-0 text-[10px] text-clay-300">
+              你{it.targetName ? ` → @${it.targetName}` : ''}
+            </span>
+          </div>
+          <p className="mt-0.5 break-words text-[12px] leading-snug text-brown-200/90">{it.text}</p>
+        </div>
+      </div>
+    );
+  }
+  // 角色回应：左侧琥珀气泡，未读高亮。
+  if (it.noteKind === 'ai_reply') {
+    return (
+      <div
+        className={clsx(
+          'rounded-lg rounded-tl-sm border px-2 py-1.5',
+          it.read ? 'border-brown-700/50 bg-brown-800/40' : 'border-amber-500/40 bg-amber-900/15',
+        )}
+      >
+        <div className="flex items-baseline gap-1.5">
+          <span className="shrink-0 text-[10px] font-semibold text-amber-300/90">
+            {it.actorName ?? '居民'} 回应
+          </span>
+          <span className="shrink-0 text-[9px] text-brown-200/40">{timeAgo(it.t)}</span>
+        </div>
+        <p className="mt-0.5 break-words text-[12px] leading-snug text-brown-200/95">{it.text}</p>
+      </div>
+    );
+  }
+  // 默认（作品互动等系统通知）。
   return (
     <div
       className={clsx(

@@ -11,6 +11,7 @@ import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import SettingsMenu from './SettingsMenu';
 import SidebarTabs from './SidebarTabs.tsx';
 import BroadcastHud from './BroadcastHud.tsx';
+import Composer, { type Character } from './Composer.tsx';
 import { useAutoJoinWorld } from '../hooks/useAutoJoinWorld.ts';
 import SignalHud from './SignalHud.tsx';
 import { api } from '../../convex/_generated/api';
@@ -107,6 +108,14 @@ export default function Game({
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
+  // 传话器的 @ 候选：场上所有 AI 居民。
+  const characters: Character[] = useMemo(() => {
+    if (!game) return [];
+    return [...game.world.players.values()]
+      .filter((p) => !p.human)
+      .map((p) => ({ id: p.id as string, name: game.playerDescriptions.get(p.id)?.name ?? '居民' }));
+  }, [game]);
+
   if (!worldId || !engineId || !game) {
     return null;
   }
@@ -153,9 +162,9 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </ConvexProvider>
             </Stage>
           </div>
-          {/* 走近空间/作品时的交互提示（不拦截指针） */}
+          {/* 走近空间/作品时的交互提示（不拦截指针）；抬高避让底部传话器 */}
           {nearbyPrompt && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center px-4">
               <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/90 px-4 py-2 text-sm text-brown-100 shadow-xl">
                 <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
                   空格
@@ -166,6 +175,8 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </div>
             </div>
           )}
+          {/* 主视图底部居中的传话器：语音/文字 + @ 居民，话语落入通知系统 */}
+          <Composer worldId={worldId} userId={userId} characters={characters} />
           {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
             <button
