@@ -172,6 +172,19 @@ export default function SettingsMenu({
             />
           </>
         )}
+
+        <div
+          className="settings-version"
+          style={{
+            textAlign: 'center',
+            fontSize: 11,
+            opacity: 0.45,
+            padding: '8px 0 2px',
+            letterSpacing: '0.04em',
+          }}
+        >
+          v{__APP_VERSION__}
+        </div>
       </div>
     </div>
   );
