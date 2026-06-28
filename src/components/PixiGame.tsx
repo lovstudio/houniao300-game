@@ -10,7 +10,6 @@ import { useConvex, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api.js';
 import { useSendInput } from '../hooks/sendInput.ts';
 import { toastOnError } from '../toasts.ts';
-import { DebugPath } from './DebugPath.tsx';
 import { DebugCollisionOverlay } from './DebugCollisionOverlay.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { VenuePing } from './VenuePing.tsx';
@@ -26,7 +25,7 @@ import {
 } from '../../data/sandCityGeometry.ts';
 import { VENUE_INTERIOR_MAPS } from '../../data/birdRestaurantInterior.ts';
 import type { ControlMode } from './Game.tsx';
-import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
+import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
 import { Location, playerLocation } from '../../convex/aiTown/location.ts';
@@ -839,13 +838,6 @@ export const PixiGame = (props: {
         <DebugCollisionOverlay map={props.game.worldMap} />
       )}
       {ping && <VenuePing x={ping.x} y={ping.y} t={ping.t} tileDim={tileDim} />}
-      {players.map(
-        (p) =>
-          // Only show the path for the human player in non-debug mode.
-          (SHOW_DEBUG_UI || p.id === humanPlayerId) && (
-            <DebugPath key={`path-${p.id}`} player={p} tileDim={tileDim} />
-          ),
-      )}
       {lastDestination && <PositionIndicator destination={lastDestination} tileDim={tileDim} />}
       {players.map((p) => (
         <Player
