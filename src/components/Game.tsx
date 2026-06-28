@@ -21,6 +21,11 @@ import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 
 export type ControlMode = 'player' | 'camera';
 
+// 玩家走近一个「空间」入口或一件「作品」时，提示其可按空格查看详情/进入。
+export type NearbyPrompt =
+  | { kind: 'venue'; interiorId: string; label: string }
+  | { kind: 'installation'; id: string; label: string };
+
 export default function Game({
   userId,
   controlMode,
@@ -64,6 +69,8 @@ export default function Game({
   const [panelOpen, setPanelOpen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 1024,
   );
+  // 玩家走近空间入口或作品时的「按空格查看详情」提示。
+  const [nearbyPrompt, setNearbyPrompt] = useState<NearbyPrompt | null>(null);
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -126,10 +133,24 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                   showCollisionOverlay={showCollisionOverlay}
                   historicalTime={historicalTime}
                   setSelectedElement={setSelectedElement}
+                  setNearbyPrompt={setNearbyPrompt}
                 />
               </ConvexProvider>
             </Stage>
           </div>
+          {/* 走近空间/作品时的交互提示（不拦截指针） */}
+          {nearbyPrompt && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
+              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-brown-900/85 px-4 py-2 text-sm text-brown-100 shadow-xl backdrop-blur-sm">
+                <kbd className="rounded border border-white/30 bg-brown-800 px-2 py-0.5 font-mono text-xs tracking-wider text-white">
+                  空格
+                </kbd>
+                <span>
+                  {nearbyPrompt.kind === 'venue' ? '进入' : '查看'}「{nearbyPrompt.label}」
+                </span>
+              </div>
+            </div>
+          )}
           {/* 收起态把手：贴右缘的浮木卷轴拉手——和手卷同源的世界道具，向左拉即展开。 */}
           {!panelOpen && (
             <button
@@ -143,6 +164,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               <span className="chev">‹</span>
             </button>
           )}
+
 
           {SHOW_DEV_TOOLS && showCollisionOverlay && (
             <div className="pointer-events-none absolute bottom-3 left-3 z-40 rounded-lg border border-white/20 bg-brown-900/85 px-3 py-2 text-[11px] leading-tight text-brown-100 shadow-xl">
