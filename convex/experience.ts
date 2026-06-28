@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { query, mutation, action, internalMutation, internalQuery, ActionCtx, QueryCtx } from './_generated/server';
+import { query, mutation, action, internalAction, internalMutation, internalQuery, ActionCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { chatCompletion } from './util/llm';
@@ -611,24 +611,112 @@ async function genImageSafe(
   }
 }
 
-// 生成首格（导演 + 文生图），供两个入口复用。
-// referenceBlob 存在时（用户上传过该作品的风格化照片记忆），首格以其为参考做 image edit，
-// 让主角就是用户本人的沙雕化形象；该首格图再锁成 firstPanelStorageId，后续每格沿用，全程锁脸。
+// 取参考图 blob：优先 Convex storage（refStorageId），其次远程 URL（refUrl）；取不到返回 undefined。
+async function resolveReference(
+  ctx: ActionCtx,
+  refStorageId?: string,
+  refUrl?: string,
+): Promise<Blob | undefined> {
+  if (refStorageId) return (await ctx.storage.get(refStorageId)) ?? undefined;
+  if (refUrl) {
+    try {
+      const res = await fetch(refUrl);
+      if (res.ok) return await res.blob();
+    } catch (e) {
+      console.error('拉取参考图失败，跳过主角参考', e);
+    }
+  }
+  return undefined;
+}
+
+// 后台异步生图：把 20-60s 的生图+落盘从前台交互链路里挪走。
+// 前台已 insertPanel(pending) 并把 narration/question 立即返回给用户；本 action 由 scheduler 触发，
+// 完成后 setPanelImage(ready+trace) 或 setPanelImageFailed，前端订阅 getExperience 自动刷新。
+// 首格（isFirst）额外把生成图锁成 firstPanelStorageId + protagonistDesc，供后续每格 image edit 锁脸。
+export const generatePanelImage = internalAction({
+  args: {
+    panelId: v.id('panels'),
+    experienceId: v.id('experiences'),
+    imagePrompt: v.string(),
+    requestId: v.string(),
+    startedAt: v.number(), // director 开始时间戳，用于算 totalMs（director→store 全链路）
+    isFirst: v.boolean(),
+    refStorageId: v.optional(v.string()), // 参考图定位：首格=照片记忆，非首格=firstPanelStorageId
+    refUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // 外层兜底：任何异常都不能让 panel 永久 pending；未标过状态就 setPanelImageFailed。
+    let resolved = false;
+    try {
+      // 非首格的 reference 可能尚未就绪（首格还在后台生成）；resolveReference 取不到时返回 undefined，
+      // genImageSafe 会自动走纯 t2i（不等待/不轮询）。
+      const reference = await resolveReference(ctx, args.refStorageId, args.refUrl);
+      const outcome = await genImageSafe(ctx, args.imagePrompt, 'experience-panels', args.requestId, reference);
+      if (outcome.image) {
+        // 首格：先把参考图（firstPanelStorageId）锁好，再标 ready——让 reference 在前端被允许进入
+        // 下一格之前就绪，缩小非首格 image edit 拿不到 reference 的窗口。
+        if (args.isFirst) {
+          const firstPanelStorageId = outcome.image.imageStorageId ?? (await ctx.storage.store(outcome.image.blob));
+          await ctx.runMutation(internal.experience.setExperienceLock, {
+            experienceId: args.experienceId,
+            firstPanelStorageId,
+          });
+        }
+        // trace 里一并写 requestId + totalMs，方便从 DB trace 反查日志。
+        const trace = JSON.stringify({
+          ...outcome.image.trace,
+          requestId: args.requestId,
+          storeMs: outcome.image.storeMs,
+          totalMs: Date.now() - args.startedAt,
+        });
+        await ctx.runMutation(internal.experience.setPanelImage, {
+          panelId: args.panelId,
+          imageUrl: outcome.image.imageUrl,
+          imageStorageId: outcome.image.imageStorageId,
+          imageTrace: trace,
+        });
+      } else {
+        await ctx.runMutation(internal.experience.setPanelImageFailed, {
+          panelId: args.panelId,
+          imageError: outcome.error,
+        });
+      }
+      resolved = true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[gen] requestId=${args.requestId} stage=panel-image 后台异常 resolved=${resolved}`, e);
+      if (!resolved) {
+        try {
+          await ctx.runMutation(internal.experience.setPanelImageFailed, {
+            panelId: args.panelId,
+            imageError: `panel-image: ${msg}`,
+          });
+        } catch (e2) {
+          console.error(`[gen] requestId=${args.requestId} setPanelImageFailed 兜底也失败`, e2);
+        }
+      }
+    }
+  },
+});
+
+// 生成首格的前台部分：director（同步，用户即刻拿到旁白/题目）+ insertPanel(pending) + 调度后台生图。
+// referenceLocator（用户上传过该作品的风格化照片记忆）传给后台，让首格主角就是用户本人的沙雕化形象。
 async function generateFirstPanel(
   ctx: ActionCtx,
   experienceId: Id<'experiences'>,
   event: Doc<'events'>,
-  referenceBlob?: Blob,
+  refStorageId?: string,
+  refUrl?: string,
 ) {
   const requestId = newRequestId();
-  const tDir = Date.now();
+  const startedAt = Date.now();
   const step = await director(event, [], {
     stepIndex: 0,
     minPanels: event.minPanels,
     maxPanels: event.maxPanels,
     forceFinal: false,
   });
-  console.log(`[gen] requestId=${requestId} stage=director ms=${Date.now() - tDir} panelIndex=0`);
+  console.log(`[gen] requestId=${requestId} stage=director ms=${Date.now() - startedAt} panelIndex=0`);
   const panelId = await ctx.runMutation(internal.experience.insertPanel, {
     experienceId,
     index: 0,
@@ -639,27 +727,23 @@ async function generateFirstPanel(
     allowCustom: step.allowCustom ?? true,
     isFinal: false,
   });
-  const outcome = await genImageSafe(ctx, step.imagePrompt, 'experience-panels', requestId, referenceBlob);
-  if (outcome.image) {
-    await ctx.runMutation(internal.experience.setPanelImage, {
-      panelId,
-      imageUrl: outcome.image.imageUrl,
-      imageStorageId: outcome.image.imageStorageId,
-      imageTrace: JSON.stringify({ ...outcome.image.trace, storeMs: outcome.image.storeMs }),
+  // protagonistDesc 是文字锁：后续每格 director 都要读它锁主角，必须前台同步落库（图还没生成时就有）。
+  // firstPanelStorageId 是图片锁（仅 image edit 用），留给后台生图完成时再写。
+  if (step.protagonist) {
+    await ctx.runMutation(internal.experience.setExperienceLock, {
+      experienceId,
+      protagonistDesc: step.protagonist,
     });
-  } else {
-    await ctx.runMutation(internal.experience.setPanelImageFailed, { panelId, imageError: outcome.error });
   }
-  // 首格图须存一份到 Convex storage 作为后续每格 image edit 的参考（即使展示图已转存七牛），
-  // 因为 answerPanel 通过 ctx.storage.get(firstPanelStorageId) 取参考 blob。
-  const refStorageId = outcome.image
-    ? outcome.image.imageStorageId ?? (await ctx.storage.store(outcome.image.blob))
-    : undefined;
-  // 锁定主角 + 首格参考图，供后续每格做 image edit，保持跨格视觉一致。
-  await ctx.runMutation(internal.experience.setExperienceLock, {
+  await ctx.scheduler.runAfter(0, internal.experience.generatePanelImage, {
+    panelId,
     experienceId,
-    protagonistDesc: step.protagonist,
-    firstPanelStorageId: refStorageId,
+    imagePrompt: step.imagePrompt,
+    requestId,
+    startedAt,
+    isFirst: true,
+    refStorageId,
+    refUrl,
   });
 }
 
@@ -699,22 +783,18 @@ export const startActivityExperience = action({
       userName,
     });
     // 若用户在该作品/活动下上传过照片记忆，取最新一张生成图当首格主角参考（沙雕化的自己出演）。
+    // 参考图的实际拉取挪到后台 generatePanelImage，这里只传定位（storageId/url），不阻塞前台。
     const memory = await ctx.runQuery(internal.photoMemories.latestMemoryForActivity, {
       activityKey: activity.activityKey,
       userId,
     });
-    let referenceBlob: Blob | undefined;
-    if (memory?.imageStorageId) {
-      referenceBlob = (await ctx.storage.get(memory.imageStorageId as Id<'_storage'>)) ?? undefined;
-    } else if (memory?.imageUrl) {
-      try {
-        const res = await fetch(memory.imageUrl);
-        if (res.ok) referenceBlob = await res.blob();
-      } catch (e) {
-        console.error('拉取照片记忆生成图失败，跳过主角参考', e);
-      }
-    }
-    await generateFirstPanel(ctx, experienceId, event, referenceBlob);
+    await generateFirstPanel(
+      ctx,
+      experienceId,
+      event,
+      memory?.imageStorageId ?? undefined,
+      memory?.imageUrl ?? undefined,
+    );
     return experienceId;
   },
 });
@@ -739,7 +819,7 @@ export const answerPanel = action({
     const forceFinal = nextIndex >= event.maxPanels - 1;
 
     const requestId = newRequestId();
-    const tDir = Date.now();
+    const startedAt = Date.now();
     const step = await director(event, history, {
       stepIndex: nextIndex,
       minPanels: event.minPanels,
@@ -747,7 +827,7 @@ export const answerPanel = action({
       forceFinal,
       protagonistDesc: state.experience.protagonistDesc,
     });
-    console.log(`[gen] requestId=${requestId} stage=director ms=${Date.now() - tDir} panelIndex=${nextIndex}`);
+    console.log(`[gen] requestId=${requestId} stage=director ms=${Date.now() - startedAt} panelIndex=${nextIndex}`);
     const isFinal = forceFinal || (!!step.final && nextIndex >= event.minPanels - 1);
 
     const panelId = await ctx.runMutation(internal.experience.insertPanel, {
@@ -760,22 +840,17 @@ export const answerPanel = action({
       allowCustom: isFinal ? false : step.allowCustom ?? true,
       isFinal,
     });
-    // 用首格图作参考做 image edit，锁定主角 + 色板 + 沙雕材质（仅改场景/动作）；
-    // 生图失败优雅降级，不阻断剧情/收尾。
-    const reference = state.experience.firstPanelStorageId
-      ? (await ctx.storage.get(state.experience.firstPanelStorageId)) ?? undefined
-      : undefined;
-    const outcome = await genImageSafe(ctx, step.imagePrompt, 'experience-panels', requestId, reference);
-    if (outcome.image) {
-      await ctx.runMutation(internal.experience.setPanelImage, {
-        panelId,
-        imageUrl: outcome.image.imageUrl,
-        imageStorageId: outcome.image.imageStorageId,
-        imageTrace: JSON.stringify({ ...outcome.image.trace, storeMs: outcome.image.storeMs }),
-      });
-    } else {
-      await ctx.runMutation(internal.experience.setPanelImageFailed, { panelId, imageError: outcome.error });
-    }
+    // 生图挪到后台：以首格图作参考做 image edit 锁主角/色板/沙雕材质（仅改场景/动作）。
+    // firstPanelStorageId 此刻可能还没就绪（首格仍在后台生成）——后台取不到参考会自动降级纯 t2i。
+    await ctx.scheduler.runAfter(0, internal.experience.generatePanelImage, {
+      panelId,
+      experienceId,
+      imagePrompt: step.imagePrompt,
+      requestId,
+      startedAt,
+      isFirst: false,
+      refStorageId: state.experience.firstPanelStorageId ?? undefined,
+    });
 
     if (isFinal) {
       // 命名结局 + 金句题词由 director 保证（validateStep 已强约束 + 重试）。
