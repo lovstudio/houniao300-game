@@ -66,7 +66,10 @@ export default function BroadcastHud({
 
   return (
     <div className="pointer-events-auto absolute right-2 top-2 z-30 w-60 select-none text-brown-200 sm:w-72">
-      <div className="overflow-hidden rounded-md border border-brown-700/70 bg-brown-900/85 shadow-lg backdrop-blur-sm">
+      <div
+        className="overflow-hidden rounded-md border border-brown-700 shadow-xl"
+        style={{ background: 'rgba(28,20,18,0.96)' }}
+      >
         {/* 头部：标题 + 未读红点 + 展开/收起 */}
         <button
           type="button"
