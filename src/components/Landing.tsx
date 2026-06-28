@@ -114,7 +114,7 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
         /* ── ① 标题屏 ── */
         <div
           className="absolute inset-0 flex flex-col items-center px-8 text-center transition-opacity duration-700 ease-out"
-          style={{ opacity: leaving ? 0 : 1, paddingTop: 'clamp(12vh,16vh,20vh)' }}
+          style={{ opacity: leaving ? 0 : 1, paddingTop: 'clamp(11vh,15vh,19vh)' }}
         >
           <h1 className="sr-only">沙之书 · 候鸟沙城</h1>
           <SandText
@@ -122,41 +122,59 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
             text="沙之书"
             tracking={0.16}
             settleMs={2600}
-            className="h-[clamp(170px,36vh,400px)] w-[min(92vw,760px)]"
+            className="h-[clamp(160px,34vh,380px)] w-[min(92vw,760px)]"
           />
 
-          {/* 呼吸式「开始」：紧随主标题，靠近视觉中心 */}
-          <button
-            type="button"
-            onClick={start}
-            className="landing-cta splash-fade mt-[clamp(8px,2vh,28px)] w-fit"
+          {/* 标题—CTA 桥接：暖色发丝分隔线，色用沙粒同源，过渡沙质与衬线 */}
+          <div
+            className="splash-fade"
             style={{
-              fontFamily: serif,
-              fontSize: 'clamp(13px,1.6vw,15px)',
-              letterSpacing: '0.62em',
-              textIndent: '0.62em',
-              color: INK,
-              animationDelay: '2.6s',
+              width: 'clamp(72px,9vw,118px)',
+              height: '1px',
+              marginTop: 'clamp(14px,3vh,30px)',
+              background: 'linear-gradient(90deg, transparent, #b8a079, transparent)',
+              animationDelay: '2.2s',
             }}
+          />
+
+          {/* 呼吸式「开始」：放大、加分量，居视觉中心 */}
+          <div
+            className="splash-fade mt-[clamp(14px,3vh,30px)] flex flex-col items-center"
+            style={{ animationDelay: '2.6s' }}
           >
-            开 始
-            <span
-              className="mt-2 block"
+            <button
+              type="button"
+              onClick={start}
+              className="landing-cta w-fit"
               style={{
+                fontFamily: serif,
+                fontWeight: 500,
+                fontSize: 'clamp(16px,2vw,19px)',
+                letterSpacing: '0.62em',
+                textIndent: '0.62em',
+                color: INK,
+              }}
+            >
+              开 始
+            </button>
+            <span
+              className="mt-3 block"
+              style={{
+                fontFamily: serif,
                 fontSize: '10px',
-                letterSpacing: '0.2em',
-                textIndent: '0.2em',
+                letterSpacing: '0.34em',
+                textIndent: '0.34em',
                 color: INK_SOFT,
-                opacity: 0.7,
+                opacity: 0.66,
               }}
             >
               点 击 进 入
             </span>
-          </button>
+          </div>
 
           {/* 题词 footer：底部居中，沙中逐行缓现缓隐 */}
           <div
-            className="splash-fade absolute inset-x-0 bottom-[max(5vh,28px)] flex justify-center"
+            className="splash-fade absolute inset-x-0 bottom-[max(6vh,34px)] flex justify-center"
             style={{ animationDelay: '2.4s' }}
           >
             <SandText

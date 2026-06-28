@@ -942,7 +942,7 @@ body {
 .landing-bloom { animation: landingBloom 9s ease-in-out infinite; }
 
 @keyframes ctaPulse {
-  0%, 100% { opacity: 0.5; }
+  0%, 100% { opacity: 0.62; }
   50%      { opacity: 1; }
 }
 .landing-cta { animation: ctaPulse 2.8s ease-in-out infinite; }
