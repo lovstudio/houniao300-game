@@ -13,6 +13,8 @@ export default defineConfig(({ command }) => ({
   },
   plugins: [...(command === 'serve' ? [lovinspPlugin({ bundler: 'vite' })] : []), react()],
   server: {
+    // 监听 0.0.0.0，允许同一局域网的手机用本机 IP 访问（http://<电脑IP>:5173/ai-town/）。
+    host: true,
     allowedHosts: ['ai-town-your-app-name.fly.dev', 'localhost', '127.0.0.1'],
   },
 }));
