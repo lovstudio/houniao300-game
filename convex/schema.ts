@@ -57,8 +57,22 @@ export default defineSchema({
     .index('slug', ['worldId', 'slug'])
     .index('owner', ['ownerUserId']),
 
+  // ---- 邀请码：管理员在设置里分发，注册时凭码获得 艺术家/志愿者/管理员 身份 ----
+  // 与 env 静态码（INVITE_CODE_*）并存：DB 码可计次/撤销，env 码作兜底。
+  inviteCodes: defineTable({
+    code: v.string(),
+    role: v.union(v.literal('artist'), v.literal('volunteer'), v.literal('admin')),
+    label: v.optional(v.string()), // 备注：发给谁/用途
+    maxUses: v.optional(v.number()), // undefined = 不限次
+    uses: v.number(),
+    active: v.boolean(),
+    createdBy: v.string(), // 铸码管理员 userId
+    createdAt: v.number(),
+  }).index('code', ['code']),
+
   // ---- 通知：作品被申领/被观看/被进入时，提醒归属艺术家 ----
-  notifications: defineTable({
+  // 取名 artworkNotifications 而非 notifications，避开共享 dev 上其它功能的同名表。
+  artworkNotifications: defineTable({
     userId: v.string(), // 收件人 = 作品归属艺术家
     worldId: v.id('worlds'),
     kind: v.string(), // 'artwork_viewed' | 'artwork_entered' | 'artwork_claimed'

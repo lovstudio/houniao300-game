@@ -154,7 +154,7 @@ export const recordInteraction = mutation({
 
     const cutoff = Date.now() - 30 * 60 * 1000;
     const recent = await ctx.db
-      .query('notifications')
+      .query('artworkNotifications')
       .withIndex('recent', (q) => q.eq('userId', artwork.ownerUserId!).gt('createdAt', cutoff))
       .collect();
     const dup = recent.find(
@@ -167,7 +167,7 @@ export const recordInteraction = mutation({
 
     const verb = args.kind === 'artwork_entered' ? '进入了' : '看了';
     const who = args.actorName ?? '有人';
-    return await ctx.db.insert('notifications', {
+    return await ctx.db.insert('artworkNotifications', {
       userId: artwork.ownerUserId,
       worldId: args.worldId,
       kind: args.kind,

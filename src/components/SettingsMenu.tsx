@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import InviteCodesModal from './InviteCodesModal';
 import FreezeButton from './FreezeButton';
 import MusicButton from './buttons/MusicButton';
 import SettingRow from './buttons/SettingRow';
@@ -21,6 +24,7 @@ import {
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 
 export default function SettingsMenu({
+  userId,
   controlMode,
   cameraFollow,
   isFullscreen,
@@ -35,6 +39,7 @@ export default function SettingsMenu({
   onHelp,
   tone = 'deck',
 }: {
+  userId: string;
   controlMode: 'player' | 'camera';
   cameraFollow: boolean;
   isFullscreen: boolean;
@@ -50,7 +55,11 @@ export default function SettingsMenu({
   tone?: 'deck' | 'ink';
 }) {
   const [open, setOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const profile = useQuery(api.profile.getProfile, { userId });
+  const isAdmin = profile?.role === 'admin';
 
   // 调试：抹除本地身份与记忆，刷新后生成新 uid → profile 为 null → 强制回到 onboarding 重新登记。
   const resetIdentity = () => {
@@ -145,6 +154,21 @@ export default function SettingsMenu({
           }}
         />
 
+        {isAdmin && (
+          <>
+            <div className="settings-section">管理</div>
+            <SettingRow
+              icon={<PersonIcon />}
+              label="邀请码分发"
+              onClick={() => {
+                setOpen(false);
+                setInviteOpen(true);
+              }}
+              title="生成并分发 艺术家/志愿者/管理员 邀请码"
+            />
+          </>
+        )}
+
         {SHOW_DEV_TOOLS && (
           <>
             <div className="settings-section">调试</div>
@@ -173,6 +197,8 @@ export default function SettingsMenu({
           </>
         )}
       </div>
+
+      {inviteOpen && <InviteCodesModal userId={userId} onClose={() => setInviteOpen(false)} />}
     </div>
   );
 }
