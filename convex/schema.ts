@@ -100,7 +100,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index('userId', ['userId', 'read'])
-    .index('recent', ['userId', 'createdAt']),
+    .index('recent', ['userId', 'createdAt'])
+    .index('worldRecent', ['worldId', 'createdAt']),
 
   // 一个活动 = 节目单里的一项，每个活动有自己独立的游戏。
   // activityKey 由节目单条目唯一标识（date+time+venue+title），首次进入时按 key 懒创建。

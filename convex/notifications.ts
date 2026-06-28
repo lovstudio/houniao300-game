@@ -15,6 +15,19 @@ export const listMine = query({
   },
 });
 
+// 全城公开动态：真人玩家的传话（user_said），所有人可见，与广播并列。
+export const listWorldChatter = query({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, { worldId }) => {
+    return ctx.db
+      .query('notifications')
+      .withIndex('worldRecent', (q) => q.eq('worldId', worldId))
+      .order('desc')
+      .filter((q) => q.eq(q.field('kind'), 'user_said'))
+      .take(50);
+  },
+});
+
 // 未读数（铃铛红点）。user_said 入库即 read=true，天然不计入。
 export const unreadCount = query({
   args: { userId: v.string() },
@@ -38,10 +51,17 @@ export const say = mutation({
   handler: async (ctx, { userId, worldId, text, targetName }) => {
     const clean = text.trim().slice(0, 500);
     if (!clean) throw new Error('说点什么吧');
+    // 带上说话者昵称，供全城公开动态（listWorldChatter）渲染。
+    const profile = await ctx.db
+      .query('profiles')
+      .withIndex('userId', (q) => q.eq('userId', userId))
+      .first();
     await ctx.db.insert('notifications', {
       userId,
       worldId,
       kind: 'user_said',
+      actorUserId: userId,
+      actorName: profile?.name?.trim() || undefined,
       targetName,
       text: clean,
       read: true, // 自己说的话无需提醒自己

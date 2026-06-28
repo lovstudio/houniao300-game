@@ -4,6 +4,48 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { GameId } from '../../convex/aiTown/ids';
+import { ServerGame } from '../hooks/serverGame';
+
+// 真人玩家在场/离场：从响应式世界状态里 diff 出加入/退出事件（引擎按空闲回收，
+// 无离场 mutation，故只能靠状态变化推导）。事件是会话级临时流，刷新即清。
+type PresenceEvent = { id: string; t: number; sub: 'joined' | 'left'; name: string };
+
+function useHumanPresence(game: ServerGame | undefined): PresenceEvent[] {
+  const humans = useMemo(() => {
+    if (!game) return [] as { id: string; name: string }[];
+    return [...game.world.players.values()]
+      .filter((p) => p.human)
+      .map((p) => ({
+        id: p.id as string,
+        name: game.playerDescriptions.get(p.id as never)?.name ?? '访客',
+      }));
+  }, [game]);
+  const sig = humans
+    .map((h) => h.id)
+    .sort()
+    .join(',');
+  const prevRef = useRef<Map<string, string> | null>(null);
+  const [events, setEvents] = useState<PresenceEvent[]>([]);
+  useEffect(() => {
+    const cur = new Map(humans.map((h) => [h.id, h.name]));
+    // 首次：静默种入当前在场者，避免把已在场的人误报为「刚加入」。
+    if (prevRef.current === null) {
+      prevRef.current = cur;
+      return;
+    }
+    const prev = prevRef.current;
+    const now = Date.now();
+    const added: PresenceEvent[] = [];
+    for (const [id, name] of cur)
+      if (!prev.has(id)) added.push({ id: `j${id}-${now}`, t: now, sub: 'joined', name });
+    for (const [id, name] of prev)
+      if (!cur.has(id)) added.push({ id: `l${id}-${now}`, t: now, sub: 'left', name });
+    if (added.length) setEvents((e) => [...e, ...added].slice(-30));
+    prevRef.current = cur;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+  return events;
+}
 
 function authorHue(id: string) {
   let h = 0;
@@ -30,7 +72,11 @@ type FeedItem =
       noteKind?: string; // 'user_said' | 'ai_reply' | 'artwork_*'
       actorName?: string;
       targetName?: string;
-    };
+    }
+  // 真人玩家公开传话（全城可见，与广播并列）。
+  | { kind: 'said'; id: string; t: number; text: string; actorName: string; targetName?: string }
+  // 真人加入/退出沙城（会话级临时事件）。
+  | { kind: 'presence'; id: string; t: number; sub: 'joined' | 'left'; name: string };
 
 type FeedFilter = 'all' | 'mine' | 'broadcast';
 const FILTERS: { id: FeedFilter; label: string }[] = [
@@ -44,18 +90,22 @@ const FILTERS: { id: FeedFilter; label: string }[] = [
 export default function BroadcastHud({
   worldId,
   userId,
+  game,
   onSelectAgent,
 }: {
   worldId: Id<'worlds'>;
   userId: string;
+  game?: ServerGame;
   onSelectAgent: (id: GameId<'players'>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState<FeedFilter>('all');
   const msgs = useQuery(api.messages.listRecentMessages, { worldId, limit: 80 });
   const notes = useQuery(api.notifications.listMine, { userId });
+  const chatter = useQuery(api.notifications.listWorldChatter, { worldId });
   const unread = useQuery(api.notifications.unreadCount, { userId }) ?? 0;
   const markAllRead = useMutation(api.notifications.markAllRead);
+  const presence = useHumanPresence(game);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 展开时把通知标记已读。
@@ -79,14 +129,29 @@ export default function BroadcastHud({
         actorName: n.actorName,
         targetName: n.targetName,
       });
+    for (const c of chatter ?? [])
+      items.push({
+        kind: 'said',
+        id: c._id,
+        t: c.createdAt,
+        text: c.text,
+        actorName: c.actorName ?? '访客',
+        targetName: c.targetName,
+      });
+    for (const p of presence)
+      items.push({ kind: 'presence', id: p.id, t: p.t, sub: p.sub, name: p.name });
     items.sort((a, b) => a.t - b.t); // 正序：旧→新
     return items;
-  }, [msgs, notes]);
+  }, [msgs, notes, chatter, presence]);
 
-  // 按筛选标签过滤：我的对话 = 通知流（传话/回应/系统通知）；广播 = 全城公开发言。
+  // 按筛选标签过滤：我的对话 = 个人通知（回应/系统通知）；广播 = 全城公开动态
+  //（AI 发言 + 真人传话 + 真人进出）。
   const shown = useMemo(() => {
     if (filter === 'all') return feed;
-    if (filter === 'broadcast') return feed.filter((it) => it.kind === 'broadcast');
+    if (filter === 'broadcast')
+      return feed.filter(
+        (it) => it.kind === 'broadcast' || it.kind === 'said' || it.kind === 'presence',
+      );
     return feed.filter((it) => it.kind === 'notify');
   }, [feed, filter]);
 
@@ -188,7 +253,26 @@ function PreviewLine({ it }: { it: FeedItem }) {
       </p>
     );
   }
-  if (it.noteKind === 'ai_reply') {
+  if (it.kind === 'presence') {
+    return (
+      <p className="truncate text-[11px] leading-snug text-brown-200/75">
+        <span className="font-semibold text-[#7fd4a6]">{it.name}</span>
+        <span className="text-brown-200/55">
+          {it.sub === 'joined' ? ' 走进了沙城' : ' 离开了沙城'}
+        </span>
+      </p>
+    );
+  }
+  if (it.kind === 'said') {
+    return (
+      <p className="truncate text-[11px] leading-snug text-brown-200/85">
+        <span className="font-semibold text-[#7fd4a6]">{it.actorName}</span>
+        <span className="text-brown-200/50">{it.targetName ? ` → @${it.targetName}：` : '：'}</span>
+        {it.text}
+      </p>
+    );
+  }
+  if (it.kind === 'notify' && it.noteKind === 'ai_reply') {
     return (
       <p className={clsx('truncate text-[11px] leading-snug', it.read ? 'text-brown-200/70' : 'text-amber-300')}>
         <span className="font-semibold">{it.actorName ?? '居民'}</span>
@@ -229,6 +313,18 @@ function FeedRow({
   let onAvatar: (() => void) | undefined;
   let unread = false;
 
+  // 进出场：纤细的系统提示行，不占用整张卡片。
+  if (it.kind === 'presence') {
+    return (
+      <div className="flex items-center gap-1.5 px-1.5 py-1 text-[11px] text-brown-200/55">
+        <span className="h-1 w-1 shrink-0 rounded-full bg-[#7fd4a6]" />
+        <span className="font-semibold text-[#7fd4a6]">{it.name}</span>
+        <span>{it.sub === 'joined' ? '走进了沙城' : '离开了沙城'}</span>
+        <span className="ml-auto shrink-0 text-[9px] text-brown-200/35">{timeAgo(it.t)}</span>
+      </div>
+    );
+  }
+
   if (it.kind === 'broadcast') {
     const h = authorHue(it.author);
     avatarText = it.authorName.slice(0, 1);
@@ -236,6 +332,12 @@ function FeedRow({
     name = it.authorName;
     nameColor = `hsl(${h} 55% 70%)`;
     onAvatar = () => onSelectAgent(it.author as GameId<'players'>);
+  } else if (it.kind === 'said') {
+    avatarText = it.actorName.slice(0, 1);
+    avatarBg = 'hsl(152 50% 38%)';
+    name = it.actorName;
+    nameColor = '#7fd4a6';
+    tag = it.targetName ? `@${it.targetName}` : '真人';
   } else if (it.noteKind === 'ai_reply') {
     avatarText = (it.actorName ?? '居').slice(0, 1);
     avatarBg = 'hsl(35 58% 46%)';
