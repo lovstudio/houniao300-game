@@ -7,7 +7,6 @@ import {
   activityFromSchedule,
   type ActivityDescriptor,
 } from './lib/activityEnter.ts';
-import { resolveInterior } from '../data/birdRestaurantInterior.ts';
 import { SCHEDULE, VENUE_COORDS, VENUES } from '../data/schedule.ts';
 import { getAnonUserId } from './lib/identity.ts';
 
@@ -101,7 +100,11 @@ export default function Home() {
   const activeWorldId = interiorWorld?.worldId ?? defaultWorldId;
   const activeEngineId = interiorWorld?.engineId ?? defaultEngineId;
   const activeInteriorId = interiorWorld?.interiorId;
-  const activeInterior = activeInteriorId ? resolveInterior(activeInteriorId) : undefined;
+  const activeInterior =
+    useQuery(
+      api.interiors.getInteriorMap,
+      activeInteriorId ? { interiorId: activeInteriorId } : 'skip',
+    ) ?? undefined;
 
   const game = useServerGame(activeWorldId);
   const humanTokenIdentifier = useQuery(
@@ -370,7 +373,7 @@ export default function Home() {
           userId={userId}
           worldId={activeWorldId}
           engineId={activeEngineId}
-          interiorId={activeInteriorId}
+          interior={activeInterior}
           onExitInterior={exitInterior}
           controlMode={controlMode}
           cameraFollow={cameraFollow}

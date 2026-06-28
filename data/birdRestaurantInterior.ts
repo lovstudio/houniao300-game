@@ -201,15 +201,18 @@ export function getVenueInterior(id: string) {
   return VENUE_INTERIOR_MAPS.find((interior) => interior.id === id);
 }
 
-// 「作品即建筑」可进入空间的 interiorId 约定：'artwork:<slug>'。
-export const ARTWORK_INTERIOR_PREFIX = 'artwork:';
-export function artworkInteriorId(slug: string) {
-  return `${ARTWORK_INTERIOR_PREFIX}${slug}`;
+// interiorId 约定：非手工编排的实体直接复用其「物料 key」作为 interiorId，
+// 即 venue → 'venue:<refId>'，作品 → 'work:<slug>'；手工编排的内场则用其自身 id。
+// 这样 readiness 判定（查 materials 表的同名 key）与进入用的 id 是同一个字符串，简单一致。
+export function workInteriorId(slug: string) {
+  return `work:${slug}`;
+}
+export function venueInteriorId(refId: string) {
+  return `venue:${refId}`;
 }
 
 // 通用默认内场：一个四面围墙、底部中央开门的素房间（源 1280×720 → 80×45 格）。
-// 任何标记为 kind='space' 的作品都可立刻走进它；若某栋建筑后续手工编排了专属内场
-// （在 VENUE_INTERIOR_MAPS 里放一张 id 为 'artwork:<slug>' 的地图），resolveInterior 会优先用专属的。
+// 作为兜底：实体被请求进入、但既无手工地图也无已生成几何时，回退到它，保证永不硬报错。
 export const DEFAULT_BUILDING_INTERIOR: VenueInteriorMap = {
   id: 'default-building-interior',
   venue: '内部空间',
@@ -237,13 +240,55 @@ export const DEFAULT_BUILDING_INTERIOR: VenueInteriorMap = {
   circles: [{ id: 'entry-light', x: 640, y: 620, radius: 36, kind: 'light', walkable: true }],
 };
 
-// 解析 interiorId → 内场地图：手工编排的优先（含 venue 与作品专属覆盖），
-// 'artwork:<slug>' 类一律回退到通用默认房间，保证「作品即建筑」永远可进入。
+export function defaultInterior(id: string): VenueInteriorMap {
+  return { ...DEFAULT_BUILDING_INTERIOR, id };
+}
+
+// materials.regenerate（VENUE_SYSTEM）产出的几何 JSON 结构。坐标固定在 1280×720 虚拟画布内。
+export type GeneratedInterior = {
+  subtitle?: string;
+  labels?: InteriorLabel[];
+  rects?: InteriorRect[];
+  circles?: InteriorCircle[];
+};
+
+// 在固定 1280×720 画布上挑一个可走动出生点：优先 entry/path/aisle/light 类可走形状的中心，
+// 否则退回画布中心，避免把玩家生成在墙体里。
+function pickSpawn(gen: GeneratedInterior): SourcePoint {
+  const isSpawnZone = (k: string) => k === 'entry' || k === 'path' || k === 'aisle';
+  const rect = (gen.rects ?? []).find((r) => r.walkable && isSpawnZone(r.kind));
+  if (rect) return [rect.x + rect.width / 2, rect.y + rect.height / 2];
+  const circle = (gen.circles ?? []).find((c) => c.walkable);
+  if (circle) return [circle.x, circle.y];
+  return [640, 360];
+}
+
+// 把已生成几何包装成一张完整内场地图（补齐 source/entrance/venue 等渲染与建图所需字段）。
+export function interiorFromGenerated(
+  id: string,
+  gen: GeneratedInterior,
+  venue = '内部空间',
+): VenueInteriorMap {
+  const spawn = pickSpawn(gen);
+  return {
+    id,
+    venue,
+    subtitle: gen.subtitle ?? '可走动内景',
+    source: { imageName: '', width: 1280, height: 720, capturedAt: '' },
+    mapWidth: 40,
+    mapHeight: 23,
+    entrance: { exteriorSource: [640, 690], interiorSource: spawn, radiusTiles: 6 },
+    labels: gen.labels ?? [],
+    rects: gen.rects ?? [],
+    circles: gen.circles ?? [],
+  };
+}
+
+// 纯静态解析（无 DB）：手工编排优先，已知前缀回退默认空房间。仅作前端兜底；
+// 接入「已生成几何」的解析在 convex/interiors.ts（需读 materials 表）。
 export function resolveInterior(id: string): VenueInteriorMap | undefined {
   const authored = getVenueInterior(id);
   if (authored) return authored;
-  if (id.startsWith(ARTWORK_INTERIOR_PREFIX)) {
-    return { ...DEFAULT_BUILDING_INTERIOR, id };
-  }
+  if (id.startsWith('work:') || id.startsWith('venue:')) return defaultInterior(id);
   return undefined;
 }

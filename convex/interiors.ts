@@ -1,16 +1,52 @@
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
-import { MutationCtx, mutation, query } from './_generated/server';
+import { MutationCtx, QueryCtx, mutation, query } from './_generated/server';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { insertInput } from './aiTown/insertInput';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { Descriptions } from '../data/characters';
-import { resolveInterior } from '../data/birdRestaurantInterior';
+import {
+  getVenueInterior,
+  defaultInterior,
+  interiorFromGenerated,
+  type VenueInteriorMap,
+} from '../data/birdRestaurantInterior';
 import { interiorToWorldMap } from '../data/interiorWorldMap';
 
 // 每个内场世界里安置几名 AI 居民（复用主世界的人物设定）；可后续按场馆定制。
 const INTERIOR_AGENT_COUNT = 2;
+
+// 解析 interiorId → 内场地图（DB 感知）：
+// 1) 手工编排的地图优先；2) 否则按「物料 key == interiorId」读 materials，已生成则用其几何；
+// 3) 都没有则回退通用默认空房间，保证进入永不硬报错。
+async function resolveInteriorMap(
+  ctx: QueryCtx,
+  interiorId: string,
+): Promise<VenueInteriorMap> {
+  const authored = getVenueInterior(interiorId);
+  if (authored) return authored;
+  const doc = await ctx.db
+    .query('materials')
+    .withIndex('key', (q) => q.eq('key', interiorId))
+    .first();
+  if (doc?.status === 'ready' && doc.generated) {
+    try {
+      return interiorFromGenerated(interiorId, JSON.parse(doc.generated), doc.title);
+    } catch {
+      // 生成的 JSON 损坏 → 退回默认房间
+    }
+  }
+  return defaultInterior(interiorId);
+}
+
+// 只读：解析后的内场富地图（供前端矢量渲染/碰撞叠加用）。
+export const getInteriorMap = query({
+  args: { interiorId: v.string() },
+  handler: async (ctx, args): Promise<VenueInteriorMap> => {
+    return await resolveInteriorMap(ctx, args.interiorId);
+  },
+});
 
 async function lookupInteriorWorld(ctx: MutationCtx, interiorId: string) {
   const row = await ctx.db
@@ -56,10 +92,7 @@ export const getOrCreateInteriorWorld = mutation({
     const existing = await lookupInteriorWorld(ctx, args.interiorId);
     if (existing) return existing;
 
-    const interior = resolveInterior(args.interiorId);
-    if (!interior) {
-      throw new Error(`Unknown interior: ${args.interiorId}`);
-    }
+    const interior = await resolveInteriorMap(ctx, args.interiorId);
 
     const engineId = await createEngine(ctx);
     const engine = (await ctx.db.get(engineId))!;
