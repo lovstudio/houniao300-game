@@ -47,6 +47,7 @@ import type * as util_FastIntegerCompression from "../util/FastIntegerCompressio
 import type * as util_assertNever from "../util/assertNever.js";
 import type * as util_asyncMap from "../util/asyncMap.js";
 import type * as util_compression from "../util/compression.js";
+import type * as util_generation from "../util/generation.js";
 import type * as util_geometry from "../util/geometry.js";
 import type * as util_image from "../util/image.js";
 import type * as util_isSimpleObject from "../util/isSimpleObject.js";
@@ -105,6 +106,7 @@ declare const fullApi: ApiFromModules<{
   "util/assertNever": typeof util_assertNever;
   "util/asyncMap": typeof util_asyncMap;
   "util/compression": typeof util_compression;
+  "util/generation": typeof util_generation;
   "util/geometry": typeof util_geometry;
   "util/image": typeof util_image;
   "util/isSimpleObject": typeof util_isSimpleObject;

@@ -3,8 +3,8 @@ import { query, mutation, action, internalMutation, internalQuery, ActionCtx, Qu
 import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import { chatCompletion } from './util/llm';
-import { generateImage } from './util/image';
-import { uploadToQiniu } from './util/qiniu';
+import { generateImageTraced, ImageTrace } from './util/image';
+import { newRequestId, storeGeneratedImage } from './util/generation';
 
 // ============================================================
 // 导演（LLM）：基于活动背景 + 历史问答，决定下一格连环画。
@@ -222,7 +222,8 @@ export const insertPanel = internalMutation({
     allowCustom: v.boolean(),
     isFinal: v.boolean(),
   },
-  handler: async (ctx, args) => await ctx.db.insert('panels', args),
+  // 插入即标 pending：图还在生成中，前端据此显示"正在绘制画面"。
+  handler: async (ctx, args) => await ctx.db.insert('panels', { ...args, imageStatus: 'pending' }),
 });
 
 export const setPanelImage = internalMutation({
@@ -230,12 +231,23 @@ export const setPanelImage = internalMutation({
     panelId: v.id('panels'),
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.string()),
+    imageTrace: v.optional(v.string()),
   },
-  handler: async (ctx, { panelId, imageUrl, imageStorageId }) => {
-    const patch: Partial<Doc<'panels'>> = {};
+  // 落盘成功：标 ready + 记 trace，前端解除"绘制中"并允许交互。
+  handler: async (ctx, { panelId, imageUrl, imageStorageId, imageTrace }) => {
+    const patch: Partial<Doc<'panels'>> = { imageStatus: 'ready' };
     if (imageUrl) patch.imageUrl = imageUrl;
     if (imageStorageId) patch.imageStorageId = imageStorageId;
-    if (Object.keys(patch).length) await ctx.db.patch(panelId, patch);
+    if (imageTrace) patch.imageTrace = imageTrace;
+    await ctx.db.patch(panelId, patch);
+  },
+});
+
+export const setPanelImageFailed = internalMutation({
+  args: { panelId: v.id('panels'), imageError: v.string() },
+  // 生图/落盘失败：标 failed + 记失败阶段+原因，前端显示失败态但允许继续答题。
+  handler: async (ctx, { panelId, imageError }) => {
+    await ctx.db.patch(panelId, { imageStatus: 'failed', imageError });
   },
 });
 
@@ -550,40 +562,52 @@ export const saveReflection = mutation({
 // ============================================================
 // 公开 action：核心交互闭环
 // ============================================================
-// 生图结果：blob 供首格做后续 image edit 参考；imageUrl/imageStorageId 二选一供回填。
-type GenImage = { blob: Blob; imageUrl?: string; imageStorageId?: string };
+// 生图结果：blob 供首格做后续 image edit 参考；imageUrl/imageStorageId 二选一供回填；trace/storeMs 供落库。
+type GenImage = { blob: Blob; imageUrl?: string; imageStorageId?: string; trace: ImageTrace; storeMs: number };
+// 失败时带"失败阶段+原因"，写进 panel.imageError，前端显示失败态但允许继续答题。
+type GenOutcome = { image: GenImage } | { image: null; error: string };
 
 // 生图容错：优先用首格图做 image edit；若失败（如偶发内容审核 400）退回纯 t2i；
-// 再失败则该格暂无图——绝不让单格生图失败阻断整条剧情/收尾。返回 GenImage 或 null。
-// 生成成功后优先转存七牛 CDN（imageUrl）；上传失败回退 Convex storage（imageStorageId），绝不漏图。
+// 再失败则该格无图——绝不让单格生图失败阻断整条剧情/收尾。
+// 全程用 requestId 串结构化日志（gen/store 各阶段 ms）；落盘走统一管线（七牛优先，失败回退 Convex）。
 async function genImageSafe(
   ctx: ActionCtx,
   prompt: string,
-  unique: string,
+  namespace: string,
+  requestId: string,
   reference?: Blob,
-): Promise<GenImage | null> {
+): Promise<GenOutcome> {
+  const tGen = Date.now();
   let blob: Blob | null = null;
+  let trace: ImageTrace | null = null;
+  let genError = '';
   try {
-    blob = await generateImage(prompt, reference);
+    ({ blob, trace } = await generateImageTraced(prompt, reference));
   } catch (e1) {
     if (reference) {
       try {
-        blob = await generateImage(prompt); // 退回纯 t2i（prompt 已含主角描述，仍尽量一致）
+        // 退回纯 t2i（prompt 已含主角描述，仍尽量一致）。
+        ({ blob, trace } = await generateImageTraced(prompt));
       } catch (e2) {
-        console.error('文生图(edit+t2i)均失败', e2);
+        genError = `gen: edit+t2i 均失败 ${e2 instanceof Error ? e2.message : String(e2)}`;
+        console.error(`[gen] requestId=${requestId} stage=gen ms=${Date.now() - tGen} ${genError}`, e2);
       }
     } else {
-      console.error('文生图失败', e1);
+      genError = `gen: t2i 失败 ${e1 instanceof Error ? e1.message : String(e1)}`;
+      console.error(`[gen] requestId=${requestId} stage=gen ms=${Date.now() - tGen} ${genError}`, e1);
     }
   }
-  if (!blob) return null;
+  if (!blob || !trace) return { image: null, error: genError || 'gen: 文生图返回为空' };
+  console.log(
+    `[gen] requestId=${requestId} stage=gen ms=${Date.now() - tGen} mode=${trace.mode} apiMs=${trace.apiMs} retries=${trace.retries} outKB=${trace.outKB}`,
+  );
   try {
-    const imageUrl = await uploadToQiniu(blob, unique);
-    return { blob, imageUrl };
+    const { imageUrl, imageStorageId, storeMs } = await storeGeneratedImage(ctx, blob, namespace, requestId);
+    return { image: { blob, imageUrl, imageStorageId, trace, storeMs } };
   } catch (e) {
-    console.error('七牛上传失败，回退 Convex storage', e);
-    const imageStorageId = await ctx.storage.store(blob);
-    return { blob, imageStorageId };
+    const error = `store: 七牛+Convex 落盘均失败 ${e instanceof Error ? e.message : String(e)}`;
+    console.error(`[gen] requestId=${requestId} stage=store ${error}`, e);
+    return { image: null, error };
   }
 }
 
@@ -596,12 +620,15 @@ async function generateFirstPanel(
   event: Doc<'events'>,
   referenceBlob?: Blob,
 ) {
+  const requestId = newRequestId();
+  const tDir = Date.now();
   const step = await director(event, [], {
     stepIndex: 0,
     minPanels: event.minPanels,
     maxPanels: event.maxPanels,
     forceFinal: false,
   });
+  console.log(`[gen] requestId=${requestId} stage=director ms=${Date.now() - tDir} panelIndex=0`);
   const panelId = await ctx.runMutation(internal.experience.insertPanel, {
     experienceId,
     index: 0,
@@ -612,18 +639,21 @@ async function generateFirstPanel(
     allowCustom: step.allowCustom ?? true,
     isFinal: false,
   });
-  const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-0-${Date.now()}`, referenceBlob);
-  if (gen) {
+  const outcome = await genImageSafe(ctx, step.imagePrompt, 'experience-panels', requestId, referenceBlob);
+  if (outcome.image) {
     await ctx.runMutation(internal.experience.setPanelImage, {
       panelId,
-      imageUrl: gen.imageUrl,
-      imageStorageId: gen.imageStorageId,
+      imageUrl: outcome.image.imageUrl,
+      imageStorageId: outcome.image.imageStorageId,
+      imageTrace: JSON.stringify({ ...outcome.image.trace, storeMs: outcome.image.storeMs }),
     });
+  } else {
+    await ctx.runMutation(internal.experience.setPanelImageFailed, { panelId, imageError: outcome.error });
   }
   // 首格图须存一份到 Convex storage 作为后续每格 image edit 的参考（即使展示图已转存七牛），
   // 因为 answerPanel 通过 ctx.storage.get(firstPanelStorageId) 取参考 blob。
-  const refStorageId = gen
-    ? gen.imageStorageId ?? (await ctx.storage.store(gen.blob))
+  const refStorageId = outcome.image
+    ? outcome.image.imageStorageId ?? (await ctx.storage.store(outcome.image.blob))
     : undefined;
   // 锁定主角 + 首格参考图，供后续每格做 image edit，保持跨格视觉一致。
   await ctx.runMutation(internal.experience.setExperienceLock, {
@@ -708,6 +738,8 @@ export const answerPanel = action({
     const nextIndex = panels.length;
     const forceFinal = nextIndex >= event.maxPanels - 1;
 
+    const requestId = newRequestId();
+    const tDir = Date.now();
     const step = await director(event, history, {
       stepIndex: nextIndex,
       minPanels: event.minPanels,
@@ -715,6 +747,7 @@ export const answerPanel = action({
       forceFinal,
       protagonistDesc: state.experience.protagonistDesc,
     });
+    console.log(`[gen] requestId=${requestId} stage=director ms=${Date.now() - tDir} panelIndex=${nextIndex}`);
     const isFinal = forceFinal || (!!step.final && nextIndex >= event.minPanels - 1);
 
     const panelId = await ctx.runMutation(internal.experience.insertPanel, {
@@ -732,13 +765,16 @@ export const answerPanel = action({
     const reference = state.experience.firstPanelStorageId
       ? (await ctx.storage.get(state.experience.firstPanelStorageId)) ?? undefined
       : undefined;
-    const gen = await genImageSafe(ctx, step.imagePrompt, `${experienceId}-${nextIndex}-${Date.now()}`, reference);
-    if (gen) {
+    const outcome = await genImageSafe(ctx, step.imagePrompt, 'experience-panels', requestId, reference);
+    if (outcome.image) {
       await ctx.runMutation(internal.experience.setPanelImage, {
         panelId,
-        imageUrl: gen.imageUrl,
-        imageStorageId: gen.imageStorageId,
+        imageUrl: outcome.image.imageUrl,
+        imageStorageId: outcome.image.imageStorageId,
+        imageTrace: JSON.stringify({ ...outcome.image.trace, storeMs: outcome.image.storeMs }),
       });
+    } else {
+      await ctx.runMutation(internal.experience.setPanelImageFailed, { panelId, imageError: outcome.error });
     }
 
     if (isFinal) {
