@@ -2,13 +2,14 @@ import { useRef, useState } from 'react';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
-import { Avatar, AVATAR_PRESETS, DEFAULT_PRESET } from '../lib/avatars';
+import { Avatar, DEFAULT_PRESET } from '../lib/avatars';
 import { Gender } from '../lib/identity';
 import clsx from 'clsx';
 import SandText, { type SandTextHandle } from './SandText.tsx';
 
 type AvatarChoice =
   | { kind: 'preset'; preset: string }
+  | { kind: 'uploaded'; storageId: string; url: string }
   | { kind: 'generated'; storageId: string; url: string };
 
 const GENDERS: { value: Gender; label: string }[] = [
@@ -38,40 +39,54 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
   const [inviteCode, setInviteCode] = useState('');
   const [roleError, setRoleError] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<AvatarChoice>({ kind: 'preset', preset: DEFAULT_PRESET });
-  const [desc, setDesc] = useState('');
   const [photo, setPhoto] = useState<{ storageId: Id<'_storage'>; previewUrl: string } | null>(null);
+  const [generated, setGenerated] = useState<{ storageId: string; url: string } | null>(null);
+  const [genStyle, setGenStyle] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const headingRef = useRef<SandTextHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const canSave = !!name.trim() && !!gender && !saving;
-  // 有照片或描述其一即可生成。
-  const canGenerate = !!name.trim() && !!gender && (!!desc.trim() || !!photo) && !generating;
+  // 沙之书风格基于上传的真人照片风格化，需先有照片 + 名字/性别。
+  const canGenerate = !!name.trim() && !!gender && !!photo && !generating;
 
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return;
-    const uploadUrl = await genUploadUrl();
-    const res = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': file.type },
-      body: file,
-    });
-    const { storageId } = (await res.json()) as { storageId: Id<'_storage'> };
-    setPhoto({ storageId, previewUrl: URL.createObjectURL(file) });
+    setUploading(true);
+    try {
+      const uploadUrl = await genUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      const { storageId } = (await res.json()) as { storageId: Id<'_storage'> };
+      const previewUrl = URL.createObjectURL(file);
+      setPhoto({ storageId, previewUrl });
+      // 上传成功即默认用真人原图作头像；清掉上一次的生成结果与勾选。
+      setAvatar({ kind: 'uploaded', storageId, url: previewUrl });
+      setGenerated(null);
+      setGenStyle(false);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const generate = async () => {
-    if (!canGenerate || !gender) return;
+    if (!canGenerate || !gender || !photo) return;
     setGenerating(true);
     try {
       const { storageId, url } = await genAvatar({
-        description: desc.trim(),
+        description: '',
         name: name.trim(),
         gender,
-        photoStorageId: photo?.storageId,
+        photoStorageId: photo.storageId,
       });
-      setAvatar({ kind: 'generated', storageId, url: url ?? '' });
+      const result = { storageId, url: url ?? '' };
+      setGenerated(result);
+      setAvatar({ kind: 'generated', ...result }); // 生成后默认选用沙之书风格，用户可切回原图
     } finally {
       setGenerating(false);
     }
@@ -96,7 +111,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
         artistStatement: role === 'artist' && statement.trim() ? statement.trim() : undefined,
         inviteCode: role !== 'visitor' ? inviteCode.trim() : undefined,
         avatarPreset: avatar.kind === 'preset' ? avatar.preset : undefined,
-        avatarStorageId: avatar.kind === 'generated' ? avatar.storageId : undefined,
+        avatarStorageId: avatar.kind === 'preset' ? undefined : avatar.storageId,
       });
       onDone();
     } catch (e: any) {
@@ -107,7 +122,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
     }
   };
 
-  const previewUrl = avatar.kind === 'generated' ? avatar.url : null;
+  const previewUrl = avatar.kind === 'preset' ? null : avatar.url;
   const previewPreset = avatar.kind === 'preset' ? avatar.preset : null;
 
   const serif = '"Noto Serif SC","Songti SC",serif';
@@ -129,9 +144,6 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
             settleMs={1600}
             className="h-[34px] w-[248px]"
           />
-          <p className="mt-2 text-[12px] tracking-[0.04em] text-[#7a7063]">
-            先创建你的身份，整座候鸟沙城通用
-          </p>
         </div>
       </div>
 
@@ -209,83 +221,113 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
       {roleError && <p className="mb-2 text-[12px] text-[#b0563a]">{roleError}</p>}
       <div className="mb-7" />
 
-      {/* 头像：预置 */}
-      <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">头 像</label>
-      <div className="mb-4 flex flex-wrap gap-2.5">
-        {AVATAR_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setAvatar({ kind: 'preset', preset: p.id })}
-            className={clsx(
-              'rounded-full transition-all',
-              avatar.kind === 'preset' && avatar.preset === p.id
-                ? 'ring-2 ring-[#b0563a]'
-                : 'opacity-70 ring-1 ring-[rgba(44,38,32,0.14)] hover:opacity-100',
-            )}
-          >
-            <Avatar preset={p.id} size="md" />
-          </button>
-        ))}
-      </div>
+      {/* 头像：默认上传真人照片，可选生成沙之书风格 */}
+      <label className="mb-3 block text-[11px] tracking-[0.24em] text-[#7a7063]">头 像</label>
+      <div className="mb-9">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => void pickPhoto(e.target.files?.[0])}
+        />
 
-      {/* 头像：自定义 -> AI 生成 */}
-      <div className="mb-9 border-t border-[rgba(44,38,32,0.12)] pt-4">
-        <p className="mb-2 text-[12px] text-[#7a7063]">上传真人照片或描述样子，AI 为你生成专属头像</p>
-
-        {/* 上传真人照片 */}
-        <div className="mb-3 flex items-center gap-3">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => void pickPhoto(e.target.files?.[0])}
-          />
+        {!photo ? (
           <button
-            className="shrink-0 text-[13px] tracking-[0.1em] text-[#b0563a] transition-opacity hover:opacity-70 disabled:opacity-30"
-            disabled={generating}
+            type="button"
             onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed border-[#d8cdb8] py-7 transition-colors hover:border-[#b0563a] hover:bg-[#f3ead8]/50 disabled:opacity-40"
           >
-            {photo ? '换张照片' : '上传照片 ↑'}
+            <span className="text-[13px] tracking-[0.12em] text-[#7a7063]">
+              {uploading ? '上传中…' : '上传你的照片'}
+            </span>
+            <span className="text-[11px] text-[#a89e8d]">作为你在沙城里的头像</span>
           </button>
-          {photo && (
-            <>
-              <img src={photo.previewUrl} alt="" className="h-9 w-9 rounded-full object-cover ring-1 ring-[rgba(44,38,32,0.14)]" />
+        ) : (
+          <div>
+            <div className="flex items-start gap-6">
+              {/* 真人原图 */}
               <button
-                className="text-[11px] text-[#a89e8d] transition-colors hover:text-[#b0563a]"
-                disabled={generating}
-                onClick={() => setPhoto(null)}
+                type="button"
+                onClick={() => setAvatar({ kind: 'uploaded', storageId: photo.storageId, url: photo.previewUrl })}
+                className="flex flex-col items-center gap-1.5"
               >
-                移除
+                <Avatar
+                  url={photo.previewUrl}
+                  size="lg"
+                  className={clsx('transition-all', avatar.kind === 'uploaded' ? 'ring-2 ring-[#b0563a]' : 'opacity-60 hover:opacity-90')}
+                />
+                <span className="text-[11px] text-[#7a7063]">原图</span>
               </button>
-            </>
-          )}
-        </div>
 
-        <div className="flex items-end gap-3">
-          <input
-            className={clsx(inputCls, 'flex-1 text-[14px]')}
-            placeholder={photo ? '可补充：想要的风格细节…' : '如：戴草帽的旅人、橙羽信使…'}
-            value={desc}
-            disabled={generating}
-            onChange={(e) => setDesc(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void generate()}
-          />
-          <button
-            className="shrink-0 pb-2 text-[13px] tracking-[0.1em] text-[#b0563a] transition-opacity hover:opacity-70 disabled:opacity-30"
-            disabled={!canGenerate}
-            onClick={() => void generate()}
-          >
-            {generating ? '生成中…' : '生成 →'}
-          </button>
-        </div>
-        {!name.trim() || !gender ? (
-          <p className="mt-2 text-[11px] text-[#a89e8d]">填好名字和性别后即可生成</p>
-        ) : null}
-        {avatar.kind === 'generated' && (
-          <div className="mt-3 flex items-center gap-2">
-            <Avatar url={avatar.url} size="md" className="ring-2 ring-[#b0563a]" />
-            <span className="text-[12px] text-[#7a7063]">已选用 AI 生成头像</span>
+              {/* 沙之书风格：生成中占位 / 生成结果可选用 */}
+              {generating ? (
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-[#d8cdb8] text-[11px] text-[#a89e8d]">
+                    生成中…
+                  </span>
+                  <span className="text-[11px] text-[#7a7063]">沙之书风格</span>
+                </div>
+              ) : generated ? (
+                <button
+                  type="button"
+                  onClick={() => setAvatar({ kind: 'generated', storageId: generated.storageId, url: generated.url })}
+                  className="flex flex-col items-center gap-1.5"
+                >
+                  <Avatar
+                    url={generated.url}
+                    size="lg"
+                    className={clsx('transition-all', avatar.kind === 'generated' ? 'ring-2 ring-[#b0563a]' : 'opacity-60 hover:opacity-90')}
+                  />
+                  <span className="text-[11px] text-[#7a7063]">沙之书风格</span>
+                </button>
+              ) : null}
+            </div>
+
+            {/* 操作行 */}
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px]">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading || generating}
+                className="text-[#7a7063] transition-colors hover:text-[#b0563a] disabled:opacity-30"
+              >
+                换张照片
+              </button>
+
+              {!generated && !generating && (
+                <label className={clsx('flex items-center gap-1.5', canGenerate ? 'cursor-pointer text-[#b0563a]' : 'text-[#a89e8d]')}>
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-[#b0563a]"
+                    checked={genStyle}
+                    disabled={!canGenerate}
+                    onChange={(e) => {
+                      setGenStyle(e.target.checked);
+                      if (e.target.checked) void generate();
+                    }}
+                  />
+                  生成沙之书风格头像
+                </label>
+              )}
+
+              {generated && !generating && (
+                <button
+                  type="button"
+                  onClick={() => void generate()}
+                  className="text-[#b0563a] transition-opacity hover:opacity-70"
+                >
+                  重试
+                </button>
+              )}
+
+              {generating && <span className="text-[#a89e8d]">沙之书风格生成中…</span>}
+            </div>
+
+            {(!name.trim() || !gender) && (
+              <p className="mt-2 text-[11px] text-[#a89e8d]">填好名字和性别后可生成沙之书风格</p>
+            )}
           </div>
         )}
       </div>
