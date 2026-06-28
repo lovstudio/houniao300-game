@@ -72,7 +72,20 @@ export default defineSchema({
     .index('slug', ['worldId', 'slug'])
     .index('owner', ['ownerUserId']),
 
-  // ---- 通知：作品被申领/被观看/被进入时，提醒归属艺术家 ----
+  // ---- 邀请码：管理员在设置里分发，注册时凭码获得 艺术家/志愿者/管理员 身份 ----
+  // 与 env 静态码（INVITE_CODE_*）并存：DB 码可计次/撤销，env 码作兜底。
+  inviteCodes: defineTable({
+    code: v.string(),
+    role: v.union(v.literal('artist'), v.literal('volunteer'), v.literal('admin')),
+    label: v.optional(v.string()), // 备注：发给谁/用途
+    maxUses: v.optional(v.number()), // undefined = 不限次
+    uses: v.number(),
+    active: v.boolean(),
+    createdBy: v.string(), // 铸码管理员 userId
+    createdAt: v.number(),
+  }).index('code', ['code']),
+
+  // ---- 通知：作品被申领/被观看/被进入（作品通知），以及 @角色 传话（user_said）统一存这张表 ----
   notifications: defineTable({
     userId: v.string(), // 收件人 = 作品归属艺术家 / 传话者本人
     worldId: v.id('worlds'),

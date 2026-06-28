@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { mutation, query } from './_generated/server';
 
-// 我的通知（按时间倒序）。
+// 我的作品通知（按时间倒序）。排除 user_said（那是传话流，非作品互动通知）。
 export const listMine = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
@@ -10,11 +10,12 @@ export const listMine = query({
       .query('notifications')
       .withIndex('recent', (q) => q.eq('userId', userId))
       .order('desc')
+      .filter((q) => q.neq(q.field('kind'), 'user_said'))
       .take(50);
   },
 });
 
-// 未读数（铃铛红点）。
+// 未读数（铃铛红点）。user_said 入库即 read=true，天然不计入。
 export const unreadCount = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {

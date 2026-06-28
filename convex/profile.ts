@@ -3,6 +3,7 @@ import { query, mutation, action } from './_generated/server';
 import { Doc } from './_generated/dataModel';
 import { generateImage } from './util/image';
 import { roleValidator, inviteCodeValidFor, isAdmin, type Role } from './roles';
+import { consumeDbInviteCode } from './inviteCodes';
 
 const genderValidator = v.union(v.literal('male'), v.literal('female'), v.literal('other'));
 
@@ -37,9 +38,13 @@ export const saveProfile = mutation({
   },
   handler: async (ctx, args) => {
     const role: Role = args.role ?? 'visitor';
-    // 游客可自选；艺术家/志愿者/管理员必须凭有效邀请码。
-    if (!inviteCodeValidFor(role, args.inviteCode)) {
-      throw new ConvexError('邀请码无效，无法以该身份登记');
+    // 游客可自选；其余角色凭码：先认 env 静态码（兜底，不计次），否则消费一枚 DB 动态码。
+    if (role !== 'visitor') {
+      const okEnv = inviteCodeValidFor(role, args.inviteCode);
+      const okDb = okEnv ? false : await consumeDbInviteCode(ctx, role, args.inviteCode);
+      if (!okEnv && !okDb) {
+        throw new ConvexError('邀请码无效，无法以该身份登记');
+      }
     }
     const existing = await ctx.db
       .query('profiles')

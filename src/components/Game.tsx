@@ -276,6 +276,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               <div className="corner">
                 <SettingsMenu
                   tone="ink"
+                  userId={userId}
                   controlMode={controlMode}
                   cameraFollow={cameraFollow}
                   isFullscreen={isFullscreen}

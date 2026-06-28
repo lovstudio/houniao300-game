@@ -40,6 +40,7 @@ import type * as experience from "../experience.js";
 import type * as gpsCalibration from "../gpsCalibration.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
+import type * as inviteCodes from "../inviteCodes.js";
 import type * as kb from "../kb.js";
 import type * as materials from "../materials.js";
 import type * as messages from "../messages.js";
@@ -105,6 +106,7 @@ declare const fullApi: ApiFromModules<{
   gpsCalibration: typeof gpsCalibration;
   http: typeof http;
   init: typeof init;
+  inviteCodes: typeof inviteCodes;
   kb: typeof kb;
   materials: typeof materials;
   messages: typeof messages;
