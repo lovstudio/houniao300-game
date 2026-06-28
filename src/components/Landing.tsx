@@ -113,8 +113,7 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
       {phase === 'title' ? (
         /* ── ① 标题屏 ── */
         <div
-          onClick={start}
-          className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center px-8 text-center transition-opacity duration-700 ease-out"
+          className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center transition-opacity duration-700 ease-out"
           style={{ opacity: leaving ? 0 : 1 }}
         >
           <div
@@ -182,7 +181,7 @@ export default function Landing({ userId, onDone }: { userId: string; onDone: ()
                 opacity: 0.7,
               }}
             >
-              轻触任意处
+              点 击 进 入
             </span>
           </button>
         </div>
