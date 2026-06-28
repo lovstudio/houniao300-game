@@ -130,6 +130,14 @@ export const joinWorld = mutation({
       .withIndex('userId', (q) => q.eq('userId', args.userId))
       .first();
     const name = profile?.name?.trim() || DEFAULT_NAME;
+    const roleLabel =
+      profile?.role === 'artist'
+        ? '艺术家'
+        : profile?.role === 'volunteer'
+          ? '志愿者'
+          : profile?.role === 'admin'
+            ? '管理员'
+            : '游客';
 
     // if (!name) {
     //   throw new ConvexError(`Missing name on ${JSON.stringify(identity)}`);
@@ -142,7 +150,7 @@ export const joinWorld = mutation({
     return await insertInput(ctx, world._id, 'join', {
       name,
       character: characters[Math.floor(Math.random() * characters.length)].name,
-      description: `${name} 是一名真人玩家`,
+      description: profile?.artistStatement?.trim() || `${name} 是一名${roleLabel}`,
       // description: `${identity.givenName} is a human player`,
       tokenIdentifier: args.userId,
     });

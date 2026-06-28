@@ -17,10 +17,12 @@ const GENDERS: { value: Gender; label: string }[] = [
   { value: 'other', label: '其他' },
 ];
 
-type Role = 'visitor' | 'artist';
+type Role = 'visitor' | 'artist' | 'volunteer' | 'admin';
 const ROLES: { value: Role; label: string; hint: string }[] = [
-  { value: 'visitor', label: '访客', hint: '逛展、与人和作品互动' },
-  { value: 'artist', label: '艺术家', hint: '可申领既有作品、上传并摆放新作品' },
+  { value: 'visitor', label: '游客', hint: '逛展、与人和作品互动' },
+  { value: 'artist', label: '艺术家', hint: '申领既有作品、上传并摆放新作品' },
+  { value: 'volunteer', label: '志愿者', hint: '代他人创建/摆放作品、协助引导' },
+  { value: 'admin', label: '管理员', hint: '全权：编辑/删除任意作品、改派角色' },
 ];
 
 // 全局身份录入：landing 首次进入强制完成（名字、性别、头像）。
@@ -33,6 +35,8 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
   const [gender, setGender] = useState<Gender | null>(null);
   const [role, setRole] = useState<Role>('visitor');
   const [statement, setStatement] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [roleError, setRoleError] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<AvatarChoice>({ kind: 'preset', preset: DEFAULT_PRESET });
   const [desc, setDesc] = useState('');
   const [photo, setPhoto] = useState<{ storageId: Id<'_storage'>; previewUrl: string } | null>(null);
@@ -75,6 +79,12 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
 
   const finish = async () => {
     if (!canSave || !gender) return;
+    setRoleError(null);
+    // 非游客角色需邀请码（最终由服务端校验，这里先做空值拦截）。
+    if (role !== 'visitor' && !inviteCode.trim()) {
+      setRoleError('该身份需要邀请码');
+      return;
+    }
     headingRef.current?.scatter(); // 把名字写进沙里：标题散成沙作为提交反馈
     setSaving(true);
     try {
@@ -84,10 +94,14 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
         gender,
         role,
         artistStatement: role === 'artist' && statement.trim() ? statement.trim() : undefined,
+        inviteCode: role !== 'visitor' ? inviteCode.trim() : undefined,
         avatarPreset: avatar.kind === 'preset' ? avatar.preset : undefined,
         avatarStorageId: avatar.kind === 'generated' ? avatar.storageId : undefined,
       });
       onDone();
+    } catch (e: any) {
+      // 邀请码错误等：停在登记页并提示，不进入沙城。
+      setRoleError(e?.data ?? e?.message ?? '登记失败，请重试');
     } finally {
       setSaving(false);
     }
@@ -149,14 +163,17 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
         ))}
       </div>
 
-      {/* 身份 —— 访客 / 艺术家 */}
+      {/* 身份 —— 游客 / 艺术家 / 志愿者 / 管理员 */}
       <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">身 份</label>
-      <div className="mb-3 flex gap-3">
+      <div className="mb-3 grid grid-cols-2 gap-2">
         {ROLES.map((r) => (
           <button
             key={r.value}
-            onClick={() => setRole(r.value)}
-            className="flex-1 rounded border px-3 py-2 text-left transition-colors"
+            onClick={() => {
+              setRole(r.value);
+              setRoleError(null);
+            }}
+            className="rounded border px-3 py-2 text-left transition-colors"
             style={{
               color: role === r.value ? '#2c2620' : '#a89e8d',
               borderColor: role === r.value ? '#b0563a' : '#d8cdb8',
@@ -168,9 +185,20 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
           </button>
         ))}
       </div>
+      {role !== 'visitor' && (
+        <input
+          className={clsx(inputCls, 'mb-2')}
+          placeholder={`${ROLES.find((r) => r.value === role)?.label}邀请码`}
+          value={inviteCode}
+          onChange={(e) => {
+            setInviteCode(e.target.value);
+            setRoleError(null);
+          }}
+        />
+      )}
       {role === 'artist' && (
         <textarea
-          className={clsx(inputCls, 'mb-7 resize-none')}
+          className={clsx(inputCls, 'mb-2 resize-none')}
           placeholder="一句话艺术家自述（可选）：创作主张、风格、想被怎样认识…"
           value={statement}
           maxLength={200}
@@ -178,7 +206,8 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
           onChange={(e) => setStatement(e.target.value)}
         />
       )}
-      {role !== 'artist' && <div className="mb-7" />}
+      {roleError && <p className="mb-2 text-[12px] text-[#b0563a]">{roleError}</p>}
+      <div className="mb-7" />
 
       {/* 头像：预置 */}
       <label className="mb-2 block text-[11px] tracking-[0.24em] text-[#7a7063]">头 像</label>
