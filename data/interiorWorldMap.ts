@@ -19,8 +19,9 @@ const BLOCKING_KINDS = new Set([
   'sea',
 ]);
 
-// 内场逻辑格 32px/格：source 约 1280×720 → 40×24 格（与 data 里的 mapWidth/mapHeight 一致）。
-const INTERIOR_TILE_DIM = 32;
+// 必须与 PixiStaticMap 的渲染常量 TILE 一致（16px/格），否则地图渲染与玩家 tile 坐标错位。
+// 内场格宽高由 source 尺寸 / 16 推得（1280×720 → 80×45），使内场美术按原比例铺满、不拉伸。
+const INTERIOR_TILE_DIM = 16;
 
 function rectBlocks(shape: InteriorRect, sx: number, sy: number): boolean {
   return sx >= shape.x && sx <= shape.x + shape.width && sy >= shape.y && sy <= shape.y + shape.height;
@@ -43,10 +44,10 @@ function blockedAt(interior: VenueInteriorMap, sx: number, sy: number): boolean 
 }
 
 export function interiorToWorldMap(interior: VenueInteriorMap): SerializedWorldMap {
-  const width = interior.mapWidth;
-  const height = interior.mapHeight;
   const sw = interior.source.width;
   const sh = interior.source.height;
+  const width = Math.round(sw / INTERIOR_TILE_DIM);
+  const height = Math.round(sh / INTERIOR_TILE_DIM);
 
   // tileLayer 形状为 [x][y]；-1 = 空/可走，1 = 阻挡。
   const objectLayer: number[][] = [];
@@ -69,7 +70,8 @@ export function interiorToWorldMap(interior: VenueInteriorMap): SerializedWorldM
     tileSetUrl: '/ai-town/assets/spritesheets/interior.png',
     tileSetDimX: 256,
     tileSetDimY: 256,
-    tileDim: INTERIOR_TILE_DIM,
+    tileDim: INTERIOR_TILE_DIM, // 16，与渲染常量 TILE 对齐
+
     bgTiles: [bgLayer],
     objectTiles: [objectLayer],
     animatedSprites: [],

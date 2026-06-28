@@ -1,30 +1,19 @@
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { useEffect } from 'react';
 import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { WORLD_HEARTBEAT_INTERVAL } from '../../convex/constants';
 
-export function useWorldHeartbeat() {
-  const worldStatus = useQuery(api.world.defaultWorldStatus);
-  const worldId = worldStatus?.worldId;
-
-  // Send a periodic heartbeat to our world to keep it alive.
+// 给指定 world 定期发送心跳保活；切到内场世界时传入其 worldId。
+// 内场闲置被 cron 休眠后，心跳触发 heartbeatWorld 自动唤醒（见 convex/world.ts）。
+// 服务端已对 lastViewed 做节流，这里无需再判时间窗。
+export function useWorldHeartbeat(worldId?: Id<'worlds'>) {
   const heartbeat = useMutation(api.world.heartbeatWorld);
   useEffect(() => {
-    const sendHeartBeat = () => {
-      if (!worldStatus) {
-        return;
-      }
-      // Don't send a heartbeat if we've observed one sufficiently close
-      // to the present.
-      if (Date.now() - WORLD_HEARTBEAT_INTERVAL / 2 < worldStatus.lastViewed) {
-        return;
-      }
-      void heartbeat({ worldId: worldStatus.worldId });
-    };
+    if (!worldId) return;
+    const sendHeartBeat = () => void heartbeat({ worldId });
     sendHeartBeat();
     const id = setInterval(sendHeartBeat, WORLD_HEARTBEAT_INTERVAL);
     return () => clearInterval(id);
-    // Rerun if the `worldId` changes but not `worldStatus`, since don't want to
-    // resend the heartbeat whenever its last viewed timestamp changes.
   }, [worldId, heartbeat]);
 }

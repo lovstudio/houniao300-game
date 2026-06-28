@@ -38,6 +38,7 @@ import type * as experience from "../experience.js";
 import type * as gpsCalibration from "../gpsCalibration.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
+import type * as interiors from "../interiors.js";
 import type * as materials from "../materials.js";
 import type * as messages from "../messages.js";
 import type * as music from "../music.js";
@@ -99,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   gpsCalibration: typeof gpsCalibration;
   http: typeof http;
   init: typeof init;
+  interiors: typeof interiors;
   materials: typeof materials;
   messages: typeof messages;
   music: typeof music;
