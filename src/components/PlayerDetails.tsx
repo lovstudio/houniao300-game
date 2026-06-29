@@ -37,13 +37,6 @@ export default function PlayerDetails({
   const players = [...game.world.players.values()];
   const humanPlayer = players.find((p) => p.human === humanTokenIdentifier);
   const humanConversation = humanPlayer ? game.world.playerConversation(humanPlayer) : undefined;
-  // Always select the other player if we're in a conversation with them.
-  if (humanPlayer && humanConversation) {
-    const otherPlayerIds = [...humanConversation.participants.keys()].filter(
-      (p) => p !== humanPlayer.id,
-    );
-    playerId = otherPlayerIds[0];
-  }
 
   const player = playerId && game.world.players.get(playerId);
   const playerConversation = player && game.world.playerConversation(player);
