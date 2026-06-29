@@ -4,7 +4,7 @@ import { conversationId, playerId } from './ids';
 import { Player } from './player';
 import { inputHandler } from './inputHandler';
 
-import { TYPING_TIMEOUT, CONVERSATION_DISTANCE } from '../constants';
+import { TYPING_TIMEOUT, CONVERSATION_DISTANCE, MIDPOINT_THRESHOLD } from '../constants';
 import { distance, normalize, vector } from '../util/geometry';
 import { Point } from '../util/types';
 import { Game } from './game';
@@ -103,6 +103,9 @@ export class Conversation {
             movePlayer(game, now, player2, p2Candidate, true);
           }
         }
+      } else {
+        this.walkParticipantTowardOther(game, now, player1, player2, playerDistance);
+        this.walkParticipantTowardOther(game, now, player2, player1, playerDistance);
       }
     }
 
@@ -117,6 +120,29 @@ export class Conversation {
         player2.facing.dy = -v.dy;
       }
     }
+  }
+
+  private walkParticipantTowardOther(
+    game: Game,
+    now: number,
+    player: Player,
+    otherPlayer: Player,
+    playerDistance: number,
+  ) {
+    if (player.pathfinding) {
+      return;
+    }
+    const destination =
+      playerDistance < MIDPOINT_THRESHOLD
+        ? {
+            x: Math.floor(otherPlayer.position.x),
+            y: Math.floor(otherPlayer.position.y),
+          }
+        : {
+            x: Math.floor((player.position.x + otherPlayer.position.x) / 2),
+            y: Math.floor((player.position.y + otherPlayer.position.y) / 2),
+          };
+    movePlayer(game, now, player, destination);
   }
 
   static start(game: Game, now: number, player: Player, invitee: Player) {
