@@ -20,6 +20,7 @@ import {
   PersonIcon,
   PhotoIcon,
   ShrinkIcon,
+  VersionIcon,
 } from './buttons/DeckIcons';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import SignalPanel from './SignalHud';
@@ -157,6 +158,9 @@ export default function SettingsMenu({
 
         <SignalPanel />
 
+        <div className="settings-section">关于</div>
+        <SettingRow icon={<VersionIcon />} label="版本号" value={`v${__APP_VERSION__}`} title="当前应用版本号" />
+
         {isAdmin && (
           <>
             <div className="settings-section">管理</div>
@@ -199,19 +203,6 @@ export default function SettingsMenu({
             />
           </>
         )}
-
-        <div
-          className="settings-version"
-          style={{
-            textAlign: 'center',
-            fontSize: 11,
-            opacity: 0.45,
-            padding: '8px 0 2px',
-            letterSpacing: '0.04em',
-          }}
-        >
-          v{__APP_VERSION__}
-        </div>
       </div>
 
       {inviteOpen && <InviteCodesModal userId={userId} onClose={() => setInviteOpen(false)} />}

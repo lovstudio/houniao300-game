@@ -573,6 +573,12 @@ body {
   background: rgba(255, 236, 200, 0.09);
   color: #fff3e0;
 }
+.setting-row-static,
+.setting-row-static:hover {
+  cursor: default;
+  background: transparent;
+  color: #e7d3b3;
+}
 .setting-ico {
   display: grid;
   place-items: center;

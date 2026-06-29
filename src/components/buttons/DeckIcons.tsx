@@ -132,3 +132,10 @@ export const HelpIcon = () => (
     <circle cx="12" cy="17.3" r="0.6" fill="currentColor" stroke="none" />
   </svg>
 );
+
+export const VersionIcon = () => (
+  <svg {...base} aria-hidden>
+    <path d="M7 4h7l5 5v11H7z" />
+    <path d="M14 4v5h5M10 14h6M10 17h4" />
+  </svg>
+);

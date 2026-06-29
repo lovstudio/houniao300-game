@@ -19,8 +19,8 @@ export default function SettingRow({
   onClick?: MouseEventHandler;
   title?: string;
 }) {
-  return (
-    <button type="button" className="setting-row" onClick={onClick} title={title}>
+  const content = (
+    <>
       <span className="setting-ico">{icon}</span>
       <span className="setting-label">{label}</span>
       {value !== undefined ? (
@@ -30,6 +30,16 @@ export default function SettingRow({
           <ChevronIcon />
         </span>
       )}
+    </>
+  );
+
+  return onClick ? (
+    <button type="button" className="setting-row" onClick={onClick} title={title}>
+      {content}
     </button>
+  ) : (
+    <div className="setting-row setting-row-static" title={title}>
+      {content}
+    </div>
   );
 }
