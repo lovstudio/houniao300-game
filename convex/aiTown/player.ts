@@ -300,6 +300,10 @@ export const playerInputs = {
         throw new Error(`Invalid player ID ${playerId}`);
       }
       if (args.destination) {
+        const conversation = game.world.playerConversation(player);
+        if (conversation) {
+          conversation.leave(game, now, player);
+        }
         movePlayer(game, now, player, args.destination);
       } else {
         stopPlayer(player);
