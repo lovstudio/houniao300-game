@@ -10,6 +10,11 @@ import { Player } from '../../convex/aiTown/player';
 import { GameId } from '../../convex/aiTown/ids';
 import { ServerGame } from '../hooks/serverGame';
 
+const actionButtonClass =
+  'mt-4 inline-block align-top button text-white shadow-solid text-base sm:text-lg cursor-pointer pointer-events-auto';
+const actionButtonInnerClass =
+  'inline-flex min-h-8 items-center justify-center bg-clay-700 px-3 py-1 text-center leading-none';
+
 export default function PlayerDetails({
   worldId,
   engineId,
@@ -152,40 +157,34 @@ export default function PlayerDetails({
       </div>
       {canInvite && (
         <a
-          className={
-            'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-            pendingSuffix('startConversation')
-          }
+          className={actionButtonClass + pendingSuffix('startConversation')}
           onClick={onStartConversation}
         >
-          <div className="h-full bg-clay-700 text-center">
+          <div className={actionButtonInnerClass}>
             <span>发起对话</span>
           </div>
         </a>
       )}
       {waitingForAccept && (
-        <a className="mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto opacity-50">
-          <div className="h-full bg-clay-700 text-center">
+        <a className={`${actionButtonClass} opacity-50`}>
+          <div className={actionButtonInnerClass}>
             <span>等待对方接受…</span>
           </div>
         </a>
       )}
       {waitingForNearby && (
-        <a className="mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto opacity-50">
-          <div className="h-full bg-clay-700 text-center">
+        <a className={`${actionButtonClass} opacity-50`}>
+          <div className={actionButtonInnerClass}>
             <span>正在走过来…</span>
           </div>
         </a>
       )}
       {inConversationWithMe && (
         <a
-          className={
-            'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-            pendingSuffix('leaveConversation')
-          }
+          className={actionButtonClass + pendingSuffix('leaveConversation')}
           onClick={onLeaveConversation}
         >
-          <div className="h-full bg-clay-700 text-center">
+          <div className={actionButtonInnerClass}>
             <span>离开对话</span>
           </div>
         </a>
@@ -193,24 +192,18 @@ export default function PlayerDetails({
       {haveInvite && (
         <>
           <a
-            className={
-              'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-              pendingSuffix('acceptInvite')
-            }
+            className={actionButtonClass + pendingSuffix('acceptInvite')}
             onClick={onAcceptInvite}
           >
-            <div className="h-full bg-clay-700 text-center">
+            <div className={actionButtonInnerClass}>
               <span>接受</span>
             </div>
           </a>
           <a
-            className={
-              'mt-6 button text-white shadow-solid text-xl cursor-pointer pointer-events-auto' +
-              pendingSuffix('rejectInvite')
-            }
+            className={actionButtonClass + pendingSuffix('rejectInvite')}
             onClick={onRejectInvite}
           >
-            <div className="h-full bg-clay-700 text-center">
+            <div className={actionButtonInnerClass}>
               <span>拒绝</span>
             </div>
           </a>
