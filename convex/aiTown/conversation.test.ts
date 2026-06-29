@@ -1,6 +1,7 @@
 import { Conversation } from './conversation';
 import { Player } from './player';
 import { allocGameId } from './ids';
+import { playerInputs } from './player';
 
 function makePlayer(idNumber: number, x: number, y: number) {
   return new Player({
@@ -34,6 +35,10 @@ function makeGame(player1: Player, player2: Player, conversation: Conversation) 
         [player2.id, player2],
       ]),
       conversations: new Map([[conversation.id, conversation]]),
+      agents: new Map(),
+      playerConversation(player: Player) {
+        return [...this.conversations.values()].find((c) => c.participants.has(player.id));
+      },
     },
     worldMap: {
       width: 12,
@@ -68,5 +73,22 @@ describe('Conversation walkingOver', () => {
     expect(conversation.participants.get(player2.id)?.status.kind).toBe('walkingOver');
     expect(player1.pathfinding?.state.kind).toBe('needsPath');
     expect(player2.pathfinding?.state.kind).toBe('needsPath');
+  });
+
+  test('lets player movement leave an active conversation before walking', () => {
+    const player1 = makePlayer(0, 1, 1);
+    const player2 = makePlayer(1, 2, 1);
+    const conversation = makeConversation(player1, player2);
+    const game = makeGame(player1, player2, conversation);
+    conversation.tick(game, 1000);
+
+    playerInputs.moveTo.handler(game, 1100, {
+      playerId: player1.id,
+      destination: { x: 4, y: 1 },
+    });
+
+    expect(game.world.conversations.size).toBe(0);
+    expect(player1.pathfinding?.destination).toEqual({ x: 4, y: 1 });
+    expect(player1.pathfinding?.state.kind).toBe('needsPath');
   });
 });
