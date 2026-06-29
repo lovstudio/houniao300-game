@@ -4,7 +4,7 @@ import PixiGame from './PixiGame.tsx';
 import Joystick from './Joystick.tsx';
 import type { MapMarker } from './PixiStaticMap.tsx';
 import { setPanelOpenHandler } from '../lib/panelBus.ts';
-import { type NearbyTarget, actOnNearbyTarget } from '../lib/nearby.ts';
+import { type NearbyTarget, actOnNearbyTarget, nearbyActionLabel } from '../lib/nearby.ts';
 import CalibrationPanel from './CalibrationPanel.tsx';
 import type { VenueInteriorMap } from '../../data/birdRestaurantInterior.ts';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -24,6 +24,8 @@ import { DebugTimeManager } from './DebugTimeManager.tsx';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
 import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
+import { useSendInput } from '../hooks/sendInput.ts';
+import { toastOnError } from '../toasts.ts';
 
 export type ControlMode = 'player' | 'camera';
 
@@ -43,7 +45,7 @@ function NearbyList({
         <button
           key={t.key}
           onClick={() => onPick(t)}
-          aria-label={`${t.kind === 'venue' || t.ready ? '进入' : '查看'}${t.label}`}
+          aria-label={`${nearbyActionLabel(t)}${t.label}`}
           className={clsx(
             'pointer-events-auto flex items-center gap-2 rounded-full border px-4 py-2 text-sm shadow-xl transition active:scale-95',
             i === 0
@@ -57,7 +59,7 @@ function NearbyList({
             </kbd>
           )}
           <span className="max-w-[12rem] truncate">
-            {t.kind === 'venue' || t.ready ? '进入' : '查看'}「{t.label}」
+            {nearbyActionLabel(t)}「{t.label}」
           </span>
         </button>
       ))}
@@ -122,9 +124,17 @@ export default function Game({
   const [nearbyTargets, setNearbyTargets] = useState<NearbyTarget[]>([]);
   // 触屏设备：显示虚拟摇杆，并把附近列表变为可点（手机无键盘）。
   const isTouch = useMediaQuery('(pointer: coarse)');
+  const startConversation = useSendInput(engineId as Id<'engines'>, 'startConversation');
 
   const triggerNearby = (t: NearbyTarget) =>
-    actOnNearbyTarget(t, (id) => onEnterVenueInterior?.(id));
+    actOnNearbyTarget(t, {
+      enter: (id) => onEnterVenueInterior?.(id),
+      selectPlayer: (id) => setSelectedElement({ kind: 'player', id }),
+      startConversation: (playerId, invitee) => {
+        setPanelOpen(true);
+        void toastOnError(startConversation({ playerId, invitee }));
+      },
+    });
 
   // 选中某个角色时，在移动端自动弹出面板查看其详情。
   useEffect(() => {
@@ -219,7 +229,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                   onToggleControlMode={onToggleControlMode}
                   onToggleCameraFollow={onToggleCameraFollow}
                   onSetCameraFollow={onSetCameraFollow}
-                  onEnterVenueInterior={onEnterVenueInterior}
+                  onNearbyTarget={triggerNearby}
                   interior={interior}
                   showCollisionOverlay={showCollisionOverlay}
                   historicalTime={historicalTime}

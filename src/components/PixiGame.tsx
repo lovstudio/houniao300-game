@@ -28,10 +28,10 @@ import {
   type VenueInteriorMap,
 } from '../../data/birdRestaurantInterior.ts';
 import type { ControlMode } from './Game.tsx';
-import { type NearbyTarget, actOnNearbyTarget } from '../lib/nearby.ts';
+import { type NearbyTarget } from '../lib/nearby.ts';
 import { SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
-import { COLLISION_THRESHOLD } from '../../convex/constants.ts';
+import { COLLISION_THRESHOLD, CONVERSATION_DISTANCE } from '../../convex/constants.ts';
 import { Location, playerLocation } from '../../convex/aiTown/location.ts';
 import { setJoystickHandler } from '../lib/joystickBus.ts';
 
@@ -218,7 +218,7 @@ export const PixiGame = (props: {
   onToggleControlMode: () => void;
   onToggleCameraFollow: () => void;
   onSetCameraFollow: (enabled: boolean) => void;
-  onEnterVenueInterior?: (interiorId: string) => void;
+  onNearbyTarget: (target: NearbyTarget) => void;
   showCollisionOverlay: boolean;
   setSelectedElement: SelectElement;
   setNearbyTargets: (targets: NearbyTarget[]) => void;
@@ -261,9 +261,9 @@ export const PixiGame = (props: {
   // 当前可交互的附近目标列表（按距离排序），供键盘（空格=第一项，数字=第 N 项）读取。
   const nearbyListRef = useRef<NearbyTarget[]>([]);
   const nearbyKeyRef = useRef<string | null>(null);
-  // 让 keydown 一次性监听器始终拿到最新的进入回调（props 每次渲染都会变）。
-  const onEnterVenueInteriorRef = useRef(props.onEnterVenueInterior);
-  onEnterVenueInteriorRef.current = props.onEnterVenueInterior;
+  // 让 keydown 一次性监听器始终拿到最新的附近动作回调（props 每次渲染都会变）。
+  const onNearbyTargetRef = useRef(props.onNearbyTarget);
+  onNearbyTargetRef.current = props.onNearbyTarget;
 
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
@@ -391,7 +391,8 @@ export const PixiGame = (props: {
     const { width: mapWidth, height: mapHeight } = props.game.worldMap;
     const location = optimisticHumanLocation ?? playerLocation(humanPlayer);
     const ready = new Set(props.readyInteriorKeys ?? []);
-    const found: { distance: number; target: NearbyTarget }[] = [];
+    const humanConversation = props.game.world.playerConversation(humanPlayer);
+    const found: { distance: number; priority: number; target: NearbyTarget }[] = [];
 
     for (const interior of VENUE_INTERIOR_MAPS) {
       const [sourceX, sourceY] = interior.entrance.exteriorSource;
@@ -401,6 +402,7 @@ export const PixiGame = (props: {
       if (distance <= interior.entrance.radiusTiles) {
         found.push({
           distance,
+          priority: 0,
           target: {
             key: `venue:${interior.id}`,
             kind: 'venue',
@@ -419,21 +421,59 @@ export const PixiGame = (props: {
       const distance = Math.hypot(location.x - tileX, location.y - tileY);
       if (distance <= INSTALLATION_PROMPT_RADIUS_TILES) {
         const interiorId = `work:${marker.id}`;
+        const isReady = ready.has(interiorId);
         found.push({
           distance,
+          priority: isReady ? 0 : 1,
           target: {
             key: interiorId,
             kind: 'work',
             id: marker.id,
             label: marker.label ?? marker.id,
             interiorId,
-            ready: ready.has(interiorId),
+            ready: isReady,
           },
         });
       }
     }
 
-    found.sort((a, b) => a.distance - b.distance);
+    for (const player of players) {
+      if (player.id === humanPlayer.id) continue;
+      const targetLocation = playerLocation(player);
+      const distance = Math.hypot(location.x - targetLocation.x, location.y - targetLocation.y);
+      if (distance > CONVERSATION_DISTANCE) continue;
+
+      const label = props.game.playerDescriptions.get(player.id)?.name ?? '居民';
+      const playerConversation = props.game.world.playerConversation(player);
+      if (!humanConversation && !playerConversation) {
+        found.push({
+          distance,
+          priority: 0,
+          target: {
+            key: `player:${player.id}:talk`,
+            kind: 'player',
+            action: 'talk',
+            id: player.id,
+            actorId: humanPlayer.id,
+            label,
+          },
+        });
+      }
+      found.push({
+        distance,
+        priority: 1,
+        target: {
+          key: `player:${player.id}:details`,
+          kind: 'player',
+          action: 'details',
+          id: player.id,
+          actorId: humanPlayer.id,
+          label,
+        },
+      });
+    }
+
+    found.sort((a, b) => a.distance - b.distance || a.priority - b.priority);
     publish(found.slice(0, 4).map((f) => f.target));
   }, [
     humanPlayerId,
@@ -796,7 +836,7 @@ export const PixiGame = (props: {
         const list = nearbyListRef.current;
         if (list.length) {
           event.preventDefault();
-          actOnNearbyTarget(list[0], (id) => onEnterVenueInteriorRef.current?.(id));
+          onNearbyTargetRef.current(list[0]);
         }
         return;
       }
@@ -807,7 +847,7 @@ export const PixiGame = (props: {
         const idx = Number(key) - 1;
         if (idx < list.length) {
           event.preventDefault();
-          actOnNearbyTarget(list[idx], (id) => onEnterVenueInteriorRef.current?.(id));
+          onNearbyTargetRef.current(list[idx]);
         }
         return;
       }
