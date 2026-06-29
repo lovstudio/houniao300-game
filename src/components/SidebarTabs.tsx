@@ -1189,6 +1189,7 @@ function StateTab({
 
   const players = [...game.world.players.values()];
   const agents = [...game.world.agents.values()];
+  const agentPlayerIds = new Set(agents.map((a) => a.playerId as string));
   const conversations = [...game.world.conversations.values()];
   const humans = players.filter((p) => p.human).length;
   const inConvo = new Set<string>();
@@ -1220,12 +1221,13 @@ function StateTab({
         <span className="h-px flex-1 bg-gradient-to-r from-[#cbb287] to-transparent" />
       </div>
       <div>
-        {/* 真人玩家排在前，AI 居民其后；真人加「真人」标签。 */}
+        {/* 这里只标记 AI 居民与自己；其他真人仅保留在上方统计中。 */}
         {[...players]
-          .sort((a, b) => Number(!!b.human) - Number(!!a.human))
+          .filter((p) => agentPlayerIds.has(p.id as string) || p.human === userId)
+          .sort((a, b) => Number(b.human === userId) - Number(a.human === userId))
           .map((p) => {
             const talking = inConvo.has(p.id as string);
-            const isHuman = !!p.human;
+            const isSelf = p.human === userId;
             return (
               <button
                 key={p.id}
@@ -1238,10 +1240,10 @@ function StateTab({
                 <span
                   className={
                     'h-2 w-2 shrink-0 rounded-full ' +
-                    (isHuman ? 'bg-[#1da76e]' : talking ? 'bg-[#c0654a]' : 'bg-[#b3a489]')
+                    (isSelf ? 'bg-[#1da76e]' : talking ? 'bg-[#c0654a]' : 'bg-[#b3a489]')
                   }
                   style={
-                    isHuman
+                    isSelf
                       ? { boxShadow: '0 0 0 3px rgba(29,167,110,0.16)' }
                       : talking
                         ? { boxShadow: '0 0 0 3px rgba(192,101,74,0.14)' }
@@ -1251,9 +1253,9 @@ function StateTab({
                 <span className="truncate text-[15px] font-medium text-[#2a1c14]">
                   {nameOf(p.id as string)}
                 </span>
-                {isHuman && (
+                {isSelf && (
                   <span className="shrink-0 rounded bg-[#1da76e] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    真人
+                    自己
                   </span>
                 )}
                 <span
