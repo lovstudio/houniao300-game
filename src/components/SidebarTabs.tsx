@@ -1238,7 +1238,7 @@ function StateTab({
           .map((p) => {
             const talking = inConvo.has(p.id as string);
             const isSelf = p.human === userId;
-            const isHuman = !!p.human;
+            const isAgent = agentPlayerIds.has(p.id as string);
             return (
               <button
                 key={p.id}
@@ -1266,12 +1266,12 @@ function StateTab({
                 </span>
                 {isSelf && (
                   <span className="shrink-0 rounded bg-[#1da76e] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    自己
+                    你
                   </span>
                 )}
-                {!isSelf && isHuman && (
+                {isAgent && (
                   <span className="shrink-0 rounded bg-[#9c4b34] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    真人
+                    AI
                   </span>
                 )}
                 <span
