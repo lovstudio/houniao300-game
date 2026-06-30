@@ -100,7 +100,12 @@ export default function SettingsMenu({
           <GearIcon />
         </button>
       ) : (
-        <DeckButton onClick={() => setOpen((v) => !v)} active={open} title="设置" icon={<GearIcon />}>
+        <DeckButton
+          onClick={() => setOpen((v) => !v)}
+          active={open}
+          title="设置"
+          icon={<GearIcon />}
+        >
           设置
         </DeckButton>
       )}
@@ -159,19 +164,24 @@ export default function SettingsMenu({
         <SignalPanel />
 
         <div className="settings-section">关于</div>
-        <SettingRow icon={<VersionIcon />} label="版本号" value={`v${__APP_VERSION__}`} title="当前应用版本号" />
+        <SettingRow
+          icon={<VersionIcon />}
+          label="版本号"
+          value={`v${__APP_VERSION__}`}
+          title="当前应用版本号"
+        />
 
         {isAdmin && (
           <>
             <div className="settings-section">管理</div>
             <SettingRow
               icon={<PersonIcon />}
-              label="邀请码分发"
+              label="邀请码中心"
               onClick={() => {
                 setOpen(false);
                 setInviteOpen(true);
               }}
-              title="生成并分发 艺术家/志愿者/管理员 邀请码"
+              title="生成、复制、停用邀请链接"
             />
           </>
         )}

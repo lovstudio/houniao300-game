@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -25,21 +25,49 @@ const ROLES: { value: Role; label: string; hint: string }[] = [
   { value: 'volunteer', label: '志愿者', hint: '代他人创建/摆放作品、协助引导' },
   { value: 'admin', label: '管理员', hint: '全权：编辑/删除任意作品、改派角色' },
 ];
+const GRANTABLE_ROLES: Role[] = ['artist', 'volunteer', 'admin'];
+
+function roleLabel(role: Role) {
+  return ROLES.find((r) => r.value === role)?.label ?? '游客';
+}
+
+function readInviteFromUrl(): { role: Role; code: string } | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const rawRole = params.get('role') as Role | null;
+  const code = (params.get('invite') ?? params.get('code') ?? '').trim();
+  if (!code || !rawRole || !GRANTABLE_ROLES.includes(rawRole)) return null;
+  return { role: rawRole, code };
+}
+
+function clearInviteParamsFromUrl() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  const hadInviteParams = ['invite', 'code', 'role'].some((key) => url.searchParams.has(key));
+  if (!hadInviteParams) return;
+  url.searchParams.delete('invite');
+  url.searchParams.delete('code');
+  url.searchParams.delete('role');
+  window.history.replaceState({}, '', url.toString());
+}
 
 // 全局身份录入：landing 首次进入强制完成（名字、性别、头像）。
 export default function Onboarding({ userId, onDone }: { userId: string; onDone: () => void }) {
   const save = useMutation(api.profile.saveProfile);
   const genAvatar = useAction(api.profile.generateAvatar);
   const genUploadUrl = useMutation(api.profile.generateUploadUrl);
+  const inviteFromUrl = useMemo(readInviteFromUrl, []);
 
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
-  const [role, setRole] = useState<Role>('visitor');
+  const [role, setRole] = useState<Role>(inviteFromUrl?.role ?? 'visitor');
   const [statement, setStatement] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(inviteFromUrl?.code ?? '');
   const [roleError, setRoleError] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<AvatarChoice>({ kind: 'preset', preset: DEFAULT_PRESET });
-  const [photo, setPhoto] = useState<{ storageId: Id<'_storage'>; previewUrl: string } | null>(null);
+  const [photo, setPhoto] = useState<{ storageId: Id<'_storage'>; previewUrl: string } | null>(
+    null,
+  );
   const [generated, setGenerated] = useState<{ storageId: string; url: string } | null>(null);
   const [genStyle, setGenStyle] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -113,6 +141,7 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
         avatarPreset: avatar.kind === 'preset' ? avatar.preset : undefined,
         avatarStorageId: avatar.kind === 'preset' ? undefined : avatar.storageId,
       });
+      clearInviteParamsFromUrl();
       onDone();
     } catch (e: any) {
       // 邀请码错误等：停在登记页并提示，不进入沙城。
@@ -130,7 +159,10 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
     'sand-underline w-full bg-transparent border-0 text-[15px] text-[#2c2620] outline-none placeholder:text-[#a89e8d]';
 
   return (
-    <div className="mx-auto w-full max-w-[400px] text-left" style={{ fontFamily: serif, color: '#2c2620' }}>
+    <div
+      className="mx-auto w-full max-w-[400px] text-left"
+      style={{ fontFamily: serif, color: '#2c2620' }}
+    >
       {/* 表头：沙粒「登记成为候鸟」，提交时散成沙 */}
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
         <Avatar url={previewUrl} preset={previewPreset} size="lg" />
@@ -200,13 +232,18 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
       {role !== 'visitor' && (
         <input
           className={clsx(inputCls, 'mb-2')}
-          placeholder={`${ROLES.find((r) => r.value === role)?.label}邀请码`}
+          placeholder={`${roleLabel(role)}邀请码`}
           value={inviteCode}
           onChange={(e) => {
             setInviteCode(e.target.value);
             setRoleError(null);
           }}
         />
+      )}
+      {inviteFromUrl && role === inviteFromUrl.role && inviteCode.trim() === inviteFromUrl.code && (
+        <p className="mb-2 text-[12px] text-[#7a7063]">
+          已从邀请链接填好「{roleLabel(inviteFromUrl.role)}」邀请码。
+        </p>
       )}
       {role === 'artist' && (
         <textarea
@@ -250,13 +287,20 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
               {/* 真人原图 */}
               <button
                 type="button"
-                onClick={() => setAvatar({ kind: 'uploaded', storageId: photo.storageId, url: photo.previewUrl })}
+                onClick={() =>
+                  setAvatar({ kind: 'uploaded', storageId: photo.storageId, url: photo.previewUrl })
+                }
                 className="flex flex-col items-center gap-1.5"
               >
                 <Avatar
                   url={photo.previewUrl}
                   size="lg"
-                  className={clsx('transition-all', avatar.kind === 'uploaded' ? 'ring-2 ring-[#b0563a]' : 'opacity-60 hover:opacity-90')}
+                  className={clsx(
+                    'transition-all',
+                    avatar.kind === 'uploaded'
+                      ? 'ring-2 ring-[#b0563a]'
+                      : 'opacity-60 hover:opacity-90',
+                  )}
                 />
                 <span className="text-[11px] text-[#7a7063]">原图</span>
               </button>
@@ -272,13 +316,24 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
               ) : generated ? (
                 <button
                   type="button"
-                  onClick={() => setAvatar({ kind: 'generated', storageId: generated.storageId, url: generated.url })}
+                  onClick={() =>
+                    setAvatar({
+                      kind: 'generated',
+                      storageId: generated.storageId,
+                      url: generated.url,
+                    })
+                  }
                   className="flex flex-col items-center gap-1.5"
                 >
                   <Avatar
                     url={generated.url}
                     size="lg"
-                    className={clsx('transition-all', avatar.kind === 'generated' ? 'ring-2 ring-[#b0563a]' : 'opacity-60 hover:opacity-90')}
+                    className={clsx(
+                      'transition-all',
+                      avatar.kind === 'generated'
+                        ? 'ring-2 ring-[#b0563a]'
+                        : 'opacity-60 hover:opacity-90',
+                    )}
                   />
                   <span className="text-[11px] text-[#7a7063]">沙之书风格</span>
                 </button>
@@ -297,7 +352,12 @@ export default function Onboarding({ userId, onDone }: { userId: string; onDone:
               </button>
 
               {!generated && !generating && (
-                <label className={clsx('flex items-center gap-1.5', canGenerate ? 'cursor-pointer text-[#b0563a]' : 'text-[#a89e8d]')}>
+                <label
+                  className={clsx(
+                    'flex items-center gap-1.5',
+                    canGenerate ? 'cursor-pointer text-[#b0563a]' : 'text-[#a89e8d]',
+                  )}
+                >
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 accent-[#b0563a]"

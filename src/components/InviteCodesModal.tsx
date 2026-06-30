@@ -4,11 +4,14 @@ import { api } from '../../convex/_generated/api';
 import { toast } from 'react-toastify';
 
 type GrantRole = 'artist' | 'volunteer' | 'admin';
+type CreatedInvite = { code: string; role: GrantRole };
+
 const ROLE_LABEL: Record<GrantRole, string> = {
   artist: '艺术家',
   volunteer: '志愿者',
   admin: '管理员',
 };
+const GRANT_ROLES = Object.keys(ROLE_LABEL) as GrantRole[];
 
 const ROLE_PERK: Record<GrantRole, string> = {
   artist: '可申领你的既有作品、上传并在地图上摆放新作品；有人观看你的作品时会收到通知',
@@ -17,24 +20,47 @@ const ROLE_PERK: Record<GrantRole, string> = {
 };
 
 // 正式站点域名（固定，不取 window.location，避免管理员在预览/本地时发错链接）。
-const SITE_URL = 'https://houniao300-game.lovstudio.ai/';
+const SITE_URL = 'https://houniao300-game.lovstudio.ai';
 
-// 复制时给目标用户一段能看懂的完整邀请文案：是什么、去哪、怎么填、有什么用。
+function inviteLink(code: string, role: GrantRole): string {
+  const url = new URL(SITE_URL);
+  url.searchParams.set('role', role);
+  url.searchParams.set('invite', code);
+  return url.toString();
+}
+
+// 复制时给目标用户一段能看懂的完整邀请文案：是什么、去哪、有什么用。
 function inviteMessage(code: string, role: GrantRole): string {
   const label = ROLE_LABEL[role];
+  const link = inviteLink(code, role);
   return [
     `【候鸟沙城 · ${label}邀请】`,
     `邀请你以「${label}」身份加入候鸟沙城。`,
     ``,
-    `邀请码：${code}`,
+    `邀请链接：${link}`,
+    `备用邀请码：${code}`,
     ``,
-    `如何使用：`,
-    `1) 打开 ${SITE_URL}`,
-    `2) 在登记页选择「${label}」身份`,
-    `3) 填入上面的邀请码，完成登记`,
+    `打开链接后会自动填好身份和邀请码；如果手动登记，选择「${label}」并粘贴备用邀请码。`,
     ``,
     `这个身份能做什么：${ROLE_PERK[role]}。`,
   ].join('\n');
+}
+
+async function writeClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const input = document.createElement('textarea');
+  input.value = text;
+  input.setAttribute('readonly', 'true');
+  input.style.position = 'fixed';
+  input.style.left = '-9999px';
+  document.body.appendChild(input);
+  input.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(input);
+  if (!ok) throw new Error('copy failed');
 }
 
 // 管理员邀请码分发面板：铸码、计次、启停、复制。仅管理员可见（入口在设置里）。
@@ -52,7 +78,10 @@ export default function InviteCodesModal({
   const [role, setRole] = useState<GrantRole>('artist');
   const [label, setLabel] = useState('');
   const [maxUses, setMaxUses] = useState('');
+  const [latest, setLatest] = useState<CreatedInvite[]>([]);
   const [busy, setBusy] = useState(false);
+
+  const parsedMaxUses = () => (maxUses.trim() ? Math.max(1, Number(maxUses)) : undefined);
 
   const mint = async () => {
     setBusy(true);
@@ -61,12 +90,13 @@ export default function InviteCodesModal({
         actorUserId: userId,
         role,
         label: label.trim() || undefined,
-        maxUses: maxUses.trim() ? Math.max(1, Number(maxUses)) : undefined,
+        maxUses: parsedMaxUses(),
       });
+      setLatest([{ code, role }]);
       setLabel('');
       setMaxUses('');
-      await navigator.clipboard?.writeText(inviteMessage(code, role)).catch(() => {});
-      toast.success(`已生成 ${code}，完整邀请文案已复制`);
+      await writeClipboard(inviteMessage(code, role)).catch(() => {});
+      toast.success(`已生成${ROLE_LABEL[role]}邀请，文案已复制`);
     } catch (e: any) {
       toast.error(e?.data ?? e?.message ?? '生成失败');
     } finally {
@@ -74,26 +104,91 @@ export default function InviteCodesModal({
     }
   };
 
-  // 复制完整邀请文案（含用法说明），而非光秃秃的码。
-  const copy = (code: string, role: GrantRole) => {
-    navigator.clipboard?.writeText(inviteMessage(code, role)).then(
-      () => toast.success('完整邀请文案已复制'),
+  const mintAll = async () => {
+    setBusy(true);
+    try {
+      const currentLabel = label.trim();
+      const currentMaxUses = parsedMaxUses();
+      const created = await Promise.all(
+        GRANT_ROLES.map(async (r) => ({
+          role: r,
+          code: await create({
+            actorUserId: userId,
+            role: r,
+            label: currentLabel ? `${currentLabel} · ${ROLE_LABEL[r]}` : undefined,
+            maxUses: currentMaxUses,
+          }),
+        })),
+      );
+      setLatest(created);
+      setLabel('');
+      setMaxUses('');
+      await writeClipboard(
+        created.map((item) => inviteMessage(item.code, item.role)).join('\n\n---\n\n'),
+      ).catch(() => {});
+      toast.success('已生成三种身份邀请，全部文案已复制');
+    } catch (e: any) {
+      toast.error(e?.data ?? e?.message ?? '生成失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyMessage = (code: string, role: GrantRole) => {
+    void writeClipboard(inviteMessage(code, role)).then(
+      () => toast.success('邀请文案已复制'),
+      () => toast.error('复制失败'),
+    );
+  };
+
+  const copyLink = (code: string, role: GrantRole) => {
+    void writeClipboard(inviteLink(code, role)).then(
+      () => toast.success('邀请链接已复制'),
+      () => toast.error('复制失败'),
+    );
+  };
+
+  const copyCode = (code: string) => {
+    void writeClipboard(code).then(
+      () => toast.success('邀请码已复制'),
+      () => toast.error('复制失败'),
+    );
+  };
+
+  const copyLatest = () => {
+    void writeClipboard(
+      latest.map((item) => inviteMessage(item.code, item.role)).join('\n\n---\n\n'),
+    ).then(
+      () => toast.success('全部邀请文案已复制'),
       () => toast.error('复制失败'),
     );
   };
 
   const inputCls =
     'w-full rounded border border-[#c2a878] bg-[#f6ecd3] px-3 py-2 text-sm text-[#2a1c14] placeholder:text-[#a8906c] focus:border-clay-500 focus:outline-none';
+  const secondaryBtn =
+    'rounded border border-[#cbb287] bg-[#f6ecd3] px-2.5 py-1 text-xs font-bold text-[#5b4632] transition hover:border-clay-500 hover:bg-[#efe1c2]';
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
       <div
-        className="sand-paper-bg flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-[#cbb287] text-[#2a1c14] shadow-2xl"
+        className="sand-paper-bg flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-[#cbb287] text-[#2a1c14] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#cbb287] px-4 py-3">
-          <h2 className="font-display text-xl">邀请码分发</h2>
-          <button onClick={onClose} className="rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#d3bd8c]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#cbb287] px-4 py-3">
+          <div>
+            <h2 className="font-display text-xl">邀请码中心</h2>
+            <p className="mt-0.5 text-xs text-[#7a6043]">
+              生成后直接复制邀请链接，受邀人打开即可登记。
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded bg-[#dcc89f] px-2 py-1 text-xs text-[#5b4632] hover:bg-[#d3bd8c]"
+          >
             关闭
           </button>
         </div>
@@ -101,7 +196,7 @@ export default function InviteCodesModal({
         {/* 铸码 */}
         <div className="shrink-0 space-y-2 border-b border-[#cbb287] px-4 py-3">
           <div className="flex gap-2">
-            {(Object.keys(ROLE_LABEL) as GrantRole[]).map((r) => (
+            {GRANT_ROLES.map((r) => (
               <button
                 key={r}
                 onClick={() => setRole(r)}
@@ -138,7 +233,60 @@ export default function InviteCodesModal({
               生成
             </button>
           </div>
+          <button
+            onClick={() => void mintAll()}
+            disabled={busy}
+            className="w-full rounded border border-clay-700/40 bg-[#f3ead8] px-3 py-2 text-sm font-bold text-clay-700 transition hover:bg-[#ead8b0] disabled:opacity-50"
+          >
+            三种身份各生成一枚
+          </button>
         </div>
+
+        {latest.length > 0 && (
+          <div className="shrink-0 border-b border-[#cbb287] bg-[#f3ead8]/70 px-4 py-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-bold tracking-[0.18em] text-[#7a6043]">刚刚生成</div>
+              {latest.length > 1 && (
+                <button className={secondaryBtn} onClick={copyLatest}>
+                  复制全部
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {latest.map((item) => (
+                <div
+                  key={`${item.role}-${item.code}`}
+                  className="rounded border border-[#cbb287] bg-[#efe1c2] p-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-clay-700/15 px-1.5 py-0.5 text-[11px] font-bold text-clay-700">
+                      {ROLE_LABEL[item.role]}
+                    </span>
+                    <button
+                      onClick={() => copyCode(item.code)}
+                      className="font-mono text-sm font-bold text-[#2a1c14] hover:underline"
+                      title="复制邀请码"
+                    >
+                      {item.code}
+                    </button>
+                    <button className={secondaryBtn} onClick={() => copyLink(item.code, item.role)}>
+                      复制链接
+                    </button>
+                    <button
+                      className={secondaryBtn}
+                      onClick={() => copyMessage(item.code, item.role)}
+                    >
+                      复制文案
+                    </button>
+                  </div>
+                  <div className="mt-2 break-all rounded bg-[#f8efd9] px-2 py-1.5 font-mono text-[11px] text-[#5b4632]">
+                    {inviteLink(item.code, item.role)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 列表 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -155,13 +303,15 @@ export default function InviteCodesModal({
                   key={c._id}
                   className={
                     'rounded border px-3 py-2 ' +
-                    (c.active ? 'border-[#cbb287] bg-[#efe1c2]' : 'border-[#d8cdb8] bg-[#e8ddc8] opacity-60')
+                    (c.active
+                      ? 'border-[#cbb287] bg-[#efe1c2]'
+                      : 'border-[#d8cdb8] bg-[#e8ddc8] opacity-60')
                   }
                 >
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => copy(c.code, c.role)}
-                      title="复制完整邀请文案"
+                      onClick={() => copyCode(c.code)}
+                      title="复制邀请码"
                       className="font-mono text-sm font-bold text-[#2a1c14] hover:underline"
                     >
                       {c.code}
@@ -180,6 +330,14 @@ export default function InviteCodesModal({
                       className="rounded bg-[#dcc89f] px-2 py-0.5 text-[11px] text-[#5b4632] hover:bg-[#d3bd8c]"
                     >
                       {c.active ? '停用' : '启用'}
+                    </button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button className={secondaryBtn} onClick={() => copyLink(c.code, c.role)}>
+                      复制链接
+                    </button>
+                    <button className={secondaryBtn} onClick={() => copyMessage(c.code, c.role)}>
+                      复制文案
                     </button>
                   </div>
                   {c.label && <div className="mt-1 text-[11px] text-[#6b5238]">{c.label}</div>}
