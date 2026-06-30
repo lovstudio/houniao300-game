@@ -86,6 +86,30 @@ export default function PlayerDetails({
     sameConversation &&
     playerStatus?.kind === 'participating' &&
     humanStatus?.kind === 'participating';
+  const isHuman = !!player.human;
+  const displayName = playerDescription?.name ?? '居民';
+  const isTalking = !!playerConversation;
+  const detailTag = isMe ? '你' : isHuman ? '真人玩家' : 'AI 居民';
+  const statusText = isMe
+    ? isTalking
+      ? '你正在一段对话里。想继续探索时，可以先离开对话。'
+      : '你正在沙城里漫步。靠近作品、空间或其他居民，就会出现可互动的入口。'
+    : isHuman
+      ? isTalking
+        ? inConversationWithMe
+          ? '你们正在面对面聊天。'
+          : '对方正在和别人交谈，稍后再打招呼会更自然。'
+        : '对方也在沙城现场。可以点地图靠近，或直接发起一次对话。'
+      : isTalking
+        ? inConversationWithMe
+          ? '这位 AI 居民正在和你对话。'
+          : '这位 AI 居民正在交谈中。'
+        : '这位 AI 居民正在沙城里游荡，随时可以被叫住。';
+  const detailText = isMe
+    ? '这是你在这座沙城里的化身。这里不需要自我介绍，重要的是你接下来要去哪里、和谁相遇、想留下什么。'
+    : isHuman
+      ? `${displayName} 和你一样，是正在这座沙城里移动的真人玩家。你看到的是对方此刻在场的化身，不是系统身份档案。`
+      : playerDescription?.description;
 
   const onStartConversation = async () => {
     if (!humanPlayer || !playerId) {
@@ -135,9 +159,12 @@ export default function PlayerDetails({
     <>
       <div className="flex gap-4">
         <div className="box w-3/4 sm:w-full mr-auto">
-          <h2 className="bg-[#e3d2ad] p-2 font-display text-2xl sm:text-4xl tracking-wider shadow-solid text-center">
-            {playerDescription?.name}
-          </h2>
+          <div className="bg-[#e3d2ad] p-3 shadow-solid text-center">
+            <div className="mb-1 text-[10px] font-bold tracking-[0.22em] text-[#9c4b34]">
+              {detailTag}
+            </div>
+            <h2 className="font-display text-2xl tracking-wider sm:text-4xl">{displayName}</h2>
+          </div>
         </div>
         <a
           className="button text-white shadow-solid text-2xl cursor-pointer pointer-events-auto"
@@ -154,7 +181,7 @@ export default function PlayerDetails({
           onClick={onStartConversation}
         >
           <div className={actionButtonInnerClass}>
-            <span>发起对话</span>
+            <span>{isHuman ? '打个招呼' : '发起对话'}</span>
           </div>
         </a>
       )}
@@ -211,14 +238,8 @@ export default function PlayerDetails({
       )}
       <div className="desc my-6">
         <p className="leading-tight -m-4 bg-[#e3d2ad] text-base sm:text-sm">
-          {!isMe && playerDescription?.description}
-          {isMe && <i>这就是你！</i>}
-          {!isMe && inConversationWithMe && (
-            <>
-              <br />
-              <br />(<i>正在和你对话！</i>)
-            </>
-          )}
+          <span className="block font-semibold text-[#9c4b34]">{statusText}</span>
+          {detailText && <span className="mt-3 block">{detailText}</span>}
         </p>
       </div>
       {!isMe && playerConversation && playerStatus?.kind === 'participating' && (
@@ -235,7 +256,7 @@ export default function PlayerDetails({
       {!playerConversation && previousConversation && (
         <>
           <div className="box flex-grow">
-            <h2 className="bg-[#e3d2ad] text-lg text-center">Previous conversation</h2>
+            <h2 className="bg-[#e3d2ad] text-lg text-center">上一次对话</h2>
           </div>
           <Messages
             worldId={worldId}
