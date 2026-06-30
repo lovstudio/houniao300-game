@@ -3,13 +3,14 @@ import { AgentDescription } from '../../convex/aiTown/agentDescription.ts';
 import { PlayerDescription } from '../../convex/aiTown/playerDescription.ts';
 import { World } from '../../convex/aiTown/world.ts';
 import { WorldMap } from '../../convex/aiTown/worldMap.ts';
-import { Id } from '../../convex/_generated/dataModel';
+import { Doc, Id } from '../../convex/_generated/dataModel';
 import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { parseMap } from '../../convex/util/object.ts';
 
 export type ServerGame = {
+  engine: Doc<'engines'>;
   world: World;
   playerDescriptions: Map<GameId<'players'>, PlayerDescription>;
   agentDescriptions: Map<GameId<'agents'>, AgentDescription>;
@@ -26,6 +27,7 @@ export function useServerGame(worldId: Id<'worlds'> | undefined): ServerGame | u
       return undefined;
     }
     return {
+      engine: worldState.engine,
       world: new World(worldState.world),
       agentDescriptions: parseMap(
         descriptions.agentDescriptions,

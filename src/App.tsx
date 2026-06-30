@@ -110,7 +110,7 @@ export default function Home() {
   const humanTokenIdentifier = useQuery(
     api.world.userStatus,
     activeWorldId ? { worldId: activeWorldId, userId } : 'skip',
-  ) ?? null;
+  );
 
   // 进入内场：取/建该内场的独立世界（含自有地图与 AI 居民），然后把客户端切过去。
   const enterInterior = useCallback(
@@ -371,6 +371,8 @@ export default function Home() {
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <Game
           userId={userId}
+          game={game}
+          humanTokenIdentifier={humanTokenIdentifier}
           worldId={activeWorldId}
           engineId={activeEngineId}
           interior={activeInterior}

@@ -6,7 +6,7 @@ import { PixiStaticMap, type MapMarker } from './PixiStaticMap.tsx';
 import PixiViewport, { viewportMinScale } from './PixiViewport.tsx';
 import { Viewport } from 'pixi-viewport';
 import { Id } from '../../convex/_generated/dataModel';
-import { useConvex, useQuery } from 'convex/react';
+import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api.js';
 import { useSendInput } from '../hooks/sendInput.ts';
 import { toastOnError } from '../toasts.ts';
@@ -211,6 +211,7 @@ export const PixiGame = (props: {
   engineId: Id<'engines'>;
   game: ServerGame;
   historicalTime: number | undefined;
+  humanTokenIdentifier?: string | null;
   width: number;
   height: number;
   controlMode: ControlMode;
@@ -233,10 +234,8 @@ export const PixiGame = (props: {
   const convex = useConvex();
   const viewportRef = useRef<Viewport | undefined>();
 
-  const humanTokenIdentifier =
-    useQuery(api.world.userStatus, { worldId: props.worldId, userId: props.userId }) ?? null;
   const humanPlayerId = [...props.game.world.players.values()].find(
-    (p) => p.human === humanTokenIdentifier,
+    (p) => p.human === props.humanTokenIdentifier,
   )?.id;
 
   const [ping, setPing] = useState<{ x: number; y: number; t: number } | null>(null);

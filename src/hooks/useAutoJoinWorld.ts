@@ -1,10 +1,10 @@
-import { useConvex, useMutation, useQuery } from 'convex/react';
+import { useConvex, useMutation } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { useEffect, useRef } from 'react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { waitForInput } from './sendInput';
-import { useServerGame } from './serverGame';
+import type { ServerGame } from './serverGame';
 import { toast } from 'react-toastify';
 
 // 沙之书 · 方案 A：打开即自动入场，无需点击；不提供「离开」。
@@ -12,12 +12,12 @@ import { toast } from 'react-toastify';
 // 若被服务端按空闲回收（HUMAN_IDLE_TOO_LONG），isPlaying 由 true→false，
 // effect 重新触发会自动再次入场——所以事实上离不开这本书。
 // （原先寄生在 InteractButton 里，现抽成纯逻辑 hook：入场是世界规则，不该是一个按钮。）
-export function useAutoJoinWorld(userId: string, worldId?: Id<'worlds'>): boolean {
-  const game = useServerGame(worldId);
-  const humanTokenIdentifier = useQuery(
-    api.world.userStatus,
-    worldId ? { worldId, userId } : 'skip',
-  );
+export function useAutoJoinWorld(
+  userId: string,
+  worldId: Id<'worlds'> | undefined,
+  game: ServerGame | undefined,
+  humanTokenIdentifier: string | null | undefined,
+): boolean {
   const userPlayerId =
     game && [...game.world.players.values()].find((p) => p.human === humanTokenIdentifier)?.id;
   const join = useMutation(api.world.joinWorld);

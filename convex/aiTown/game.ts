@@ -25,6 +25,7 @@ import { internal } from '../_generated/api';
 import { HistoricalObject } from '../engine/historicalObject';
 import { AgentDescription, serializedAgentDescription } from './agentDescription';
 import { parseMap, serializeMap } from '../util/object';
+import { STEP_INTERVAL, TICK } from '../constants';
 
 const gameState = v.object({
   world: v.object(serializedWorld),
@@ -44,8 +45,8 @@ const gameStateDiff = v.object({
 type GameStateDiff = Infer<typeof gameStateDiff>;
 
 export class Game extends AbstractGame {
-  tickDuration = 16;
-  stepDuration = 125;
+  tickDuration = TICK;
+  stepDuration = STEP_INTERVAL;
   maxTicksPerStep = 600;
   maxInputsPerStep = 32;
 

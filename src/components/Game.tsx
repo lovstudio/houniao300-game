@@ -22,7 +22,7 @@ import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
 import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
 import { DebugTimeManager } from './DebugTimeManager.tsx';
 import { GameId } from '../../convex/aiTown/ids.ts';
-import { useServerGame } from '../hooks/serverGame.ts';
+import type { ServerGame } from '../hooks/serverGame.ts';
 import { SHOW_DEBUG_UI, SHOW_DEV_TOOLS } from '../lib/debugSettings.ts';
 import { useSendInput } from '../hooks/sendInput.ts';
 import { toastOnError } from '../toasts.ts';
@@ -69,6 +69,8 @@ function NearbyList({
 
 export default function Game({
   userId,
+  game,
+  humanTokenIdentifier,
   worldId,
   engineId,
   interior,
@@ -89,6 +91,8 @@ export default function Game({
   onExitInterior,
 }: {
   userId: string;
+  game?: ServerGame;
+  humanTokenIdentifier?: string | null;
   // 当前激活世界：外部小镇=默认世界；进入内场时=该内场的独立世界。
   // 可能为 undefined（默认世界状态加载中）；下方守卫会拦截。
   worldId?: Id<'worlds'>;
@@ -147,13 +151,11 @@ export default function Game({
     return () => setPanelOpenHandler(null);
   }, []);
 
-  const game = useServerGame(worldId);
-
   // Send a periodic heartbeat to the active world to keep it alive.
   useWorldHeartbeat(worldId);
 
   // 打开即自动入场（方案 A）——入场是世界规则，不再是一个按钮。
-  useAutoJoinWorld(userId, worldId);
+  useAutoJoinWorld(userId, worldId, game, humanTokenIdentifier);
 
   // 作品（DB 唯一真相源）：地图标记与侧栏列表共用同一数据。
   const artworks = useQuery(api.artworks.list, worldId ? { worldId } : 'skip');
@@ -165,8 +167,7 @@ export default function Game({
   const readyKeys = useQuery(api.materials.readyKeys, {});
   const readyInteriorKeys = useMemo(() => readyKeys ?? [], [readyKeys]);
 
-  const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
-  const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
+  const { historicalTime, timeManager } = useHistoricalTime(game?.engine);
 
   // 传话器的 @ 候选：场上所有 AI 居民。
   const characters: Character[] = useMemo(() => {
@@ -220,6 +221,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                 <PixiGame
                   userId={userId}
                   game={game}
+                  humanTokenIdentifier={humanTokenIdentifier}
                   worldId={worldId}
                   engineId={engineId}
                   width={width}

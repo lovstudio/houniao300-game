@@ -105,10 +105,6 @@ export const userStatus = query({
     //   return null;
     // }
     // return identity.tokenIdentifier;
-    const world = await ctx.db.get(args.worldId);
-    if (!world) {
-      throw new ConvexError(`Invalid world ID: ${args.worldId}`);
-    }
     return args.userId;
   },
 });
