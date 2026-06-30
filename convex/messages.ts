@@ -11,7 +11,9 @@ export const listMessages = query({
   handler: async (ctx, args) => {
     const messages = await ctx.db
       .query('messages')
-      .withIndex('conversationId', (q) => q.eq('worldId', args.worldId).eq('conversationId', args.conversationId))
+      .withIndex('conversationId', (q) =>
+        q.eq('worldId', args.worldId).eq('conversationId', args.conversationId),
+      )
       .collect();
     const out = [];
     for (const message of messages) {
@@ -35,12 +37,14 @@ export const listRecentMessages = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const all = await ctx.db
-      .query('messages')
-      .withIndex('conversationId', (q) => q.eq('worldId', args.worldId))
-      .collect();
-    all.sort((a, b) => a._creationTime - b._creationTime);
-    const recent = all.slice(-(args.limit ?? 80));
+    const limit = Math.min(Math.max(args.limit ?? 80, 1), 200);
+    const recent = (
+      await ctx.db
+        .query('messages')
+        .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
+        .order('desc')
+        .take(limit)
+    ).reverse();
     const nameCache = new Map<string, string>();
     const out = [];
     for (const message of recent) {
@@ -48,9 +52,7 @@ export const listRecentMessages = query({
       if (!authorName) {
         const pd = await ctx.db
           .query('playerDescriptions')
-          .withIndex('worldId', (q) =>
-            q.eq('worldId', args.worldId).eq('playerId', message.author),
-          )
+          .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', message.author))
           .first();
         authorName = pd?.name ?? message.author;
         nameCache.set(message.author, authorName);
