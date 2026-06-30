@@ -1221,13 +1221,24 @@ function StateTab({
         <span className="h-px flex-1 bg-gradient-to-r from-[#cbb287] to-transparent" />
       </div>
       <div>
-        {/* 这里只标记 AI 居民与自己；其他真人仅保留在上方统计中。 */}
         {[...players]
-          .filter((p) => agentPlayerIds.has(p.id as string) || p.human === userId)
-          .sort((a, b) => Number(b.human === userId) - Number(a.human === userId))
+          .sort((a, b) => {
+            const aIsSelf = a.human === userId;
+            const bIsSelf = b.human === userId;
+            if (aIsSelf !== bIsSelf) return Number(bIsSelf) - Number(aIsSelf);
+
+            const aIsHuman = !!a.human;
+            const bIsHuman = !!b.human;
+            if (aIsHuman !== bIsHuman) return Number(bIsHuman) - Number(aIsHuman);
+
+            const aIsAgent = agentPlayerIds.has(a.id as string);
+            const bIsAgent = agentPlayerIds.has(b.id as string);
+            return Number(bIsAgent) - Number(aIsAgent);
+          })
           .map((p) => {
             const talking = inConvo.has(p.id as string);
             const isSelf = p.human === userId;
+            const isHuman = !!p.human;
             return (
               <button
                 key={p.id}
@@ -1256,6 +1267,11 @@ function StateTab({
                 {isSelf && (
                   <span className="shrink-0 rounded bg-[#1da76e] px-1.5 py-0.5 text-[10px] font-bold text-white">
                     自己
+                  </span>
+                )}
+                {!isSelf && isHuman && (
+                  <span className="shrink-0 rounded bg-[#9c4b34] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    真人
                   </span>
                 )}
                 <span
